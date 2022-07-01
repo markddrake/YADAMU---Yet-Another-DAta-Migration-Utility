@@ -143,7 +143,9 @@ class Yadamu extends _Yadamu {
   getCompareRules(rules) {
 	return {
       emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 
+    , minBigIntIsNull      : rules.MIN_BIGINT_IS_NULL 
     , doublePrecision      : rules.DOUBLE_PRECISION || 18
+    , numericScale     : rules.NUMERIC_SCALE || null
 	, spatialPrecision     : rules.SPATIAL_PRECISION || 18
 	, timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
 	, orderedJSON          : rules.hasOwnProperty("ORDERED_JSON") ? rules.ORDERED_JSON : false	

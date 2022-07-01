@@ -62,20 +62,20 @@ class MongoOutputManager extends YadamuOutputManager {
           break;
 		case this.dbi.DATA_TYPES.INTEGER_TYPE:
           return (col,idx) => {
-            return new Int32(col)
+            return new Int32(typeof col === 'string' ? col : col.toString())
 	      }		
     	case this.dbi.DATA_TYPES.DOUBLE_TYPE:
           return (col,idx) => {
-            return new Double(col)
+            return new Double(typeof col === 'string' ? col : col.toString())
 	      }		
 		case this.dbi.DATA_TYPES.MONGO_DECIMAL128_TYPE:
 		  return (col,idx) => {
 			 return Decimal128.fromString( typeof col === 'string' ? col : col.toString()) 
 	      }
           break;
-		case this.dbi.DATA_TYPES.MONGO_BIGINT_TYPE:
+		case this.dbi.DATA_TYPES.BIGINT_TYPE:
 		  return (col,idx) => {
-			 return Long.fromString(col)
+			 return Long.fromString(typeof col === 'string' ? col : col.toString())
 	      }
           break;
         case this.dbi.DATA_TYPES.SPATIAL_TYPE:
@@ -178,7 +178,7 @@ class MongoOutputManager extends YadamuOutputManager {
       case 'DOCUMENT' :
 	    this.batchRow = (row) => {
           if (Array.isArray(row[0])) {
-            this.batch.push({array : row[0]})
+            this.batch.push({yadamu : row[0]})
           }
           else {
             this.batch.push(row[0]);
@@ -227,7 +227,6 @@ class MongoOutputManager extends YadamuOutputManager {
   cacheRow(row) {
       
     // Apply the row transformation and add row to the current batch.
-	
 	this.rowTransformation(row)
 	this.batchRow(row)
     this.COPY_METRICS.cached++

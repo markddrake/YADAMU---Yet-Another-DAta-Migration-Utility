@@ -332,6 +332,9 @@ class YadamuWriter extends Writable {
 		if (this.skipTable) {
 	      throw err
 		}
+		else {
+          this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],err)
+		}
 	  }
 	}
     else {

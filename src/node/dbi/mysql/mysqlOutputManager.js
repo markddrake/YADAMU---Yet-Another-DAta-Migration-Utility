@@ -84,7 +84,8 @@ class MySQLOutputManager extends YadamuOutputManager {
             col = col.substring(0,10) + ' '  + (col.endsWith('Z') ? col.substring(11).slice(0,-1) : (col.endsWith('+00:00') ? col.substring(11).slice(0,-6) : col.substring(11)))
             // Truncate fractional values to 6 digit precision
             // ### Consider rounding, but what happens at '9999-12-31 23:59:59.999999
-            return col.substring(0,26);
+			// Avoid Trailing spaces - Warning 4096 Details: Delimiter ' ' in position 10 in datetime value '2011-03-03 ' at row 1 is superfluous and is deprecated. Please remove.
+            return col.substring(0,26).trim();
  		  }
  		  break;
  		case this.dbi.DATA_TYPES.FLOAT_TYPE:

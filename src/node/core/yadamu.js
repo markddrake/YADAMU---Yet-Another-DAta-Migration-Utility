@@ -1,4 +1,3 @@
-"use strict"
 
 import fs                     from 'fs';
 import path                   from 'path';
@@ -935,8 +934,12 @@ class Yadamu {
 	  results = this.metrics
 	  
 	} catch (e) {		
-  	  await source.destroy(e)
-	  await target.destroy(e)
+  	  if (!source.DESTROYED) {
+		await source.destroy(e)
+	  }
+  	  if (!target.DESTROYED) {
+	    await target.destroy(e)
+	  }
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       results = e;

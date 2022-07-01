@@ -148,6 +148,8 @@ class OracleOutputManager extends YadamuOutputManager {
             if (col instanceof Date) {
               col = col.toISOString()
             }
+			// col = col.endsWith('Z') ? col.slice(0,-1) : col
+			// col = col.endsWith('00:00') ? col.slice(0,-6) : col
             col = col.length   > 19 ? col.substring(0,19) : col
             col = col.length === 10 ? `${col}T00:00:00` : col
             col = col.length ===  8 ? `1970-01-01T${col}` : col
@@ -162,7 +164,8 @@ class OracleOutputManager extends YadamuOutputManager {
             // Avoid Javascript dates due to lost of precsion.
             // row[bindIdx] = new Date(Date.parse(col.endsWith('Z') ? col : col + 'Z'));
             if (typeof col === 'string') {
-              return (col.endsWith('Z') || col.endsWith('+00:00')) ? col : col + 'Z';
+		      const val = col.indexOf('T') < 0 ? `${col.substring(0,10)}T00:00:00.000000${col.substring(10)}` : col 
+              return (col.endsWith('Z') || col.endsWith('+00:00')) ? val : `${val}Z`;
             }
             if (col instanceof Date) {
               return col.toISOString()

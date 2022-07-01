@@ -83,7 +83,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     }    
 
     buildColumnLists(schemaMetadata,rules) {
-
+		
 	  const compareInfo = {}
 	  schemaMetadata.forEach((tableMetadata) => {
         compareInfo[tableMetadata.TABLE_NAME] = tableMetadata.DATA_TYPE_ARRAY.map((dataType,idx) => {
@@ -98,7 +98,11 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
             case this.DATA_TYPES.CLOB_TYPE :
 		      return rules.EMPTY_STRING_IS_NULL ? `case when "${columnName}" = '' then NULL else "${columnName}" end` : `"${columnName}"`
 		    case this.DATA_TYPES.DOUBLE_TYPE :
-              return rules.DOUBLE_PRECISION !== null ? `round("${columnName}",${rules.DOUBLE_PRECISION})` : `"${columnName}"`
+		      const columnClause = rules.DOUBLE_PRECISION !== null ? `round("${columnName}",${rules.DOUBLE_PRECISION})` : `"${columnName}"`
+			  return rules.INFINITY_IS_NULL ? `case when "${columnName}" = 'Inf' then NULL when "${columnName}" = '-Inf' then NULL when "${columnName}" <> "${columnName}" then NULL else ${columnClause} end` : columnClause
+		    case this.DATA_TYPES.NUMERIC_TYPE :
+		    case this.DATA_TYPES.DECIMAL_TYPE:
+              return ((rules.NUMERIC_SCALE !== null) && (rules.NUMERIC_SCALE < tableMetadata.SIZE_CONSTRAINT_ARRAY[idx][0])) ? `round("${columnName}",${rules.NUMERIC_SCALE})` : `"${columnName}"`
   		    case this.DATA_TYPES.GEOGRAPHY_TYPE :
             case this.DATA_TYPES.GEOMETRY_TYPE :
 		      return `case when YADAMU.invalidGeoHash("${columnName}") then ST_AsText("${columnName}") else ${rules.SPATIAL_PRECISION < 20 ? `ST_GeoHash("${columnName}" USING PARAMETERS NUMCHARS=${rules.SPATIAL_PRECISION})` : `ST_GeoHash("${columnName}")`} end`

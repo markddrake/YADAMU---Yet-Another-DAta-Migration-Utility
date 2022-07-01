@@ -30,6 +30,7 @@ select table_name, listagg(
                          'substr(to_char("' || column_name || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,${timeStampLength}) "' || column_name || '"'
                        ${rules.emptyStringIsNull ? `when data_type in ('TEXT','VARCHAR') then 'case when "' || column_name || '" = '''' then NULL else "' || column_name || '" end "' || column_name || '"'` : ''} 
                        ${rules.infinityIsNull ? `when data_type in ('FLOAT') then 'case when "' || column_name || '" in (''INF'',''-INF'',''NAN'') then NULL else "' || column_name || '"  end "' || column_name || '"'` : ''}
+                       ${rules.minBigIntIsNull ? `when data_type in ('BIGINT') 'case when "' || column_name || '" = -9223372036854775808  then NULL else "' || column_name || '" end "' || column_name || '"'` : ''} 
                        else 
                          '"' || column_name || '"'
                      end 

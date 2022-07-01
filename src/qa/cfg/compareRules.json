@@ -47,9 +47,29 @@
 		"mongodb": {
 			"oracle": 14,
 			"snowflake": 14
+		}
+	},
+	"NUMERIC_SCALE": {
+		"default": null,
+		"oracle" : {
+			"mssql" : 19
+		,   "snowflake" : 19
+		},
+		"postgres" : {
+			"mssql" : 19
+		,   "snowflake" : 19
+		},
+		"mysql" : {
+			"mssql" : 18
+		,   "snowflake" : 19
+		},
+        "mariadb" : {
+			"mssql" : 19
+		,   "snowflake" : 19
 		},
 		"vertica" : {
-			"default" : 14
+			"mssql" : 19
+		,   "snowflake" : 19
 		}
 	},
 	"SERIALIZED_JSON": {
@@ -74,11 +94,48 @@
 		},
 		"postgres": {
 			"oracle": true
-		},"snowflake": {
+		},
+		"snowflake": {
 			"oracle": true
 		},
 		"vertica": {
 			"oracle": true
+		},
+		"terdata": {
+			"oracle": true
+		},
+		"db2": {
+			"oracle": true
+		}
+	},
+	"MIN_BIGINT_IS_NULL": {
+		"default": false,
+		"mariadb": {
+			"vertica": true
+		},
+		"mongodb": {
+			"vertica": true
+		},
+		"mssql": {
+			"vertica": true
+		},
+		"mysql": {
+			"vertica": true
+		},
+		"postgres": {
+			"vertica": true
+		},
+		"snowflake": {
+			"vertica": true
+		},
+		"vertica": {
+			"vertica": true
+		},
+		"terdata": {
+			"vertica": true
+		},
+		"db2": {
+			"vertica": true
 		}
 	},
 	"INFINITY_IS_NULL": {
@@ -87,23 +144,32 @@
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
+		, "db2": true
 		},
 		"oracle": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
+		, "db2": true
 		},
 		"mongodb": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
+		, "db2": true
 		},
 		"snowflake": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
+		, "db2": true
+		},
+		"vertica": {
+	      "mariadb": true
+		, "mssql": true
+		, "mysql": true
+		, "db2": true
 		}
-
 	},
 	"ORDERED_JSON": {
 		"default": false,
@@ -132,6 +198,7 @@
         , "snowflake": {
 		    "VARIANT"  : "SNOWFLAKE_VARIANT"
 		}
+		,  "db2"       : "STRIP_XML_DECLARATION"
 	  }
 	, "oracle#11.2": {
 		"mssql"      : "SERIALIZE_AS_BLOB"
@@ -145,9 +212,10 @@
       , "snowflake": {
 	      "VARIANT"  : "SNOWFLAKE_VARIANT"
         }
-	  }
+	,  "db2"       : "STRIP_XML_DECLARATION"
+    }
 	, "vertica": {
-        "mssql": "DECODE_AND_STRIP_DECLARATION"
+        "mssql": "STRIP_XML_DECLARATION"
 	  }
 	}
   , "OBJECTS_COMPARISON_RULE": {

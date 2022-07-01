@@ -1006,7 +1006,14 @@ $END
 			 end
            when TARGET_DATA_TYPE = 'BOOLEAN' then
              P_BOOLEAN_DATA_TYPE
-           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then
+		   when (TARGET_DATA_TYPE like '% TIME ZONE') then
+		     case
+			   when DATA_TYPE_LENGTH is not NULL then
+			     replace(TARGET_DATA_TYPE,'TIMESTAMP','TIMESTAMP(' || DATA_TYPE_LENGTH || ')')
+			   else
+                 TARGET_DATA_TYPE
+			 end
+           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE LIKE '%(%)') then
              TARGET_DATA_TYPE
 		   when (TARGET_DATA_TYPE = 'NUMBER') and (DATA_TYPE_LENGTH > 38) then
              TARGET_DATA_TYPE		   

@@ -88,10 +88,10 @@ class YadamuOutputManager extends Transform {
     await this.dbi.cacheLoaded
     // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'PROCESSING')
     this.tableInfo = this.dbi.getTableInfo(tableName)
-    this.initializeBatchCache() 
-    this.batch = await this.nextBatch()
 	this.skipTable = this.dbi.MODE === 'DDL_ONLY';	
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
+    this.initializeBatchCache() 
+    this.batch = await this.nextBatch()
   }
      
   generateTransformations(dataTypes) {

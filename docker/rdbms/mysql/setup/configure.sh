@@ -6,7 +6,7 @@ apt-get install -y wget
 curl https://repo.mysql.com//mysql-apt-config_0.8.22-1_all.deb >  mysql-apt-config_0.8.22-1_all.deb
 export DEBIAN_FRONTEND="noninteractive";
 dpkg -i mysql-apt-config*.deb
-apt-get update
+apt-get update  --allow-unauthenticated  
 apt-get install -y mysql-shell
 export STAGE=/var/lib/mysql/stage
 cd $STAGE

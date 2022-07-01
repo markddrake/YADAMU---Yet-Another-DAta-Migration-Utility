@@ -1,0 +1,32 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "connections.json"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "parameters"                        : {
+    "DIRECTORY"                       : "export/json/%location%"
+  }
+, "tests" : [{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "db2#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "db2#1"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "db2#1"
+  , "target": "db2#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

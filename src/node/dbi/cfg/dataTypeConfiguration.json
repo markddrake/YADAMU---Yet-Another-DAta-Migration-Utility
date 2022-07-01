@@ -46,6 +46,9 @@
 	"Yugabyte": {
 	  "class" : "../postgres/postgresDataTypes.js"
 	, "file": "src/node/dbi/yugabyte/yugabyteTypeMappings.json"
+	},
+	"Cockroach": {
+	  "class" : "../postgres/postgresDataTypes.js"
+	, "file": "src/node/dbi/postgres/postgresTypeMappings.json"
 	}
-
 }

@@ -1,6 +1,6 @@
 class CSVLibrary {
 
-  static getCSVTransformation(col,isLastColumn) {
+  static getCSVTransformation(col,isLastColumn,dataType) {
 
     switch (typeof col) {
 	  case "number":
@@ -89,7 +89,7 @@ class CSVLibrary {
 	}
   }	 
   
-  static getCSVTransformations(batch) {
+  static getCSVTransformations(batch,dataTypes) {
 
     // RFC4180
 
@@ -98,7 +98,7 @@ class CSVLibrary {
 	const lastIdx = batch[0].length - 1
 	return batch[0].map((col,colIdx) => {
        const lastColumn = colIdx === lastIdx
-	   return col !== null ? this.getCSVTransformation(col,lastColumn) : this.getCSVTransformation(batch[batch.findIndex((row) => {return row[colIdx] !== null})]?.[colIdx],lastColumn)
+	   return col !== null ? this.getCSVTransformation(col,lastColumn,dataTypes[colIdx].toLowerCase()) : this.getCSVTransformation(batch[batch.findIndex((row) => {return row[colIdx] !== null})]?.[colIdx],lastColumn,dataTypes[colIdx].toLowerCase())
 	})
   }
 

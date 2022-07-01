@@ -612,8 +612,9 @@ class PostgresDBI extends YadamuDBI {
   async getSchemaMetadata() {
     
 	const options = {
-	  "circleAsPolygon"    : this.INBOUND_CIRCLE_FORMAT === 'POLYGON',
-	  "calculateByteaSize" : true
+	  "circleAsPolygon"    : this.INBOUND_CIRCLE_FORMAT === 'POLYGON'
+	, "calculateByteaSize" : true
+	, "postgisInstalled"   : this.POSTGIS_INSTALLED
 	}
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,options])

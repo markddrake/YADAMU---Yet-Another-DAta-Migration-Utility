@@ -292,6 +292,7 @@ as
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
   V_DOUBLE_PRECISION    NUMBER         := case when JSON_EXISTS(P_RULES, '$.doublePrecision')    then JSON_VALUE(P_RULES, '$.doublePrecision')       else NULL end;
+  V_NUMERIC_SCALE   NUMBER             := case when JSON_EXISTS(P_RULES, '$.numericScale')       then JSON_VALUE(P_RULES, '$.numericScale')          else NULL end;
   V_TIMESTAMP_PRECISION NUMBER         := case when JSON_EXISTS(P_RULES, '$.timestampPrecision') then JSON_VALUE(P_RULES, '$.timestampPrecision')    else 9 end; 
   V_ORDERED_JSON        BOOLEAN        := case when JSON_EXISTS(P_RULES, '$.orderedJSON')        then JSON_VALUE(P_RULES, '$.orderedJSON') = 'true'  else FALSE end; 
   V_XML_RULE            VARCHAR2(128)  := case when JSON_EXISTS(P_RULES, '$.xmlRule')            then JSON_VALUE(P_RULES, '$.xmlRule')               else NULL end;
@@ -302,13 +303,14 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 $ELSE
 --
   V_RULES                XMLTYPE       := XMLTYPE(P_RULES);
-  V_DOUBLE_PRECISION     NUMBER        := case when V_RULES.EXISTSNODE('/rules/doublePrecision')    = 1 then V_RULES.extract('/rules/doublePrecision/text()').getStringVal()       else NULL end;
-  V_TIMESTAMP_PRECISION  NUMBER        := case when V_RULES.EXISTSNODE('/rules/timestampPrecision') = 1 then V_RULES.extract('/rules/timestampPrecision/text()').getNumberVal()    else 9 end; 
-  V_ORDERED_JSON         BOOLEAN       := case when V_RULES.EXISTSNODE('/rules/orderedJSON')        = 1 then V_RULES.extract('/rules/orderedJSON/text()').getStringVal() = 'true'  else FALSE end; 
-  V_XML_RULE             VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/xmlRule/text()')     = 1 then V_RULES.extract('/rules/xmlRule/text()').getStringVal()               else NULL end;
-  V_OBJECTS_RULE         VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/objectsRule')        = 1 then V_RULES.extract('/rules/objectsRule/text()').getStringVal()           else 'SKIP' end;
-  V_EXCLUDE_MVIEWS       VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/excludeMViews')      = 1 then UPPER(V_RULES.extract('/rules/excludeMViews/text()').getStringVal())  else 'TRUE' end;
-  V_INFINITY_IS_NULL     VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/infinityIsNull')     = 1 then UPPER(V_RULES.extract('/rules/infinityIsNull/text()').getStringVal()) else 'FALSE' end;
+  V_DOUBLE_PRECISION     NUMBER        := case when V_RULES.EXISTSNODE('/rules[number(doublePrecision) = doublePrecision]')       = 1 then V_RULES.extract('/rules/doublePrecision/text()').getNumberVal()       else NULL end;
+  V_NUMERIC_SCALE        NUMBER        := case when V_RULES.EXISTSNODE('/rules[number(numericScale) = numericScale]')             = 1 then V_RULES.extract('/rules/numericScale/text()').getNumberVal()          else NULL end;
+  V_TIMESTAMP_PRECISION  NUMBER        := case when V_RULES.EXISTSNODE('/rules[number(timestampPrecision) = timestampPrecision]') = 1 then V_RULES.extract('/rules/timestampPrecision/text()').getNumberVal()    else 9 end; 
+  V_ORDERED_JSON         BOOLEAN       := case when V_RULES.EXISTSNODE('/rules/orderedJSON')                                      = 1 then V_RULES.extract('/rules/orderedJSON/text()').getStringVal() = 'true'  else FALSE end; 
+  V_XML_RULE             VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/xmlRule/text()')                                   = 1 then V_RULES.extract('/rules/xmlRule/text()').getStringVal()               else NULL end;
+  V_OBJECTS_RULE         VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/objectsRule')                                      = 1 then V_RULES.extract('/rules/objectsRule/text()').getStringVal()           else 'SKIP' end;
+  V_EXCLUDE_MVIEWS       VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/excludeMViews')                                    = 1 then UPPER(V_RULES.extract('/rules/excludeMViews/text()').getStringVal())  else 'TRUE' end;
+  V_INFINITY_IS_NULL     VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/infinityIsNull')                                   = 1 then UPPER(V_RULES.extract('/rules/infinityIsNull/text()').getStringVal()) else 'FALSE' end;
 --
 $END  
   
@@ -342,6 +344,13 @@ $END
 					   '"' || atc.COLUMN_NAME || '"'
 				   end
                end
+			 when (atc.DATA_TYPE in ('NUMBER')) then
+			   case 
+				 when (((DATA_SCALE is NULL) and (V_NUMERIC_SCALE is not NULL)) or (V_NUMERIC_SCALE < DATA_SCALE)) then
+				   'round(t."' || atc.COLUMN_NAME || '",' || V_NUMERIC_SCALE || ') "' || atc.COLUMN_NAME || '"'
+                 else 			 		  
+				   '"' || atc.COLUMN_NAME || '"'
+			   end
              when atc.DATA_TYPE = 'BFILE' then
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE(t."' || atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
 		     when (atc.DATA_TYPE = 'SDO_GEOMETRY') then

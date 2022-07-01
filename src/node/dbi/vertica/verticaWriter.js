@@ -49,7 +49,7 @@ class VerticaWriter extends YadamuWriter {
  
   async writeBatchAsCSV(filename,batch) {
     const sw = new StringWriter();
-    const csvTransformations = CSVLibrary.getCSVTransformations(batch)
+    const csvTransformations = CSVLibrary.getCSVTransformations(batch,this.tableInfo.targetDataTypes)
     CSVLibrary.writeBatchAsCSV(sw,batch,csvTransformations)
     let stack
     try {
@@ -128,12 +128,9 @@ class VerticaWriter extends YadamuWriter {
      }
   }
   
-  addOperator(arg,operator) {
-
-     if ((arg.length > 65000) && (operator.prefix.indexOf('(HEX_TO_BINARY(') > -1)) {
-       operator.prefix = operator.prefix.replace('(HEX_TO_BINARY(','(YADAMU.LONG_HEX_TO_BINARY(')
-     }
-     return `${operator.prefix}${this.addArgument(arg)}${operator.suffix}`
+  addInsertOperator(arg,operator) {
+     const prefix = ((arg.length > 65000) && (operator.prefix.indexOf('(HEX_TO_BINARY(') > -1)) ? operator.prefix.replace('(HEX_TO_BINARY(','(YADAMU.LONG_HEX_TO_BINARY(') : operator.prefix
+     return `${prefix}${this.addArgument(arg)}${operator.suffix}`
   }
   
   async _writeBatch(batch,rowCount) {
@@ -224,7 +221,7 @@ class VerticaWriter extends YadamuWriter {
       for (const row in batch.insert) {
         try {
           await this.dbi.createSavePoint();
-          const sqlStatement = `${this.tableInfo.dml} (${batch.insert[row].map((col,idx) => {return ((col === null) || (this.tableInfo.insertOperators[idx] === null)) ? this.addArgument(col) : this.addOperator(col,this.tableInfo.insertOperators[idx])}).join(",")})`
+          const sqlStatement = `${this.tableInfo.dml} (${batch.insert[row].map((col,idx) => {return ((col === null) || (this.tableInfo.insertOperators[idx] === null)) ? this.addArgument(col) : this.addInsertOperator(col,this.tableInfo.insertOperators[idx])}).join(",")})`
           let results = await this.dbi.executeSQL(sqlStatement);
           await this.dbi.releaseSavePoint();
           this.adjustRowCounts(1);

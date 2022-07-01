@@ -1,11 +1,9 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                           from 'perf_hooks';
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuWriter from '../base/yadamuWriter.js';
-import {BatchInsertError} from '../../core/yadamuException.js'
+import YadamuWriter         from '../base/yadamuWriter.js';
 
 class ExampleWriter extends YadamuWriter {
 
@@ -42,19 +40,29 @@ class ExampleWriter extends YadamuWriter {
       }
     }
 
+    let insertCount = rowCount
+    this.dbi.SQL_TRACE.enable()
+
     for (const row in batch) {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,batch[row]);
    	    this.adjustRowCounts(1)
+        this.dbi.SQL_TRACE.disable()
       } catch (cause) {
+        this.dbi.SQL_TRACE.comment(`Previous Statement repeated ${row} times.`)
+        this.dbi.SQL_TRACE.enable()
         const errInfo = {}
         this.handleIterativeError(`INSERT ONE`,cause,row,batch[row],errInfo);
         if (this.skipTable) {
+		  let insertCont = row
           break;
         }
       }
     }     
    
+    this.dbi.SQL_TRACE.enable()
+    this.dbi.SQL_TRACE.comment(`Previous Statement repeated ${insertCount} times.`)
+
     this.endTime = performance.now();
     this.releaseBatch(batch)
     return this.skipTable     

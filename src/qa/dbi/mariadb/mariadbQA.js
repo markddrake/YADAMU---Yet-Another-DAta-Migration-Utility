@@ -57,6 +57,7 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
       }
 
       const compareRules =  JSON.stringify(this.yadamu.getCompareRules(rules))
+
       let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])
 
       const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})

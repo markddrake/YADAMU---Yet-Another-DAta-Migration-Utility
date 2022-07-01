@@ -8,7 +8,7 @@ class MsSQLParser extends YadamuParser {
   
     return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 	  switch (dataType) {
-		 case 'xml':
+		 case this.dbi.DATA_TYPES.XML_TYPE:
 		   // Replace Entities for Non-Breaking space with ' ' and New Line with `\n' 
 		   // Potential Problem with document centric XML ? 
 		   // Issue with XML declaration

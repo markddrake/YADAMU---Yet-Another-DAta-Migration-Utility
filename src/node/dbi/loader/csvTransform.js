@@ -1,7 +1,6 @@
-"use strict" 
 
-import YadamuParser from '../base/yadamuParser.js'
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import YadamuParser           from '../base/yadamuParser.js'
+import YadamuDataTypes        from '../base/yadamuDataTypes.js'
 
 class CSVTransform extends YadamuParser {
 
@@ -10,7 +9,7 @@ class CSVTransform extends YadamuParser {
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
-      if (YadamuLibrary.isBinaryType(dataType)) {
+      if (YadamuDataTypes.isBinary(dataType)) {
         return (row,idx) =>  {
   		  row[idx] = Buffer.from(row[idx],'hex')
 		}

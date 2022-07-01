@@ -136,7 +136,23 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     classFactory(yadamu) {
       return new MsSQLQA(yadamu,this,this.connectionParameters,this.parameters)
     }
+	
+	/*
        
+    async bulkInsert(bulkOperation) {
+	  
+	  this.batchNumber = this.batchNumber ? this.batchNumber + 1  : 1
+	  if (this.batchNumber === 5) {
+	    this.yadamu.killConfiguration = {delay: 1100}
+	    const pid = await this.getConnectionID();
+        await this.manager.scheduleTermination(pid,this.getWorkerNumber())
+	  }
+	  await super.bulkInsert(bulkOperation)
+	}
+	  
+
+    */
+	
     async scheduleTermination(pid,workerId) {
       const tags = this.getTerminationTags(workerId,pid)
       this.yadamuLogger.qa(tags,`Termination Scheduled.`);

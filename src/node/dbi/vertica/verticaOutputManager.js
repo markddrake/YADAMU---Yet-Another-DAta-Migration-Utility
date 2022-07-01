@@ -200,6 +200,12 @@ class VerticaOutputManager extends YadamuOutputManager {
           return (col,idx) => {
 		    return this.toSQLIntervalYM(col)
 		  }
+		/*
+		case this.dbi.DATA_TYPES.INTEGER_TYPE:
+		  return (col,idx) => {
+		    return col.toString()
+		  }
+		*/
 		default:
 	      return null
       }
@@ -230,8 +236,12 @@ class VerticaOutputManager extends YadamuOutputManager {
 	      // COPY seems to cause EMPTY Strings to become NULL
 	      if (row[idx].length === 0) {
 			emptyStringList.push(idx)
-		    // throw new WhitespaceIssue(this.tableInfo.columnNames[idx])
-	      }
+		  }
+		  else {
+			if (row[idx].trim().length === 0) {
+		      throw new WhitespaceIssue(this.tableInfo.columnNames[idx])
+	        }
+		  }
         }
 	  })
       if (emptyStringList.length > 0) {
@@ -257,7 +267,7 @@ class VerticaOutputManager extends YadamuOutputManager {
 	  return this.skipTable
 	} catch (cause) {
 	  if (cause instanceof EmptyStringDetected) {
-		const emptyStringKey= cause.emptyStringList.join('-')
+		const emptyStringKey = cause.emptyStringList.join('-')
 		this.batch[emptyStringKey] = this.batch[emptyStringKey] || []
 		this.batch[emptyStringKey].push(row)
 	    this.COPY_METRICS.cached++

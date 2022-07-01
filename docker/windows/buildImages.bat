@@ -25,4 +25,4 @@ docker build -t yadamu/oracle:11.2.0.4           --file=c:\Docker\Build\YADAMU\o
 docker build -t yadamu/oracle:11.2.0.1           --file=c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.1\dockerfile   c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.1
 						               								           
 docker build -t yadamu/postgres:14              --file=c:\Docker\Build\YADAMU\postgres\windows\14\dockerfile       c:\Docker\Build\YADAMU\postgres\windows\14
-
+docker build -t yadamu/db2                      --file=C:\Docker\Build\YADAMU\DB2\linux\dockerfile                 C:\Docker\Build\YADAMU\DB2\linux

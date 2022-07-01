@@ -48,10 +48,7 @@ class MsSQLWriter extends YadamuWriter {
         // Reminder Report Batch Error throws cause if there are lost rows
 		this.reportBatchError(batch,`INSERT MANY`,cause)
 	    await this.dbi.restoreSavePoint(cause);
-		if (this.dbi.TEDIOUS_TRANSACTION_ISSUE) {
-		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
-		  await this.dbi.recoverTransactionState(true)
-		}	
+		await this.dbi.verifyTransactionState()
 	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative';
       }
@@ -72,6 +69,7 @@ class MsSQLWriter extends YadamuWriter {
     }	
 	
 	this.dbi.SQL_TRACE.enable()
+	let insertCount = rowCount
 
     for (const row in batch.rows) {
       try {
@@ -83,19 +81,17 @@ class MsSQLWriter extends YadamuWriter {
 		this.adjustRowCounts(1)
         this.dbi.SQL_TRACE.disable()
       } catch (cause) {
-		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.TEDIOUS_TRANSACTION_ISSUE) {
-		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
-		  await this.dbi.recoverTransactionState(true)
-		}	
+		await this.dbi.verifyTransactionState()
         this.handleIterativeError(`INSERT ONE`,cause,row,batch.rows[row]);
         if (this.skipTable) {
+		  this.insertCount = row
           break;
 		}
       }
     }       
 
-    this.dbi.SQL_TRACE.comment(`Previous Statement repeated ${rowCount} times.`)
     this.dbi.SQL_TRACE.enable()
+    this.dbi.SQL_TRACE.comment(`Statement executed ${insertCount} times.`)
 
 	await this.dbi.clearCachedStatement();   
     this.endTime = performance.now();

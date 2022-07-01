@@ -534,6 +534,10 @@ class VerticaDBI extends YadamuDBI {
 	  case this.DATA_TYPES.GEOGRAPHY_TYPE:
 	    // TODO : Support Text / GeoJSON
 	    return `ST_AsBinary("${columnInfo[2]}") "${columnInfo[2]}"` 
+	  case this.DATA_TYPES.DOUBLE_TYPE:
+	  case this.DATA_TYPES.DOUBLE_TYPE:
+	    // return `case when to_char("${columnInfo[2]}") <> "${columnInfo[2]}" then YADAMU.RENDER_FLOAT("${columnInfo[2]}") else to_char("${columnInfo[2]}") end "${columnInfo[2]}"` 
+	    return `YADAMU.RENDER_FLOAT("${columnInfo[2]}") "${columnInfo[2]}"` 
 	  default:
 	    return `"${columnInfo[2]}"`
     }

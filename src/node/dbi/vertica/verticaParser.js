@@ -26,6 +26,11 @@ class VerticaParser extends YadamuParser {
 		  return (row,idx) => {
 		    row[idx] = typeof row[idx] === 'string' ? row[idx].replace(/(\.0*|(?<=(\..*))0*)$/, '') : row[idx]
 		  }
+		case this.dbi.DATA_TYPES.DOUBLE_TYPE:
+		  // Trim excessive insiginicant zeros resulting from mapping for unbounded numbers
+		  return (row,idx) => {
+		    row[idx] = Number(row[idx]).toExponential(17)
+		  }
 		default:
 		  return null;
       }
@@ -35,6 +40,7 @@ class VerticaParser extends YadamuParser {
   constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
     super(dbi,queryInfo,yadamuLogger,parseDelay)    
   }
+  
 }
 
 export { VerticaParser as default }

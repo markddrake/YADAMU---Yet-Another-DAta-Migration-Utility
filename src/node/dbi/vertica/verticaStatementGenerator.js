@@ -10,9 +10,12 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   get TABLE_LOB_COUNT()         { return this._TABLE_LOB_COUNT }
   set TABLE_LOB_COUNT(v)        { this._TABLE_LOB_COUNT = v }
   
-  get MAX_POOL_USAGE()          { return 55*1024*1024 }
+  //  get MAX_POOL_USAGE()          { return 55*1024*1024 }
   
   set TABLE_UNUSED_BYTES(v)     { this._TABLE_UNUSED_BYTES = v }
+  
+  get GENERAL_POOL_LIMIT()      { return this._GENERAL_POOL_LIMIT }
+  set GENERAL_POOL_LIMIT(v)     { this._GENERAL_POOL_LIMIT = v }
   
   get TABLE_LOB_LIMIT()          { 
     const  allocatedSize = Math.floor(this._TABLE_UNUSED_BYTES / (this._TABLE_LOB_COUNT || 1)) 
@@ -22,19 +25,13 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
-
-  adjustCharacterSizing(dataType,sizeConstraint) {
-   
-    // Disable byte length adjustment for CHAR as this leads to issues related to blank padding.
-   
-    if (dataType !== this.dbi.DATA_TYPES.CHAR_TYPE) {
-      // Vertica's CHAR/VARCHAR Size Constraint is size in bytes. Adjust size from other vendors to accomodate multi-byte characters by applying user controllable Fudge Factor. What percentage of the content requires more than one byte to store.      
-      let length = sizeConstraint[0] || this.dbi.DATA_TYPES.LOB_LENGTH
-      length = this.SOURCE_VENDOR === this.dbi.DATABASE_VENDOR ? length :  Math.ceil(length * this.dbi.BYTE_TO_CHAR_RATIO);
-      length = length > this.dbi.DATA_TYPES.LOB_LENGTH ?  this.dbi.DATA_TYPES.LOB_LENGTH : length
-      sizeConstraint[0] = length		
-	}
-  }
+  
+  async init() {
+    // Set it to the value of the resolved promise..
+    super.init();
+	const results = await this.dbi.executeSQL(`SELECT min(memory_size_kb) FROM resource_pool_status WHERE pool_name='general'`)
+	this.GENERAL_POOL_LIMIT = results.rows[0][0]
+  }  
   
   generateDDLStatement(schema,tableName,columnDefinitions,targetDataTypes) {
 	  
@@ -167,7 +164,6 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 	
     let insertMode = 'Copy';
-	
 	// console.log(tableMetadata)
     
 	const insertOperators       = []
@@ -188,14 +184,23 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 	  let checkConstraint = ''
 	  
 	  switch (targetDataType) {
+        // Disable byte length adjustment for CHAR as this leads to issues related to blank padding.
+     	// case this.dbi.DATA_TYPES.CHAR_TYPE:
+     	case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+           // Vertica's CHAR/VARCHAR Size Constraint is size in bytes. Adjust size from other vendors to accomodate multi-byte characters by applying user controllable Fudge Factor. What percentage of the content requires more than one byte to store.      
+		   sizeConstraints[idx][0] = (this.dbi.DATABASE_VENDOR === this.SOURCE_VENDOR) ? sizeConstraints[idx][0] : Math.ceil(sizeConstraints[idx][0] * this.dbi.BYTE_TO_CHAR_RATIO)
+		   if (sizeConstraints[idx][0] > this.dbi.DATA_TYPES.VARCHAR_LENGTH) {
+		     columnDataTypes[idx] = this.dbi.DATA_TYPES.CLOB_TYPE
+	       }			 
+		   break
 		 case this.dbi.DATA_TYPES.XML_TYPE:
 		   columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
-		   sizeConstraints[idx][0] = this.dbi.DATA_TYPES.LOB_LENGTH
+		   sizeConstraints[idx][0] = (this.dbi.DATABASE_VENDOR === this.SOURCE_VENDOR) ? sizeConstraints[idx][0] : this.dbi.DATA_TYPES.LOB_LENGTH
            checkConstraint = `check(YADAMU.IS_XML("${columnName}"))`
 		   break;
 		case this.dbi.DATA_TYPES.JSON_TYPE:
 		   columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
-		   sizeConstraints[idx][0] = this.dbi.DATA_TYPES.LOB_LENGTH
+		   sizeConstraints[idx][0] = (this.dbi.DATABASE_VENDOR === this.SOURCE_VENDOR) ? sizeConstraints[idx][0] : this.dbi.DATA_TYPES.LOB_LENGTH
            checkConstraint = `check(YADAMU.IS_JSON("${columnName}"))`
 		   break;
 		case this.dbi.DATA_TYPES.CLOB_TYPE:
@@ -205,6 +210,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 		default:
 	  }
 	  
+	  let columnFunction  = ''
 	  const columnDefinition = YadamuDataTypes.decomposeDataType(columnDataTypes[idx])
 	  
 	  switch (columnDefinition.type) {
@@ -231,7 +237,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
                // copyColumnDefinitions[idx] = `"${columnName}" FORMAT 'HEX'`
           }
           insertOperators[idx] = {
-            prefix:   ''
+            prefix:   'x'
           , suffix:   `::${columnDefinition.type.toUpperCase()}(${length})`
           }
           break
@@ -324,6 +330,13 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
           , suffix:   ' as TIME)'
           }
           break;
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+          copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast(SUBSTR("YADAMU_COL_${column_suffix}",1,26) as TIMESTAMP)`
+          insertOperators[idx] = { 
+            prefix:   ''
+          , suffix:   ''
+          }
+          break;
         case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
           copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast("YADAMU_COL_${column_suffix}" as TIME WITH TIME ZONE)`
           insertOperators[idx] = { 
@@ -332,14 +345,16 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
           }
           break;
         case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
-          copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(64), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS INTERVAL DAY TO SECOND)`
+		  columnFunction = tableMetadata.dataFile ? `CAST(YADAMU.PARSE_ISO8601_INTERVAL("YADAMU_COL_${column_suffix}") AS INTERVAL DAY TO SECOND) ` : ` CAST("YADAMU_COL_${column_suffix}" AS INTERVAL DAY TO SECOND)`
+          copyColumnDefinitions[idx] =  `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(64), "${columnName}" as ${columnFunction}`
           insertOperators[idx] = { 
             prefix:   'cast('
           , suffix:   ' as INTERVAL DAY TO SECOND)'
           }
           break;
         case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
-          copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(64), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS INTERVAL YEAR TO MONTH)`
+		  columnFunction = tableMetadata.dataFile ? `CAST(YADAMU.PARSE_ISO8601_INTERVAL("YADAMU_COL_${column_suffix}") AS INTERVAL YEAR TO MONTH) ` : ` CAST("YADAMU_COL_${column_suffix}" AS INTERVAL YEAR TO MONTH)`
+          copyColumnDefinitions[idx] =  `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(64), "${columnName}" as ${columnFunction}`
           insertOperators[idx] = { 
             prefix:   'cast('
           , suffix:   ' as INTERVAL YEAR TO MONTH)'
@@ -358,27 +373,32 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
       return `"${columnName}" ${this.generateStorageClause(columnDataTypes[idx],sizeConstraints[idx])}${checkConstraint ? ` ${checkConstraint}`:  ''}`
     })
 
+
     this.dbi.applyDataTypeMappings(tableMetadata.tableName,tableMetadata.columnNames,targetDataTypes,this.dbi.IDENTIFIER_MAPPINGS,true)
 	
 	// Check Row Size and adjust as necessary
 	
-    const lobList = []
-	let bytesUsed = this.calculateFixedRowSize(columnDataTypes,sizeConstraints,lobList)
-	// console.log(tableMetadata.tableName,bytesUsed,lobList.length)
-	if (bytesUsed > this.dbi.DATA_TYPES.ROW_SIZE) {
-	  this.adjustLobSizes(tableMetadata.tableName,bytesUsed,lobList,columnDefinitions,copyColumnDefinitions,sizeConstraints)
+	if (this.dbi.DATABASE_VENDOR !== tableMetadata.vendor) {
+      const lobList = []
+	  let bytesUsed = this.calculateFixedRowSize(columnDataTypes,sizeConstraints,lobList)
+	  // console.log(tableMetadata,bytesUsed,lobList.length)
+	  if (bytesUsed > this.dbi.DATA_TYPES.ROW_SIZE) {
+  	    this.adjustLobSizes(tableMetadata.tableName,bytesUsed,lobList,columnDefinitions,copyColumnDefinitions,sizeConstraints)
+	  }
+
+      // Vertica Raises out of Memory if copy buffer is > 55M ?
+	
 	}
 
-    // Vertica Raises out of Memory if copy buffer is > 55M ?
-	
-	if (poolUsage > this.MAX_POOL_USAGE) {
-	  const poolAllowed = Math.floor(this.MAX_POOL_USAGE / lobList.length)
-	  copyColumnDefinitions.forEach((copyColumnDefinition,idx) => {
-        if (columnDefinitions[idx].indexOf(`" ${this.dbi.DATA_TYPES.BLOB_TYPE}`) > 0) {
-  		  copyColumnDefinitions[idx] = copyColumnDefinitions[idx].replace(/\(\d*?\)/,`(${poolAllowed})`)
-        } 
-      })
-	}
+	if (poolUsage > this.GENERAL_POOL_LIMIT) {
+	    const longBinaryColumns = copyColumnDefinitions.filter((colDef) => {return colDef.includes('YADAMU.LONG_HEX_TO_BINARY')})
+	    const poolAllowed = Math.floor(this.GENERAL_POOL_LIMIT / longBinaryColumns.length)
+	    copyColumnDefinitions.forEach((copyColumnDefinition,idx) => {
+          if (columnDefinitions[idx].indexOf(`" ${this.dbi.DATA_TYPES.BLOB_TYPE}`) > 0) {
+            copyColumnDefinitions[idx] = copyColumnDefinitions[idx].replace(/\(\d*?\)/,`(${poolAllowed})`)
+          } 
+        })
+	  }
 
     // All remote paths must use POSIX/Linux seperators (Vertica does not run on MS-Windows)
 
@@ -411,7 +431,6 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     }
     
     // Add Support for Copy based Operations
-    
     return tableInfo
   }
 

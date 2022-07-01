@@ -23,10 +23,10 @@ values(
   -32768,
   -2147483648,
   -9223372036854775808,
-  12356789.123456789,
-  12356789.123456789,
-  1.17549e-38,
-  2.22507e-308,
+  -12356789.123456789,
+  -12356789.123456789,
+  -3.4028234663852886e+38,
+  -1.7976931348623158e+308,
   -92233720368547758.08,
   DEFAULT,
   DEFAULT,
@@ -40,14 +40,145 @@ values(
   9223372036854775807,
   12356789.123456789,
   12356789.123456789,
-  3.4028235e+38,
-  1.79769e308,
+  3.4028234663852886e+38,
+  1.7976931348623158e+308,
   92233720368547758.07,
   DEFAULT,
   DEFAULT,
   DEFAULT
 );
 --
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  -1.1754943508222875e-38,
+  -2.2250738585072014e-308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  1.1754943508222875e-38,
+  2.2250738585072014e-308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  1.0/3.0,
+  1.0/3.0,
+  1.0/3.0,
+  1.0/3.0,
+  1.0/3.0,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  sqrt(2),
+  sqrt(2),
+  sqrt(2),
+  sqrt(2),
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  pi(),
+  pi(),
+  pi(),
+  pi(),
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  exp(1.0),
+  exp(1.0),
+  exp(1.0),
+  exp(1.0),
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  NULL, 
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  'Infinity',
+  'Infinity',
+  NULL,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  NULL, 
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  '-Infinity',
+  '-Infinity',
+  NULL,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  NULL, 
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  'NaN',
+  'NaN',
+  NULL,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
 insert into t_postgres.numeric_types 
 values(
   -32768,
@@ -55,114 +186,9 @@ values(
   null,
   null,
   null,
-  1.0/3.0,
-  1.0/3.0,
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  -2147483648,
   null,
   null,
   null,
-  pi(),
-  pi(),
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  null,
-  -9223372036854775808,
-  null,
-  null,
-  sqrt(2),
-  sqrt(2),
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  null,
-  null,
-  12356789.123456789,
-  null,
-  null,
-  null,
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  null,
-  null,
-  null,
-  12356789.123456789,
-  null,
-  null,
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  null,
-  null,
-  null,
-  null,
-  1.17549e-38,
-  null,
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-  2.22507e-308,
-  null,
-  DEFAULT,
-  DEFAULT,
-  DEFAULT
-);
---
-insert into t_postgres.numeric_types 
-values(
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-  -92233720368547758.08,
   DEFAULT,
   DEFAULT,
   DEFAULT
@@ -175,8 +201,22 @@ values(
   null,
   null,
   null,
-  exp(1.0),
-  exp(1.0),
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+insert into t_postgres.numeric_types 
+values(
+  null,
+  -2147483648,
+  null,
+  null,
+  null,
+  null,
+  null,
   null,
   DEFAULT,
   DEFAULT,
@@ -185,9 +225,23 @@ values(
 --
 insert into t_postgres.numeric_types 
 values(
-  null, 
+  null,
   2147483647,
   null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  -9223372036854775808,
   null,
   null,
   null,
@@ -212,6 +266,20 @@ values(
   DEFAULT,
   DEFAULT
 );
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  -12356789.123456789,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
 --
 insert into t_postgres.numeric_types 
 values(
@@ -227,6 +295,20 @@ values(
   DEFAULT,
   DEFAULT
 );
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  -12356789.123456789,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
 --
 insert into t_postgres.numeric_types 
 values(
@@ -242,6 +324,20 @@ values(
   DEFAULT,
   DEFAULT
 );
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  -3.4028234663852886e+38,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
 --
 insert into t_postgres.numeric_types 
 values(
@@ -250,7 +346,36 @@ values(
   null,
   null,
   null,
-  3.4028235e+38,
+  3.4028234663852886e+38,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  -1.1754943508222875e-38,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  1.1754943508222875e-38,
   null,
   null,
   DEFAULT,
@@ -266,7 +391,52 @@ values(
   null,
   null,
   null,
-  1.79769e308,
+  -1.7976931348623158e+308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  1.7976931348623158e+308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  -2.2250738585072014e-308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  2.2250738585072014e-308,
   null,
   DEFAULT,
   DEFAULT,
@@ -282,7 +452,7 @@ values(
   null,
   null,
   null,
-  92233720368547758.07,
+  -92233720368547758.08,
   DEFAULT,
   DEFAULT,
   DEFAULT
@@ -290,14 +460,14 @@ values(
 --
 insert into t_postgres.numeric_types 
 values(
-  NULL, 
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  'Infinity',
-  'Infinity',
-  NULL,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
   DEFAULT,
   DEFAULT,
   DEFAULT
@@ -305,14 +475,14 @@ values(
 --
 insert into t_postgres.numeric_types 
 values(
-  NULL, 
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  '-Infinity',
-  '-Infinity',
-  NULL,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
   DEFAULT,
   DEFAULT,
   DEFAULT
@@ -320,14 +490,45 @@ values(
 --
 insert into t_postgres.numeric_types 
 values(
-  NULL, 
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  'NaN',
-  'NaN',
-  NULL,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+--
+insert into t_postgres.numeric_types 
+values(
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  100,
+  100,
+  100,
+  100,
+  100,
+  100,
+  100,
+  100,
   DEFAULT,
   DEFAULT,
   DEFAULT

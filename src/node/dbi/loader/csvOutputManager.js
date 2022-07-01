@@ -27,11 +27,11 @@ class CSVOutputManager extends JSONOutputManager {
 
     // Construct CSV Transformation Rules Incrementatlly (Row by Row). Transformations are defined basded on the first non-null column.
     // Once all columns have been processed this function beomes a No-op.
-
-    this.pendingTransformations = this.pendingTransformations.flatMap((idx) => {
+    
+	this.pendingTransformations = this.pendingTransformations.flatMap((idx) => {
 	  if (row[idx] !== null) {
-        this.csvTransformations[idx] = CSVLibrary.getCSVTransformation(row[idx],(idx === row.length-1)) 
-	    return []
+        this.csvTransformations[idx] = CSVLibrary.getCSVTransformation(row[idx],(idx === row.length-1),this.tableInfo.targetDataTypes[idx].toLowerCase())
+		return []
 	  }
 	  return [idx]
 	})

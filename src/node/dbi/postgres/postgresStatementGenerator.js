@@ -59,98 +59,84 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 			case this.dbi.DATA_TYPES.POINT_TYPE:
 			case this.dbi.DATA_TYPES.PATH_TYPE:
 			case this.dbi.DATA_TYPES.POLYGON_TYPE:
-              switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
-                case "WKB":
-                  return `ST_GeomFromWKB($%)::${dataTypeDefinition.type}`
-                  break;
-                case "EWKB":
-                  return `ST_GeomFromEWKB($%)::${dataTypeDefinition.type}`
-                  break;
-                case "WKT":
-                  return `ST_GeomFromText($%)::${dataTypeDefinition.type}`
-                  break;
-                case "EWKT":
-                  return `ST_GeomFromEWKT($%)::${dataTypeDefinition.type}`
-                  break;
-                case "GeoJSON":
-                  return `ST_GeomFromGeoJSON($%)::${dataTypeDefinition.type}`
-                  break;
-				case "Native":
-                  return '$%';		
-                default:
-                  return `$%::${dataTypeDefinition.type}`
-              }
+			  if (this.dbi.POSTGIS_INSTALLED) {
+                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                  case "WKB":
+                    return `ST_GeomFromWKB($%)::${dataTypeDefinition.type}`
+                  case "EWKB":
+                    return `ST_GeomFromEWKB($%)::${dataTypeDefinition.type}`
+                  case "WKT":
+                    return `ST_GeomFromText($%)::${dataTypeDefinition.type}`
+                  case "EWKT":
+                    return `ST_GeomFromEWKT($%)::${dataTypeDefinition.type}`
+                  case "GeoJSON":
+                    return `ST_GeomFromGeoJSON($%)::${dataTypeDefinition.type}`
+                  default:
+                    return `$%::${dataTypeDefinition.type}`
+				}  
+			  }
+			  return '$%';
 			case this.dbi.DATA_TYPES.PGSQL_CIRCLE_TYPE:
 			  switch (this.dbi.INBOUND_CIRCLE_FORMAT) {
 			    case "CIRCLE":
 				  return `YADAMU_AsCircle($%)`
 				default:
-                  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
-                    case "WKB":
-                      return `${dataTypeDefinition.type}(ST_GeomFromWKB($%)::polygon)`
-                      break;
-                    case "EWKB":
-                      return `${dataTypeDefinition.type}(ST_GeomFromEWKB($%)::polygon)`
-                      break;
-                    case "WKT":
-                      return `${dataTypeDefinition.type}(ST_GeomFromText($%)::polygon)`
-                      break;
-                    case "EWKT":
-                      return `${dataTypeDefinition.type}(ST_GeomFromEWKT($%)::polygon)`
-                      break;
-                    case "GeoJSON":
-                      return `${dataTypeDefinition.type}(ST_GeomFromGeoJSON($%)::polygon)`
-                      break;
-				    case "Native":
-                      return '$%';		
-                    default:
-			          return `$%::${dataTypeDefinition.type}`
-                  }
+    			  if (this.dbi.POSTGIS_INSTALLED) {
+                    switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                      case "WKB":
+                        return `${dataTypeDefinition.type}(ST_GeomFromWKB($%)::polygon)`
+                      case "EWKB":
+                        return `${dataTypeDefinition.type}(ST_GeomFromEWKB($%)::polygon)`
+                      case "WKT":
+                        return `${dataTypeDefinition.type}(ST_GeomFromText($%)::polygon)`
+                      case "EWKT":
+                        return `${dataTypeDefinition.type}(ST_GeomFromEWKT($%)::polygon)`
+                      case "GeoJSON":
+                        return `${dataTypeDefinition.type}(ST_GeomFromGeoJSON($%)::polygon)`
+  				      case "Native":
+                        return '$%';		
+                      default:
+			            return `$%::${dataTypeDefinition.type}`
+                    }
+				 }
 		      }
+			  return '$%';		  
 			case this.dbi.DATA_TYPES.BOX_TYPE:
-              switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
-                case "WKB":
-                  return `${dataTypeDefinition.type}(ST_GeomFromWKB($%)::polygon)`
-                  break;
-                case "EWKB":
-                  return `${dataTypeDefinition.type}(ST_GeomFromEWKB($%)::polygon)`
-                  break;
-                case "WKT":
-                  return `${dataTypeDefinition.type}(ST_GeomFromText($%)::polygon)`
-                  break;
-                case "EWKT":
-                  return `${dataTypeDefinition.type}(ST_GeomFromEWKT($%)::polygon)`
-                  break;
-                case "GeoJSON":
-                  return `${dataTypeDefinition.type}(ST_GeomFromGeoJSON($%)::polygon)`
-                  break;
-				case "Native":
-                  return '$%';		
-                default:
-			      return `$%::${dataTypeDefinition.type}`
-              }
+  			  if (this.dbi.POSTGIS_INSTALLED) {
+                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                  case "WKB":
+                    return `${dataTypeDefinition.type}(ST_GeomFromWKB($%)::polygon)`
+                  case "EWKB":
+                    return `${dataTypeDefinition.type}(ST_GeomFromEWKB($%)::polygon)`
+                  case "WKT":
+                    return `${dataTypeDefinition.type}(ST_GeomFromText($%)::polygon)`
+                  case "EWKT":
+                    return `${dataTypeDefinition.type}(ST_GeomFromEWKT($%)::polygon)`
+                  case "GeoJSON":
+                    return `${dataTypeDefinition.type}(ST_GeomFromGeoJSON($%)::polygon)`
+                  default:
+			        return `$%::${dataTypeDefinition.type}`
+                }
+			  }
+			  return '$%';		  
 			case this.dbi.DATA_TYPES.LINE_TYPE:
-              switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
-                case "WKB":
-                  return `YADAMU_AsLSeg(ST_GeomFromWKB($%)::path)`
-                  break;
-                case "EWKB":
-                  return `YADAMU_AsLSeg(ST_GeomFromEWKB($%)::path)`
-                  break;
-                case "WKT":
-                  return `YADAMU_AsLSeg(ST_GeomFromText($%)::path)`
-                  break;
-                case "EWKT":
-                  return `YADAMU_AsLSeg(ST_GeomFromEWKT($%)::path)`
-                  break;
-                case "GeoJSON":
-                  return `YADAMU_AsLSeg(ST_GeomFromGeoJSON($%)::path)`
-                  break;
-				case "Native":
-                  return '$%';		
-                default:
-                  return `$%::lseg`
-              }
+  			  if (this.dbi.POSTGIS_INSTALLED) {
+                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                  case "WKB":
+                    return `YADAMU_AsLSeg(ST_GeomFromWKB($%)::path)`
+                  case "EWKB":
+                    return `YADAMU_AsLSeg(ST_GeomFromEWKB($%)::path)`
+                  case "WKT":
+                    return `YADAMU_AsLSeg(ST_GeomFromText($%)::path)`
+                  case "EWKT":
+                    return `YADAMU_AsLSeg(ST_GeomFromEWKT($%)::path)`
+                  case "GeoJSON":
+                    return `YADAMU_AsLSeg(ST_GeomFromGeoJSON($%)::path)`
+                  default:
+                    return `$%::lseg`
+                }
+			  }
+			  return '$%';		  
 			case this.dbi.DATA_TYPES.PGSQL_LINE_EQ_TYPE:
 			  return `YADAMU_AsLine($%)`
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_INT4_TYPE:

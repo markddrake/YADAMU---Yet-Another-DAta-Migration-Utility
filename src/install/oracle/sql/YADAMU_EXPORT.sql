@@ -415,7 +415,9 @@ $END
                  /*
                  ** Higher Precision representation of the FLOAT and DOUBLE
                  */
-                 when atc.DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT') then
+                 when atc.DATA_TYPE in ('BINARY_FLOAT') then
+                   'TO_CHAR(CAST("' || atc.COLUMN_NAME || '" as BINARY_DOUBLE))'
+                 when atc.DATA_TYPE in ('BINARY_DOUBLE') then
                    'TO_CHAR("' || atc.COLUMN_NAME || '")'
                  /*
                  ** Quick Fixes for datatypes not natively supported by NODE.js Driver

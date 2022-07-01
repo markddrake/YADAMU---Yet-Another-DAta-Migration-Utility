@@ -68,7 +68,7 @@ class MySQLWriter extends YadamuWriter {
   
   async _writeBatch(batch,rowCount) {     
 
-    // console.log(batch[0])
+    // console.log(rowCount,batch)
 
 	// this.yadamuLogger.trace([this.constructor.name,'_writeBatch',this.tableName,this.tableInfo.insertMode,this.COPY_METRICS.batchNumber,rowCount,batch.length],'Start')    
 	
@@ -98,7 +98,7 @@ class MySQLWriter extends YadamuWriter {
           try {
             await this.dbi.createSavePoint();    
             const multiRowInsert = `${this.tableInfo.dml} ${new Array(rowCount).fill(this.tableInfo.rowConstructor).join(',')}`
-            const results = await this.dbi.executeSQL(multiRowInsert,batch);
+            const results = await this.dbi.executeSQL(multiRowInsert,batch.flat());
             await this.processWarnings(results,null);
             this.endTime = performance.now();
             await this.dbi.releaseSavePoint();

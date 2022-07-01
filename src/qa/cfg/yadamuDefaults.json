@@ -24,7 +24,10 @@
 		"mariadb": "../dbi/mariadb/mariadbQA.js",
 		"mongodb": "../dbi/mongodb/mongoQA.js",
 		"snowflake": "../dbi/snowflake/snowflakeQA.js",
-		"teradata": "../dbi/teradata/worker/teradataQA.js"
+		"teradata": "../dbi/teradata/worker/teradataQA.js",
+		"yugabyte": "../dbi/yugabyte/yugabyteQA.js",
+		"cockroach": "../dbi/cockroach/cockroachQA.js"
+
 	},
 	"mongodb": {
 		"MONGO_PARSE_STRINGS" : false
@@ -50,6 +53,9 @@
 	  "BYTE_TO_CHAR_RATIO" : 1.5
 	},
    	"redshift": {
+	  "BYTE_TO_CHAR_RATIO" : 1.5
+	},
+   	"db2": {
 	  "BYTE_TO_CHAR_RATIO" : 1.5
 	}
 }

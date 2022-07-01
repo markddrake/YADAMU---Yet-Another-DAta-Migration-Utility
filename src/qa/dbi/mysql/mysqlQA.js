@@ -52,7 +52,7 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
     // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
 
 	async finalizeImport() {
-	  await setTimeout(1000);
+	  await setTimeout(2500);
 	  super.finalizeImport()
     }
 	

@@ -43,7 +43,7 @@ class SnowflakeStatementLibrary {
                                when c.data_type in ('GEOMETRY','GEOGRAPHY') then
 							     concat('${this.dbi.SPATIAL_SERIALIZER}("',column_name,'")')
 							   when c.data_type in ('FLOAT','FLOAT4','FLOAT8','DOUBLE','DOUBLE PRECISION','REAL') then
-							     concat('TO_VARCHAR("',column_name,'",''TME'') "',column_name,'"')
+							     concat('YADAMU_SYSTEM.PUBLIC.RENDER_FLOAT("',column_name,'") "',column_name,'"')
                                else
                                  concat('"',column_name,'"')
                                end

@@ -77,7 +77,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
       compareRules.excludeMViews = ((rules.OPERATION  !== 'DBROUNDTRIP') && (rules.MODE === 'DATA_ONLY'))
    	  
 	  compareRules = this.JSON_PARSING_SUPPORTED ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
-	  
+
 	  const args = {
 		P_SOURCE_SCHEMA        : source.schema,
 		P_TARGET_SCHEMA        : target.schema,

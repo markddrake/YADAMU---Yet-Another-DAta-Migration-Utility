@@ -5,8 +5,8 @@
 , "recreateSchema"                    : true
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
-, "parameters"                      : {
-    "DIRECTORY"                     : "export/json/%location%"
+, "parameters"                        : {
+    "DIRECTORY"                       : "export/json/%location%"
   }
 , "tests" : [{
 	"operation" : "import"

@@ -495,6 +495,7 @@ begin
   declare @SQLERRM      nvarchar(2000);
 
   declare @EMPTY_STRING_IS_NULL BIT           = case when JSON_VALUE(@RULES,'$.emptyStringIsNull') = 'true' then 1 else 0 end;
+  declare @MIN_BIGINT_IS_NULL   BIT           = case when JSON_VALUE(@RULES,'$.minBigIntIsNull') = 'true' then 1 else 0 end;
   declare @TIMESTAMP_PRECISION  INT           = JSON_VALUE(@RULES,'$.timestampPrecision'); 
                                                                    
   declare @SPATIAL_PRECISION    INT           = JSON_VALUE(@RULES,'$.spatialPrecision');
@@ -513,6 +514,13 @@ begin
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @TIMESTAMP_PRECISION)) then
                        -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@TIMESTAMP_PRECISION,')) "',c.COLUMN_NAME,'"')
                         concat('convert(datetime2(',@TIMESTAMP_PRECISION,'),convert(varchar(',@TIMESTAMP_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
+                      when c.DATA_TYPE in ('bigint') then
+                        case 
+                          when @MIN_BIGINT_IS_NULL = 1 then
+                            concat('case when "',c.COLUMN_NAME,'" = -9223372036854775808 then NULL else "',c.COLUMN_NAME,'" end "',c.COLUMN_NAME,'"')
+                          else
+                            concat('"',c.COLUMN_NAME,'"')
+                        end
                       when c.DATA_TYPE in ('varchar','nvarchar') then
                         case 
                           when @EMPTY_STRING_IS_NULL = 1 then

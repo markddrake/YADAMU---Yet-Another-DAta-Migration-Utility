@@ -198,9 +198,11 @@ DELIMITER $$
 --
 CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_COMPARE_RULES JSON)
 BEGIN
-  declare V_MAP_EMPTY_STRING_TO_NULL BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.emptyStringIsNull' returning DECIMAL) = 1;
+  declare V_EMPTY_STRING_IS_NULL     BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.emptyStringIsNull' returning DECIMAL) = 1;
+  declare V_MIN_BIGINT_IS_NULL       BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.minBigIntIsNull' returning DECIMAL) = 1;
   declare V_SPATIAL_PRECISION        INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.spatialPrecision');
   declare V_DOUBLE_PRECISION         INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.doublePrecision');
+  declare V_NUMERIC_SCALE            INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.numericScale');
   declare V_ORDERED_JSON             BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.orderedJSON' returning DECIMAL) = 1;
 
   declare TABLE_NOT_FOUND CONDITION for 1146; 
@@ -242,8 +244,22 @@ BEGIN
                           concat('cast(concat(''["'',replace("',column_name,'",'','',''","''),''"]'') as json)') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
-                            when V_MAP_EMPTY_STRING_TO_NULL then
+                            when V_EMPTY_STRING_IS_NULL then
                               concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        when data_type in ('bigint') then
+                          case
+                            when V_MIN_BIGINT_IS_NULL then
+                              concat('case when "',column_name,'" = -9223372036854775808 then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        when data_type in ('decimal') then
+                          case
+                            when (V_NUMERIC_SCALE is not NULL) and (V_NUMERIC_SCALE < numeric_scale) then
+                               concat('round("',column_name,'",',V_NUMERIC_SCALE,')')
                             else 
                               concat('"',column_name,'"') 
                           end 
@@ -264,8 +280,22 @@ BEGIN
                           concat('hex("',column_name,'")') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
-                            when V_MAP_EMPTY_STRING_TO_NULL then
+                            when V_EMPTY_STRING_IS_NULL then
                               concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        when data_type in ('bigint') then
+                          case
+                            when V_MIN_BIGINT_IS_NULL then
+                              concat('case when "',column_name,'" = -9223372036854775808 then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        when data_type in ('decimal') then
+                          case
+                            when (V_NUMERIC_SCALE is not NULL) and (V_NUMERIC_SCALE < numeric_scale) then
+                               concat('round("',column_name,'",',V_NUMERIC_SCALE,')')
                             else 
                               concat('"',column_name,'"') 
                           end 

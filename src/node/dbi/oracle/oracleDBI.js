@@ -368,8 +368,8 @@ class OracleDBI extends YadamuDBI {
 
   async closePool(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool instanceof oracledb.Pool) },${(this.pool.status === oracledb.POOL_STATUS_OPEN)},${options.drainTime})`)
-
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closePool(${(this.pool instanceof oracledb.Pool) },${(this.pool.status === oracledb.POOL_STATUS_OPEN)},${options.drainTime})`)
+	
     if ((this.pool instanceof oracledb.Pool) && (this.pool.status === oracledb.POOL_STATUS_OPEN)) {
       let stack;
       try {
@@ -386,7 +386,9 @@ class OracleDBI extends YadamuDBI {
         this.pool = undefined
 	    throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.Pool.close()'))
       }
-    }
+    
+	}
+	
   }
   
   async createLob(lobType) {

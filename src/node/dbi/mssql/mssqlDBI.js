@@ -3,7 +3,7 @@ import fs                             from 'fs';
 
 import {
   setTimeout 
-}                             from "timers/promises"
+}                                     from "timers/promises"
 
 import { 
   performance 
@@ -207,33 +207,30 @@ class MsSQLDBI extends YadamuDBI {
     const e = new Error(`Unexpected ${operation} operation`)
     this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
   }
-  
+
   getTransactionManager() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.getTransactionManager()`,this.getWorkerNumber()],``)
 
     this.TRANSACTION_IN_PROGRESS = false;
     const transaction = new sql.Transaction(this.pool)
-    transaction.on('rollback',async () => { 
+    transaction.on('rollback',() => { 
       if (!this.EXPECTED_ROLLBACK) {
         this.TEDIOUS_TRANSACTION_ISSUE = true;
         this.reportTransactionState('ROLLBACK')
-        await this.recoverTransactionState(false)
       }
     })
     return transaction
   }
   
-  async recoverTransactionState(newTransaction) {
-	await this.request.cancel()
-	this.transaction = this.getTransactionManager()
-    if (newTransaction) {
-	  // Error Recovery if Rows are lost
-	  //
+  async verifyTransactionState() {
+    if (this.TEDIOUS_TRANSACTION_ISSUE) {
+  	  await this.request.cancel()
+	  this.transaction = this.getTransactionManager()
       await this.beginTransaction()
-	}
+    }
   }
-
+  
   getRequest() {
     let stack
     try {
@@ -968,7 +965,7 @@ class MsSQLDBI extends YadamuDBI {
     
     while (true) {
       // Exit with result or exception.  
-      try {
+      try {		
         const sqlStartTime = performance.now()
         stack = new Error().stack
         const request = this.getRequest()
@@ -982,9 +979,10 @@ class MsSQLDBI extends YadamuDBI {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'BULK INSERT')
+		  await this.verifyTransactionState()
           continue		  
         }
-		throw this.trackExceptions(cause)
+		throw cause
       }      
     } 
   }

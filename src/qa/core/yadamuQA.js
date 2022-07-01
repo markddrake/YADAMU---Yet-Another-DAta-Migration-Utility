@@ -96,6 +96,7 @@ class YadamuQA {
   get STAGING_AREA()                              { return this.test.hasOwnProperty('stagingArea') ? this.test.stagingArea : this.configuration.hasOwnProperty('stagingArea') ? this.configuration.stagingArea : undefined }
   get RELOAD_STAGING_AREA()                       { return this.test.hasOwnProperty('reloadStagingArea') ? this.test.reloadStagingArea : this.configuration.hasOwnProperty('reloadStagingArea') ? this.configuration.reloadStagingArea : false }
   get EMPTY_STRING_IS_NULL()                      { return this.test.hasOwnProperty('emptyStringIsNull') ? this.test.emptyStringIsNull : this.configuration.hasOwnProperty('emptyStringIsNull') ? this.configuration.emptyStringIsNull : undefined }
+  get MIN_BIGINT_IS_NULL()                        { return this.test.hasOwnProperty('minBigEntIsNull') ? this.test.minBigEntIsNull : this.configuration.hasOwnProperty('minBigEntIsNull') ? this.configuration.minBigEntIsNull : undefined }
   get SKIP_DATA_STAGING()                         { return this.test.hasOwnProperty('skipDataStaging') ? this.test.skipDataStaging : this.configuration.hasOwnProperty('skipDataStaging') ? this.configuration.skipDataStaging : false }
   
   get EXPORT_PATH()                               { return this.test.exportPath || this.configuration.exportPath || '' }
@@ -389,16 +390,19 @@ class YadamuQA {
     Object.assign(compareRules, Yadamu.COMPARE_RULES[versionSpecificKey] || {})
   
     Object.assign(compareRules, this.getDefaultValue('DOUBLE_PRECISION',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+    Object.assign(compareRules, this.getDefaultValue('NUMERIC_SCALE',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('SPATIAL_PRECISION',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('ORDERED_JSON',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('SERIALIZED_JSON',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('EMPTY_STRING_IS_NULL',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+    Object.assign(compareRules, this.getDefaultValue('MIN_BIGINT_IS_NULL',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('OBJECTS_COMPARISON_RULE',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 
     Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (compareParameters.INFINITY_MANAGEMENT === 'NULLIFY')
     
     compareRules.EMPTY_STRING_IS_NULL = this.EMPTY_STRING_IS_NULL !== undefined ? this.EMPTY_STRING_IS_NULL : compareRules.EMPTY_STRING_IS_NULL 
+    compareRules.MIN_BIGINT_IS_NULL = this.MIN_BIGINT_IS_NULL !== undefined ? this.MIN_BIGINT_IS_NULL : compareRules.MIN_BIGINT_IS_NULL 
     
 	compareRules.DLL_COMPATBILITY = ((sourceVendor === targetVendor) && (sourceVersion <= targetVersion))
     
@@ -417,12 +421,20 @@ class YadamuQA {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Double precision limited to ${compareRules.DOUBLE_PRECISION} digits`);
     }
     
+    if (compareRules.NUMERIC_SCALE !== null) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Numeric scale restricted to ${compareRules.NUMERIC_SCALE} digits`);
+    }
+
     if (compareRules.SPATIAL_PRECISION !== 18) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Spatial precision limited to ${compareRules.SPATIAL_PRECISION} digits`);
     }
     
     if (compareRules.EMPTY_STRING_IS_NULL === true) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Empty Strings treated as NULL`);
+    }
+    
+    if (compareRules.MIN_BIGINT_IS_NULL === true) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Minimum (Most Negative) BIGINT value treated as NULL`);
     }
     
     if (compareRules.INFINITY_IS_NULL === true) {
@@ -1249,8 +1261,8 @@ class YadamuQA {
     compareParameters.XML_STORAGE_OPTION = sourceDBI.DATA_TYPES?.storageOptions?.XML_TYPE
     const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
     const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, keyMetrics, false, identifierMappings)
-    this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
-	this.metrics.recordFailed(compareResults.failed.length || 0)
+	this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
+	this.metrics.recordFailed(compareResults.failed?.length || 0)
     this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
     const elapsedTime =  performance.now() - taskStartTime
     this.metrics.recordTaskTimings([task.taskName,'TOTAL','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])

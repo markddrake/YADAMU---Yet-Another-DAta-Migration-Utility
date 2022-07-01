@@ -380,13 +380,13 @@ begin
                                    when P_SPATIAL_FORMAT = 'WKB' then
                                      'case when "' || column_name || '" is NULL then NULL else ST_AsBinary(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsText((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsText(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry)) end "' || COLUMN_NAME || '"'
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'YadamuJSON' then
 								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
                                    else
@@ -433,6 +433,8 @@ begin
 							     end  
                                when (c.data_type in ('int4range','int8range','numrange','tsrange','tstzrange','daterange','tsvector')) then
                                  'YADAMU_AsJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+							   when (c.data_type in ('real')) then 
+     					         '"' || column_name || '"::double precision "' || COLUMN_NAME || '"'
                                else
                                  '"' || column_name || '"'
                              end,

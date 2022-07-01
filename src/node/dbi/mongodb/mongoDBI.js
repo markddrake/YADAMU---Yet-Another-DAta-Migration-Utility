@@ -43,7 +43,7 @@ import MongoStatementGenerator       from './mongoStatementGenerator.js'
 **  DOCUMENT: The source material must consist of a single JSON Object. 
 **            The export format is still an array of arrays. The Array representing each row will have one member which must be valid JSON. e.g. "CollectionName" : [[JSON],[{JSON}]]
 **            If the JSON is an object the object becomes the mongo document.
-**            If the JSON is a scalar or an array then then a mongo document with a single key of "yadamuValue" will be inserted. The JSON will be the value assocoated with yadamuValue
+**            If the JSON is a scalar or an array then then a mongo document with a single key of "yadamu" will be inserted. The JSON will be the value assocoated with yadamuValue
 **            ### ToDo : Allow name of key to be supplied by user
 **  
 **  OBJECT:   The source material consists of a one or more non-JSON columns, or more than one JSON column

@@ -1,0 +1,48 @@
+{
+  "mappings": {
+	"CHAR_TYPE"                                            : "CHAR"  
+  ,	"VARCHAR_TYPE"                                         : "VARCHAR"  
+  , "NCHAR_TYPE"                                           : "GRAPHIC"
+  , "NVARCHAR_TYPE"                                        : "VARGRAPHIC"
+  , "NUMERIC_TYPE"                                         : "NUMERIC"                                                          
+  , "DECIMAL_TYPE"                                         : "DECIMAL"                                                          
+  , "FLOAT_TYPE"                                           : "REAL"                                                   
+  , "DOUBLE_TYPE"                                          : "DOUBLE"                                                   
+  , "SMALLINt_TYPE"                                        : "SMALLINT"                                                   
+  , "INTEGER_TYPE"                                         : "INTEGER"                                                   
+  , "BIGINT_TYPE"                                          : "BIGINT"                                                   
+  , "BINARY_TYPE"                                          : "BINARY"                                                        
+  , "VARBINARY_TYPE"                                       : "VARBINARY"                                                        
+  , "DATE_TYPE"                                            : "DATE"                                                       
+  , "TIME_TYPE"                                            : "TIME"                                                       
+  , "TIMESTAMP_TYPE"                                       : "TIMESTAMP"                                                       
+  , "BOOLEAN_TYPE"                                         : "BOOLEAN"                                                   
+  , "CLOB_TYPE"                                            : "CLOB"                                                       
+  , "NCLOB_TYPE"                                           : "DBCLOB"                                                       
+  , "BLOB_TYPE"                                            : "BLOB"                                                       
+  , "XML_TYPE"                                             : "XML"                                                       
+  , "JSON_TYPE"                                            : "JSON"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "DECFLOAT(34)"                                                          
+  , "IBMDB2_DECFLOAT_TYPE"                                 : "DECFLOAT"
+  , "SPATIAL_TYPE"                                         : "ST_GEOMETRY"
+  }  
+, "limits": {
+    "SCALAR_LENGTH"                                        : 4000
+  , "CHAR_LENGTH"                                          : 255
+  , "VARCHAR_LENGTH"                                       : 32672
+  , "NCHAR_LENGTH"                                         : 127
+  , "NVARCHAR_LENGTH"                                      : 16336
+  , "BINARY_LENGTH"                                        : 255
+  , "VARBINARY_LENGTH"                                     : 32672
+  , "NUMERIC_PRECISION"                                    : 31
+  , "NUMERIC_SCALE"                                        : 31
+  , "TIMESTAMP_PRECISION"                                  : 9
+  , "CLOB_LENGTH"                                          : 2147483647
+  , "BLOB_LENGTH"                                          : 2147483647
+  , "NCLOB_LENGTH"                                         : 1073741823
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "WKB"
+  , "JSON_TYPE"                                            : "BLOB"
+  }
+}                                                        

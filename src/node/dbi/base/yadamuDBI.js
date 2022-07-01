@@ -63,7 +63,7 @@ class SQLTrace {
   }
   
   disable() {
-    this.disabledWriter = this.writer
+    this.disabledWriter = this.disabledWriter || this.writer
     this.writer = NullWriter.NULL_WRITER
     this.enabled = false
   }
@@ -337,7 +337,7 @@ class YadamuDBI extends EventEmitter {
     super()
     this.DRIVER_ID = performance.now()
     yadamu.activeConnections.add(this)
-    this.DESTORYED = false;
+    this.DESTROYED = false;
     
     this.yadamu = yadamu;
     this.setConnectionProperties(connectionSettings || {})
@@ -383,7 +383,7 @@ class YadamuDBI extends EventEmitter {
     
     if (manager) {
       this.workerReady = new Promise((resolve,reject) => {
-        this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { reject(e) })
+        this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { this.yadamuLogger.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e) })
       })
     }
     else {
@@ -450,22 +450,27 @@ class YadamuDBI extends EventEmitter {
   }
 
   async initializeWorker(manager) {
-    this.manager = manager
-    this.workerNumber = -1
-    this.cloneSettings()
+	try {
+      this.manager = manager
+      this.workerNumber = -1
+      this.cloneSettings()
      
-    // Set up a promise to make it possible to wait on AllSettled..   
-    this.workerState = new Promise((resolve,reject) => {
-      this.on(YadamuConstants.DESTROYED,() => {
-        manager.activeWorkers.delete(this)
-        resolve(YadamuConstants.DESTROYED)
+      // Set up a promise to make it possible to wait on AllSettled..   
+      this.workerState = new Promise((resolve,reject) => {
+        this.on(YadamuConstants.DESTROYED,() => {
+          manager.activeWorkers.delete(this)
+          resolve(YadamuConstants.DESTROYED)
+        })
       })
-    })
       
-    manager.activeWorkers.add(this)
+      manager.activeWorkers.add(this)
       
-    await this.setWorkerConnection()
-    await this.configureConnection()
+      await this.setWorkerConnection()
+      await this.configureConnection()
+	} catch (e) {
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e)
+	  manager.activeWorkers.delete(this)
+	}
   }
   
   loadTableList(tableListPath) {
@@ -1270,6 +1275,8 @@ class YadamuDBI extends EventEmitter {
 
     if (!this.DESTROYED) {
 
+	  this.DESTROYED = true
+
       if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
         // Active Workers contains the set of Workers that have not terminated.
         // We need to force them to terminate and release any database connections they own.
@@ -1310,9 +1317,7 @@ class YadamuDBI extends EventEmitter {
       
       this.yadamu.activeConnections.delete(this)
 	}
-	
-	this.DESTROYED = true
-    
+	    
   } 
     
   checkConnectionState(cause) {
@@ -1871,7 +1876,6 @@ class YadamuDBI extends EventEmitter {
   workerDBI(workerNumber) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
-    
     const dbi = this.classFactory(this.yadamu)  
     dbi.workerNumber = workerNumber
     dbi.SQL_TRACE.setWorkderId(workerNumber)
@@ -1894,7 +1898,7 @@ class YadamuDBI extends EventEmitter {
   }
   
   async destroyWorker() {
-    // this.yadamuLogger.trace([this.constructor.name,'destroyWorker()',this.ROLE,this.getWorkerNumber()],`Termianting Worker`)
+    // this.yadamuLogger.trace([this.constructor.name,'destroyWorker()',this.ROLE,this.getWorkerNumber()],`Terminating Worker`)
     await this.writersFinished()
     await this.releaseWorkerConnection() 
     this.emit(YadamuConstants.DESTROYED)

@@ -1,0 +1,27 @@
+{
+    "PRODUCT_DESCRIPTIONS" : {
+      "columnMappings" : { 
+	    "TRANSLATED_NAME" : { "dataType" : "VARGRAPHIC(150)" }
+      , "TRANSLATED_DESCRIPTION" : { "dataType" : "VARGRAPHIC(6000)" }
+	  }
+    },
+    "ProductDescription" : {
+      "columnMappings" : { 
+	    "Description" : { "dataType" : "VARGRAPHIC(600)" }
+	  }
+    },
+    "DimProduct" : {
+      "columnMappings" : { 
+	    "SpanishProductName" : { "dataType" : "VARGRAPHIC(75)" }
+	  , "FrenchProductName" : { "dataType" : "VARGRAPHIC(75)" }
+	  , "FrenchDescription " : { "dataType" : "VARGRAPHIC(800)" }
+	  , "ChineseDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  , "ArabicDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  , "HebrewDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  , "ThaiDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  , "GermanDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  , "JapaneseDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  , "TurkishDescription" : { "dataType" : "VARGRAPHIC(800)" }
+	  }
+    }
+}    

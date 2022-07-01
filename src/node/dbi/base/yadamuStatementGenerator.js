@@ -131,20 +131,7 @@ class YadamuStatementGenerator {
     typeDefinition.length = typeDefinition.length > this.dbi.DATA_TYPES.NUMERIC_PRECISION ? this.dbi.DATA_TYPES.NUMERIC_PRECISION : typeDefinition.length
     typeDefinition.scale = typeDefinition.scale > this.dbi.DATA_TYPES.NUMERIC_SCALE ? this.dbi.DATA_TYPES.NUMERIC_SCALE : typeDefinition.scale
   }  
-  
-  adjustColumnSize() {
-	 
-    /*
-    **
-    **  Adjust Size Constraint to account for differences between source nad target, such as where source specified length in characters but target specifies length in bytes.
-    **
-    */	
-
-  } 
-  
-  adjustCharacterSizing(dataType,sizeConstraint) {
-  }
-  
+    
   refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint) {
 
 	 /*
@@ -152,16 +139,25 @@ class YadamuStatementGenerator {
 	 ** Adjust data type based on size constraints
 	 **
 	 */
-	
+	 	
     switch (targetDataType) {
       case this.dbi.DATA_TYPES.CHAR_TYPE:
       case this.dbi.DATA_TYPES.VARCHAR_TYPE:
       case this.dbi.DATA_TYPES.CLOB_TYPE:
-        this.adjustCharacterSizing(targetDataType,sizeConstraint)
         switch (true) {
 		  case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.CLOB_TYPE
           case (sizeConstraint[0] > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.CLOB_TYPE
-          case (sizeConstraint[0] < this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.VARCHAR_TYPE
+          case (sizeConstraint[0] < this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.VARCHAR_TYPE
+          default:                                                                return targetDataType
+        }
+
+      case this.dbi.DATA_TYPES.NCHAR_TYPE:
+      case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
+      case this.dbi.DATA_TYPES.NCLOB_TYPE:
+        switch (true) {
+		  case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.NCLOB_TYPE
+          case (sizeConstraint[0] > this.dbi.DATA_TYPES.NVARCHAR_LENGTH):         return this.dbi.DATA_TYPES.NCLOB_TYPE
+          case (sizeConstraint[0] < this.dbi.DATA_TYPES.NVARCHAR_LENGTH):         return this.dbi.DATA_TYPES.NVARCHAR_TYPE
           default:                                                                return targetDataType
         }
 

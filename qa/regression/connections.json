@@ -176,6 +176,24 @@
 	  ,	"port"                          : 5433
       }
     },
+	"db2#1"                             : {
+      "db2"                             : {
+	    "user"                          : "DB2INST1"
+	  ,	"host"                          : "IBMDB2-01"
+	  ,	"database"                      : "YADAMU"
+	  ,	"password"                      : "oracle"
+	  ,	"port"                          : 50000
+      }
+	},
+    "yugabyte#1"                        : {
+      "yugabyte"                        : {
+        "user"                          : "postgres"
+      , "host"                          : "yb-tserver-n1"
+      , "database"                      : "yadamu"
+      , "password"                      : "oracle"
+      , "port"                          : 5433
+      }
+    },
 	"minio#1": {
 	  "awsS3": {
 		"accessKeyId"                   : "AKIAIOSFODNN7EXAMPLE"

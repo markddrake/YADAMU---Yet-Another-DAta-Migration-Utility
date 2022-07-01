@@ -1,0 +1,3 @@
+FROM ibmcom/db2
+RUN mkdir -p /var/custom
+COPY configureDB2.sh /var/custom

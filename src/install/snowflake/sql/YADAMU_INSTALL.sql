@@ -1,8 +1,7 @@
 create or replace procedure YADAMU_SYSTEM.PUBLIC.INSTALL_HELPERS()
 returns VARCHAR
 language javascript
-as
-$$
+as $$
 let uuid
 try {
   const allocated = snowflake.createStatement( { sqlText: `call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTANCE_ID()`}).execute()
@@ -24,4 +23,11 @@ snowflake.createStatement( { sqlText: statement }).execute()
 return 'Success'
 $$
 ;
+create or replace function YADAMU_SYSTEM.PUBLIC.RENDER_FLOAT(FLOAT_VALUE FLOAT)
+returns VARCHAR
+language javascript
+as $$
+  return FLOAT_VALUE ? FLOAT_VALUE.toExponential(20) : FLOAT_VALUE
+$$;
+
 

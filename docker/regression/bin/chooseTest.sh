@@ -74,9 +74,52 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09Copy
   ;;
 
+  everything)
+    source qa/bin/createOutputFolders.sh mnt
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh initialize
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh stageDataSets
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11TestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10TestSuite
+    source $YADAMU_SCRIPT_DIR/runCmdLineTests.sh
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
+  ;;	
+  
   interactive)
     sleep 365d
   ;; 
+  
   
   *)
     echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, snowflake, vertica, vertica09, cmdLine, copy, interactive or custom"

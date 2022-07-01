@@ -59,6 +59,7 @@ class YadamuDataTypes {
     Object.assign(this,this.TYPE_CONFIGURATION.limits);
     this.storageOptions = this.STORAGE_OPTIONS 
     Object.assign(this.storageOptions,this.TYPE_CONFIGURATION.storageOptions || {});     
+												  
   }
   
   
@@ -645,6 +646,18 @@ class YadamuDataTypes {
   
   set SNOWFLAKE_VARIANT_TYPE(v)             { YadamuDataTypes.redefineProperty(this,'SNOWFLAKE_VARIANT_TYPE',v) }
 
+  get IBMDB2_DECFLOAT_TYPE()                { return  `${this.VARCHAR_TYPE}(36)` }
+  
+  set IBMDB2_DECFLOAT_TYPE(v)               { YadamuDataTypes.redefineProperty(this,'IBMDB2_DECFLOAT_TYPE',v) }
+  
+  get IBMDB2_DECFLOAT16_TYPE()              { return this.IBMDB2_DECFLOAT_TYPE }
+  
+  set IBMDB2_DECFLOAT16_TYPE(v)             { YadamuDataTypes.redefineProperty(this,'IBMDB2_DECFLOAT16_TYPE',v) }
+0
+  get IBMDB2_DECFLOAT34_TYPE()              { return this.IBMDB2_DECFLOAT_TYPE }
+  
+  set IBMDB2_DECFLOAT34_TYPE(v)             { YadamuDataTypes.redefineProperty(this,'IBMDB2_DECFLOAT34_TYPE',v) }
+  
   // Default Maxiumum Lengths
   
   get SCALAR_LENGTH()                       {
