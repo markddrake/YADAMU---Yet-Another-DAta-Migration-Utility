@@ -28,7 +28,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   
   async init() {
     // Set it to the value of the resolved promise..
-    super.init();
+    await super.init();
 	const results = await this.dbi.executeSQL(`SELECT min(memory_size_kb) FROM resource_pool_status WHERE pool_name='general'`)
 	this.GENERAL_POOL_LIMIT = results.rows[0][0]
   }  
@@ -164,6 +164,8 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 	
     let insertMode = 'Copy';
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+
 	// console.log(tableMetadata)
     
 	const insertOperators       = []
@@ -247,7 +249,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
             break;
           }
         case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
-          switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+          switch (this.SPATIAL_FORMAT) {
             case 'WKT':
             case 'EWKT':
             case 'GeoJSON':
@@ -277,7 +279,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
           }
           break;
         case  this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
-          switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+          switch (this.SPATIAL_FORMAT) {
             case 'WKT':
             case 'EWKT':
             case 'GeoJSON':
@@ -413,21 +415,21 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     })
 	
     const tableInfo = {
-      ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
-    , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
-	, copy           :  this.generateCopyOperation(tableMetadata,remotePath,copyColumnDefinitions)
-    , mergeout:         `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
-    , stagingFileName:  stagingFileName
-    , localPath:        localPath
-    , columnNames    :  tableMetadata.columnNames
-    , targetDataTypes:  targetDataTypes
-    , maxLengths:       maxLengths
-    , insertOperators:  insertOperators
-    , insertMode     :  insertMode
-    , _SCHEMA_NAME:     this.targetSchema
-    , _BATCH_SIZE    :  this.dbi.BATCH_SIZE
-    , _TABLE_NAME:      tableMetadata.tableName
-    , _SPATIAL_FORMAT:  this.dbi.INBOUND_SPATIAL_FORMAT
+      ddl             :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
+    , dml             :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
+	, copy            :  this.generateCopyOperation(tableMetadata,remotePath,copyColumnDefinitions)
+    , mergeout        : `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
+    , stagingFileName : stagingFileName
+    , localPath       : localPath
+    , columnNames     : tableMetadata.columnNames
+    , targetDataTypes : targetDataTypes
+    , maxLengths      : maxLengths
+    , insertOperators : insertOperators
+    , insertMode      : insertMode
+    , _SCHEMA_NAME    : this.targetSchema
+    , _BATCH_SIZE     : this.dbi.BATCH_SIZE
+    , _TABLE_NAME     : tableMetadata.tableName
+    , _SPATIAL_FORMAT : this.SPATIAL_FORMAT
     }
     
     // Add Support for Copy based Operations

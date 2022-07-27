@@ -770,7 +770,7 @@ class YadamuQA {
         
   }
   
-  setMongoStripID(sourceDatabase,targetDatabase,parameters) {
+  setPsuedoKeyTransformation(sourceDatabase,targetDatabase,parameters) {
      
     if (sourceDatabase === 'mongodb') {
        parameters.MONGO_STRIP_ID = parameters.MONGO_STRIP_ID || false
@@ -778,6 +778,14 @@ class YadamuQA {
     
     if (targetDatabase === 'mongodb') {
       parameters.MONGO_STRIP_ID = parameters.MONGO_STRIP_ID || true
+    }
+      
+    if (sourceDatabase === 'cockroach') {
+       parameters.COCKROACH_STRIP_ROWID = parameters.COCKROACH_STRIP_ROWID || false
+    }
+    
+	if (targetDatabase === 'cockroach') {
+      parameters.COCKROACH_STRIP_ROWID = parameters.COCKROACH_STRIP_ROWID || true
     }
   
   }
@@ -841,7 +849,7 @@ class YadamuQA {
 
     const sourceDatabase =  YadamuLibrary.getVendorName(sourceConnection);
     const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
-    this.setMongoStripID(sourceDatabase,targetDatabase,parameters);
+    this.setPsuedoKeyTransformation(sourceDatabase,targetDatabase,parameters);
     
     const sourceSchema  = this.getSourceMapping(sourceDatabase,task);
     const targetSchema  = this.getTargetMapping(targetDatabase,task,this.TARGET_SCHEMA_SUFFIX);
@@ -1007,7 +1015,7 @@ class YadamuQA {
     
     const sourceDatabase =  YadamuLibrary.getVendorName(sourceConnection);
     const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
-    this.setMongoStripID(sourceDatabase,targetDatabase,parameters);
+    this.setPsuedoKeyTransformation(sourceDatabase,targetDatabase,parameters);
     
     const sourceSchema  = this.getSourceMapping(sourceDatabase,task);
     const targetSchema  = this.getTargetMapping(targetDatabase,task,this.TARGET_SCHEMA_SUFFIX);

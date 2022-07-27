@@ -820,8 +820,8 @@ values(
   'a fat cat sat on a mat and ate a fat rat'::tsvector,
   'fat & (rat | cat)'::tsquery
 );
-select YADAMU_AsJSON(tsvector_col) from t_postgres.ts_search_types;
-select YADAMU_AsTSVECTOR(YADAMU_AsJSON(tsvector_col)) from t_postgres.ts_search_types;
+select YADAMU.AS_JSON(tsvector_col) from t_postgres.ts_search_types;
+select YADAMU.AS_TSVECTOR(YADAMU.AS_JSON(tsvector_col)) from t_postgres.ts_search_types;
 --
 -- 8.17. Range Types
 --
@@ -851,20 +851,20 @@ values (
   ('(' || now() - '5h'::interval || ',' || now() + '5h'::interval || ')')::tstzrange,
   ('(' || now() - '5d'::interval || ',' || now() + '5d'::interval || ')')::daterange
 );
-select YADAMU_AsJSON(int4range_col),
-       YADAMU_AsJSON(int8range_col),
-	   YADAMU_AsJSON(numrange_col),
-	   YADAMU_AsJSON(tsrange_col),
-	   YADAMU_AsJSON(tstzrange_col),
-	   YADAMU_AsJSON(daterange_col)
+select YADAMU.AS_JSON(int4range_col),
+       YADAMU.AS_JSON(int8range_col),
+	   YADAMU.AS_JSON(numrange_col),
+	   YADAMU.AS_JSON(tsrange_col),
+	   YADAMU.AS_JSON(tstzrange_col),
+	   YADAMU.AS_JSON(daterange_col)
   from t_postgres.range_types;
 --
-select YADAMU_AsRange(YADAMU_AsJSON(int4range_col))::int4range,
-       YADAMU_AsRange(YADAMU_AsJSON(int8range_col))::int8range,
-	   YADAMU_AsRange(YADAMU_AsJSON(numrange_col))::numrange,
-	   YADAMU_AsRange(YADAMU_AsJSON(tsrange_col))::tsrange,
-	   YADAMU_AsRange(YADAMU_AsJSON(tstzrange_col))::tstzrange,
-	   YADAMU_AsRange(YADAMU_AsJSON(daterange_col))::daterange
+select YADAMU.AS_Range(YADAMU.AS_JSON(int4range_col))::int4range,
+       YADAMU.AS_Range(YADAMU.AS_JSON(int8range_col))::int8range,
+	   YADAMU.AS_Range(YADAMU.AS_JSON(numrange_col))::numrange,
+	   YADAMU.AS_Range(YADAMU.AS_JSON(tsrange_col))::tsrange,
+	   YADAMU.AS_Range(YADAMU.AS_JSON(tstzrange_col))::tstzrange,
+	   YADAMU.AS_Range(YADAMU.AS_JSON(daterange_col))::daterange
   from t_postgres.range_types;
 --
 -- 8.19. Object Identifier Types

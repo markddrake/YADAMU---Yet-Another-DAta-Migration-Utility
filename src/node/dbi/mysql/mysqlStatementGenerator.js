@@ -15,9 +15,9 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
     await this.init()
 	
     const options = {
-	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	  spatialFormat        : this.SPATIAL_FORMAT
 	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
-	, booleanStorageOption    : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, booleanStorageOption : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
 	, xmlStorageOption     : this.dbi.DATA_TYPES.storageOptions.XML_TYPE
 	}
 
@@ -46,14 +46,16 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 		
 		const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		
-        tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-        tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
         tableInfo.insertMode      = 'Batch';
+        tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
+        tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+
         /*
         **
         ** Avoid use of Iterative Mode where possible due to significant performance impact.
         **
         */
+
         const setOperators = dataTypes.map((dataType,idx) => {
 	      if (this.dbi.DATABASE_VERSION < '8.0.19' || false) {
             switch (dataType.type) {
@@ -67,7 +69,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
 			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
                 tableInfo.insertMode = 'Iterative'; 
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
                   case "EWKB":
                     return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
@@ -101,7 +103,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
 			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
                 tableInfo.insertMode = 'Rows';  
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
                   case "EWKB":
                     return 'ST_GeomFromWKB(?)';
@@ -160,7 +162,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
 			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
 			    let spatialFunction
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
                   case "EWKB":
                     spatialFunction = `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;

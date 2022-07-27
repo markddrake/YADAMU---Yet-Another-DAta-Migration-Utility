@@ -18,6 +18,7 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 
     let insertMode = 'DOCUMENT';
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
     
     let columnNames = tableMetadata.columnNames
     let dataTypes = tableMetadata.dataTypes
@@ -63,7 +64,7 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
     , sizeConstraints : sizeConstraints
     , insertMode      : insertMode
     , _BATCH_SIZE     : this.dbi.BATCH_SIZE
-    , _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
+    , _SPATIAL_FORMAT : this.SPATIAL_FORMAT
     }
 	
 	return tableInfo

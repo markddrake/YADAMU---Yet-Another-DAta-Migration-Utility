@@ -86,7 +86,7 @@
   , "PGSQL_REFCURSOR"                                      : "refcursor"       
    
   , "MONGO_OBJECTID_TYPE"                                  : "bytea"
-  , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "select"
   }
 , "limits": {
     "SCALAR_LENGTH"                                        : 10485760

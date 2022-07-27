@@ -296,11 +296,11 @@ class YadamuDataTypes {
                                                    
   set GEOMETRY_COLLECTION_TYPE(v)           { YadamuDataTypes.redefineProperty(this,'GEOMETRY_COLLECTION_TYPE',v) }
                                                    
-  get BOX_TYPE()                            { return this.SPATIAL_TYPE }
+  get BOX_TYPE()                            { return this.POLYGON_TYPE }
                                                    
   set BOX_TYPE(v)                           { YadamuDataTypes.redefineProperty(this,'BOX_TYPE',v) }
                                                    
-  get PATH_TYPE()                           { return this.SPATIAL_TYPE }
+  get PATH_TYPE()                           { return this.LINE_TYPE }
                                                    
   set PATH_TYPE(v)                          { YadamuDataTypes.redefineProperty(this,'PATH_TYPE',v) }
   
@@ -1031,6 +1031,10 @@ class YadamuDataTypes {
         return this.GEOGRAPHY_TYPE
       case typeList.includes(this.JSON_TYPE):
         return this.JSON_TYPE
+      case typeList.includes(this.POLYGON_TYPE):
+        return this.POLYGON_TYPE
+      case typeList.includes(this.LINE_TYPE):
+        return this.LINE_TYPE
       case typeList.includes(this.CLOB_TYPE):
         return this.CLOB_TYPE
       case typeList.includes(this.VARCHAR_TYPE):

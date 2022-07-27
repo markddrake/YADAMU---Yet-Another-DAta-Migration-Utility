@@ -38,7 +38,6 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
   
   // This is the spatial format of the incoming data, not the format used by this driver
   
-  get SPATIAL_FORMAT()               { return this.dbi.INBOUND_SPATIAL_FORMAT } 
   get OBJECTS_AS_JSON()              { return this.dbi.systemInformation.objectFormat === 'JSON'}
 
   get GEOJSON_FUNCTION()             { return 'DESERIALIZE_GEOJSON' }
@@ -56,7 +55,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
   get STATEMENT_GENERATOR_OPTIONS() {
 
     const options = {
-	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT // this.SPATIAL_FORMAT
 	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
 	, xmlStorageClause     : this.dbi.XMLTYPE_STORAGE_CLAUSE
 	, jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
@@ -89,12 +88,6 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
          case this.dbi.DATA_TYPES.FLOAT_TYPE:
            return { type: oracledb.DB_TYPE_BINARY_FLOAT }
          case this.dbi.DATA_TYPES.DOUBLE_TYPE:
-           /*
-           // Peek numeric binds to check for strings when writing
-           if ((metadata.source.vendor === 'SNOWFLAKE') && ['NUMBER','DECIMAL','NUMERIC','FLOAT', 'FLOAT4', 'FLOAT8', 'DOUBLE','DOUBLE PRECISION', 'REAL'].includes(metadata.source.dataTypeDefinitions[idx])) {
-             return { type: oracledb.STRING, maxSize : dataTypeDefinition.length + 3}
-           }
-           */
            return { type: oracledb.DB_TYPE_BINARY_DOUBLE }
          case this.dbi.DATA_TYPES.BINARY_TYPE:
            return { type: oracledb.DB_TYPE_RAW, maxSize : dataTypeDefinition.length}
@@ -157,14 +150,14 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
 		   switch (true) {
              case this.dbi.DATA_TYPES.BOOLEAN_AS_RAW1:
                return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
-			 // ### TODO: Map other Boolean Storage Options here
-             // case this.dbi.DATA_TYPES.BOOLEAN_AS_NUMBER1:
-             //   return { type: oracledb.NUMBER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
-			 // case this.dbi.DATA_TYPES.BOOLEAN_AS_VARCHAR5:
-			 //   return { type: oracledb.VARCHAR2, maxSize :  5 }         
-			 // case this.dbi.DATA_TYPES.BOOLEAN_AS_TF
-			 // case this.dbi.DATA_TYPES.BOOLEAN_AS_YN
-			 //   return { type: oracledb.VARCHAR2, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+      			 // ### TODO: Map other Boolean Storage Options here
+                 // case this.dbi.DATA_TYPES.BOOLEAN_AS_NUMBER1:
+                 //   return { type: oracledb.NUMBER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+			     // case this.dbi.DATA_TYPES.BOOLEAN_AS_VARCHAR5:
+			     //   return { type: oracledb.VARCHAR2, maxSize :  5 }         
+			     // case this.dbi.DATA_TYPES.BOOLEAN_AS_TF
+			     // case this.dbi.DATA_TYPES.BOOLEAN_AS_YN
+			     //   return { type: oracledb.VARCHAR2, maxSize :  this.BIND_LENGTH.BOOLEAN }         
 			 default:
                return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }   
 		   }			   
@@ -172,7 +165,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
 		 case this.dbi.DATA_TYPES.YADAMU_SPATIAL_TYPE:
 		   tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
-           switch (this.SPATIAL_FORMAT) { 
+		   switch (this.SPATIAL_FORMAT) { 
              case "WKB":
              case "EWKB":
                return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.GEOMETRY}
@@ -390,7 +383,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
       tableInfo.insertMode      = 'Batch';      
 	  tableInfo.dataFile        = tableMetadata.dataFile
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-      tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
+	  tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
       
 	  const dataTypeDefinitions = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
       tableInfo.binds           = this.generateBinds(dataTypeDefinitions,tableInfo,tableMetadata);
@@ -613,8 +606,8 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
       else  {
         tableInfo.dml = `insert /*+ APPEND */ into "${this.targetSchema}"."${tableMetadata.tableName}" (${tableInfo.columnNames.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
       }	  
-
 	});
+
 	return statementCache
   }  
 }

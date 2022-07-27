@@ -71,6 +71,19 @@ class YadamuSpatialLibrary {
     return  WKX.Geometry.parseGeoJSON(typeof geometry === "string" ? JSON.parse(geometry) : geometry).toEwkt();
   }
   
+  static toGeoJSON(spatialFormat) {
+    switch (spatialFormat) {
+      case 'WKB':
+      case 'EWKB':
+	    return YadamuSpatialLibrary.bufferToGeoJSON
+      case "WKT":
+      case "EWKT":
+	    return YadamuSpatialLibrary.wktToGeoJSON
+      case "GeoJSON":
+        return null
+	}
+  }
+  
   static recodeSpatialColumns(sourceFormat,targetFormat,dataTypes,batch,arrayOfRows) {
     
     /*
@@ -120,42 +133,32 @@ class YadamuSpatialLibrary {
     const spatialConversions = new Array(dataTypes.length).fill(null)
     spatialColumnList.forEach((spatialIdx) => {
       const testColumn = arrayOfRows ? batch[0][spatialIdx] : batch[spatialIdx]
-      switch (true) {
-        case ((sourceFormat === 'EWKB') && (targetFormat === 'EWKT') && Buffer.isBuffer(testColumn)):
-        case ((sourceFormat === 'EWKB') && (targetFormat === 'WKT') && Buffer.isBuffer(testColumn)):
-        case ((sourceFormat === 'WKB') && (targetFormat === 'EWKT') && Buffer.isBuffer(testColumn)):
-        case ((sourceFormat === 'WKB') && (targetFormat === 'WKT') && Buffer.isBuffer(testColumn)):
-          spatialConversions[spatialIdx] = this.bufferToWKT
-          break;
+	  switch (true) {
         case ((sourceFormat === 'EWKB') && (targetFormat === 'EWKT')):
         case ((sourceFormat === 'EWKB') && (targetFormat === 'WKT')):
         case ((sourceFormat === 'WKB') && (targetFormat === 'EWKT')):
         case ((sourceFormat === 'WKB') && (targetFormat === 'WKT')):
-          spatialConversions[spatialIdx] = YadamuSpatialLibrary.hexBinaryToWKT
-          break;      
-        case ((sourceFormat === 'EWKB') && (targetFormat === 'GeoJSON') && Buffer.isBuffer(testColumn)):
-        case ((sourceFormat === 'WKB') && (targetFormat === 'GeoJSON') && Buffer.isBuffer(testColumn)):
-          spatialConversions[spatialIdx] = this.bufferToGeoJSON
+          spatialConversions[spatialIdx] =  Buffer.isBuffer(testColumn) ? this.bufferToWKT : this.hexBinaryToWKT
           break;
         case ((sourceFormat === 'EWKB') && (targetFormat === 'GeoJSON')):
         case ((sourceFormat === 'WKB') && (targetFormat === 'GeoJSON')):
-          spatialConversions[spatialIdx] = this.hexBinaryToGeoJSON
-          break;      
+          spatialConversions[spatialIdx] = Buffer.isBuffer(testColumn) ? this.bufferToGeoJSON : this.hexBinaryToGeoJSON
+          break;
         case ((sourceFormat === 'EWKT') && (targetFormat === 'GeoJSON')):
         case ((sourceFormat === 'WKT') && (targetFormat === 'GeoJSON')):
-          spatialConversions[spatialIdx] = this.wktToGeoJSON
-          break;      
-        case ((sourceFormat === 'GeoJSON') && (targetFormat === 'EWKT')):
-          spatialConversions[spatialIdx] = this.geoJSONtoEWKT
-          break;      
-        case ((sourceFormat === 'GeoJSON') && (targetFormat === 'WKT')):
-          spatialConversions[spatialIdx] = this.geoJSONtoWKT
+          spatialConversions[spatialIdx] = Buffer.isBuffer(testColumn) ? this.bufferToGeoJSON : this.wktToGeoJSON
           break;      
         case ((sourceFormat === 'GeoJSON') && (targetFormat === 'EWKB')):
-          spatialConversions[spatialIdx] = this.geoJSONtoEWKB
+          spatialConversions[spatialIdx] = Buffer.isBuffer(testColumn) ? this.bufferToEWKB : this.geoJSONtoEWKB
           break;      
         case ((sourceFormat === 'GeoJSON') && (targetFormat === 'WKB')):
-          spatialConversions[spatialIdx] = this.geoJSONtoWKB
+          spatialConversions[spatialIdx] = Buffer.isBuffer(testColumn) ? this.bufferToWKB : this.geoJSONtoWKB
+          break;      
+        case ((sourceFormat === 'GeoJSON') && (targetFormat === 'EWKT')):
+          spatialConversions[spatialIdx] = Buffer.isBuffer(testColumn) ? this.bufferToEWKT : this.geoJSONtoEWKT
+          break;      
+        case ((sourceFormat === 'GeoJSON') && (targetFormat === 'WKT')):
+          spatialConversions[spatialIdx] = Buffer.isBuffer(testColumn) ? this.bufferToWKT : this.geoJSONtoWKT
           break;      
        default:
       }

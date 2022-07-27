@@ -29,7 +29,7 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
       case this.dbi.DATA_TYPES.BLOB_TYPE:
 	    return 'YADAMU.HEXTOBLOB(?)' 
 	  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
-	    switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+	    switch (this.SPATIAL_FORMAT) {
 		  case 'WKT':
 		  case 'EWKT':
     	    return null
@@ -92,6 +92,7 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
   generateTableInfo(tableMetadata) {
 
     let insertMode = 'Batch';
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
    
     const insertOperators = []
 	const columnConstraints = []
@@ -128,7 +129,7 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
 		   break
      	case this.dbi.DATA_TYPES.SPATIAL_TYPE:
 		  if (!this.dbi.DB2GSE_INSTALLED) {
-			switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+			switch (this.SPATIAL_FORMAT) {
 			  case 'WKB':
 			  case 'EWKB':
 			    columnDataTypes[idx] = this.dbi.DATA_TYPES.BLOB_TYPE
@@ -137,7 +138,7 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
 			  case 'WKT':
 			  case 'EWKT':
 			    columnDataTypes[idx] = this.dbi.DATA_TYPES.NCLOB_TYPE
-		        sizeConstraints[idx] = [this.dbi.DATA_TYPES.DBCLOB_LENGTH]
+		        sizeConstraints[idx] = [this.dbi.DATA_TYPES.NCLOB_LENGTH]
 				break;
 			  case 'GeoJSON':
 			    columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
@@ -167,22 +168,12 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
 	, sizeConstraints  : tableMetadata.sizeConstraints
     , insertMode       : insertMode
     , _BATCH_SIZE      : this.dbi.BATCH_SIZE
-    , _SPATIAL_FORMAT  : this.dbi.INBOUND_SPATIAL_FORMAT
+    , _SPATIAL_FORMAT  : this.SPATIAL_FORMAT
     }
 	
 	return tableInfo
   }
 
-  /*  
-  generateTableInfo(tableMetadata) {
-	// console.log(tableMetadata)
-    const tableInfo            = super.generateTableInfo(tableMetadata)
-	tableInfo.sizeConstraints  = tableMetadata.sizeConstraints
-	// console.log(tableInfo)
-	return tableInfo
-  }
-  */
-  
 }
 
 

@@ -1,0 +1,36 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "connections.json"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "parameters"                        : {
+    "DIRECTORY"                       : "export/json/%location%"
+  , "REMOTE_STAGING_AREA"             : "/mnt/shared/stagingArea/db/vertica"
+  , "LOCAL_STAGING_AREA"              : "/usr/src/YADAMU/stagingArea/db/vertica"
+  , "IDENTIFIER_MAPPING_FILE"         : "qa/mappings/verticaMappings.json"
+  , "MERGEOUT_INSERT_COUNT"           : 128
+  }
+, "tests" : [{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "vertica11"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "vertica11"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "vertica11"
+  , "target": "vertica11"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

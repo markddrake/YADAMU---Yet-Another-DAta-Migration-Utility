@@ -1,0 +1,41 @@
+{
+	"operation": "dbRoundtrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"createDirectory": true,
+	"verifyOperation": true,
+	"parameters": {
+		"DIRECTORY": "%operation%/%mode%/%connection%"
+	},
+	"tests": [{
+			"operation": "export",
+			"createDirectory": true,
+	        "verifyOperation": false,
+			"source": "oracle11g",
+			"target": "file-staging",
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		},{
+			"operation": "import",
+			"source": "file-staging",
+			"target": "oracle11g",
+			"parameters": {
+				"DIRECTORY": "export/%mode%/%connection%"
+			},
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		},{
+			"source": "oracle11g",
+			"target": "oracle11g",
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		}
+	]
+}

@@ -186,17 +186,16 @@ class RedshiftDBI extends YadamuDBI {
 	try {
 	  operation = 'pg.Client()'
 	  stack = new Error().stack;
-      const pgClient = new Client(this.vendorProperties)
-					
+      this.connection = new Client(this.vendorProperties)
 	  operation = 'Client.connect()'
 	  stack = new Error().stack;
-      this.connection = await pgClient.connect()
-    
+      await this.connection.connect()
 	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      await this.configureConnection()
+      return this.connection
 	} catch (e) {
-      throw this.trackExceptions(new RedshiftException(e,stack,operation))
+      throw this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,operation))
 	}
-    await configureConnection()
   }
   
   async configureConnection() {

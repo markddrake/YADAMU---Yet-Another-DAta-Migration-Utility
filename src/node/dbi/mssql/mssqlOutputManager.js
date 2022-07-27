@@ -40,7 +40,7 @@ class MsSQLOutputManager extends YadamuOutputManager {
     // Set up Transformation functions to be applied to the incoming rows
 
     let spatialFormat = this.SPATIAL_FORMAT
-
+	
 	const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(dataTypes)		
     this.tableInfo.dataTypeDefinitions = dataTypeDefinitions
 	return dataTypeDefinitions.map((dataType,idx) => {      
@@ -52,6 +52,8 @@ class MsSQLOutputManager extends YadamuOutputManager {
           break;
 		case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
 		case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+		case this.dbi.DATA_TYPES.SPATIAL_TYPE:
+		  // Test based on incoming spatial format. 
 		  if (this.SPATIAL_FORMAT === "GeoJSON") {
 			spatialFormat = "WKT"
 		    return (col,idx) => {

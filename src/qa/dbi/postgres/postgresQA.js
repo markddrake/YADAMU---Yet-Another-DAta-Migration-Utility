@@ -135,4 +135,4 @@ select table_schema, table_name,  query_to_xml(format('select count(*) as cnt fr
 select table_schema, table_name, (xpath('/row/cnt/text()', xml_count))[1]::text::int as row_count
   from ROW_COUNTS`
 
-const _SQL_COMPARE_SCHEMAS    = `call COMPARE_SCHEMA($1,$2,$3)`
+const _SQL_COMPARE_SCHEMAS    = `call YADAMU.COMPARE_SCHEMA($1,$2,$3)`

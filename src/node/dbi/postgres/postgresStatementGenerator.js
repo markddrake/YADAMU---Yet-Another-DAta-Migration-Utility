@@ -5,9 +5,9 @@ import crypto                   from 'crypto';
 import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
-class PostgresStatementGenerator extends YadamuStatementGenerator {
+class PostgreStatementGenerator extends YadamuStatementGenerator {
 
-  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) { 
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
@@ -15,10 +15,10 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 
 	await this.init()
 		
-    const sqlStatement = `select GENERATE_STATEMENTS($1,$2,$3,$4)`
+    const sqlStatement = `select YADAMU.GENERATE_STATEMENTS($1,$2,$3,$4)`
 	
 	const options = {
-	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	  spatialFormat        : this.SPATIAL_FORMAT
 	, jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
 	}
 	
@@ -45,9 +45,10 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 		const dataTypeDefinitions = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 
         const maxBatchSize        = Math.trunc(45000 / tableInfo.targetDataTypes.length);
+        
+		tableInfo.insertMode      = 'Batch';
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE > maxBatchSize ? maxBatchSize : this.dbi.BATCH_SIZE
-        tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
-        tableInfo.insertMode      = 'Batch';
+        tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
         
         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';    
         tableInfo.sizeConstraints = tableMetadata.sizeConstraints
@@ -60,7 +61,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 			case this.dbi.DATA_TYPES.PATH_TYPE:
 			case this.dbi.DATA_TYPES.POLYGON_TYPE:
 			  if (this.dbi.POSTGIS_INSTALLED) {
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
                     return `ST_GeomFromWKB($%)::${dataTypeDefinition.type}`
                   case "EWKB":
@@ -75,14 +76,24 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
                     return `$%::${dataTypeDefinition.type}`
 				}  
 			  }
+			  else {
+		        switch (dataTypeDefinition.type) {
+			      case this.dbi.DATA_TYPES.POINT_TYPE:
+				    return `YADAMU.AS_POINT($%)`
+			      case this.dbi.DATA_TYPES.PATH_TYPE:
+				    return `YADAMU.AS_PATH($%::jsonb)`
+			      case this.dbi.DATA_TYPES.POLYGON_TYPE:
+				    return `YADAMU.AS_POLYGON($%)`
+				}	  
+			  }
 			  return '$%';
 			case this.dbi.DATA_TYPES.PGSQL_CIRCLE_TYPE:
 			  switch (this.dbi.INBOUND_CIRCLE_FORMAT) {
 			    case "CIRCLE":
-				  return `YADAMU_AsCircle($%)`
+				  return `YADAMU.AS_CIRCLE($%)`
 				default:
     			  if (this.dbi.POSTGIS_INSTALLED) {
-                    switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                    switch (this.SPATIAL_FORMAT) {
                       case "WKB":
                         return `${dataTypeDefinition.type}(ST_GeomFromWKB($%)::polygon)`
                       case "EWKB":
@@ -103,7 +114,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 			  return '$%';		  
 			case this.dbi.DATA_TYPES.BOX_TYPE:
   			  if (this.dbi.POSTGIS_INSTALLED) {
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
                     return `${dataTypeDefinition.type}(ST_GeomFromWKB($%)::polygon)`
                   case "EWKB":
@@ -118,36 +129,41 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 			        return `$%::${dataTypeDefinition.type}`
                 }
 			  }
+			  else {
+				return `YADAMU.AS_BOX($%)`
+			  }
 			  return '$%';		  
 			case this.dbi.DATA_TYPES.LINE_TYPE:
   			  if (this.dbi.POSTGIS_INSTALLED) {
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
-                    return `YADAMU_AsLSeg(ST_GeomFromWKB($%)::path)`
+                    return `YADAMU.AS_LINE_SEGMENT(ST_GeomFromWKB($%)::path)`
                   case "EWKB":
-                    return `YADAMU_AsLSeg(ST_GeomFromEWKB($%)::path)`
+                    return `YADAMU.AS_LINE_SEGMENT(ST_GeomFromEWKB($%)::path)`
                   case "WKT":
-                    return `YADAMU_AsLSeg(ST_GeomFromText($%)::path)`
+                    return `YADAMU.AS_LINE_SEGMENT(ST_GeomFromText($%)::path)`
                   case "EWKT":
-                    return `YADAMU_AsLSeg(ST_GeomFromEWKT($%)::path)`
+                    return `YADAMU.AS_LINE_SEGMENT(ST_GeomFromEWKT($%)::path)`
                   case "GeoJSON":
-                    return `YADAMU_AsLSeg(ST_GeomFromGeoJSON($%)::path)`
+                    return `YADAMU.AS_LINE_SEGMENT(ST_GeomFromGeoJSON($%)::path)`
                   default:
                     return `$%::lseg`
                 }
 			  }
-			  return '$%';		  
+			  else {						   
+				return `YADAMU.AS_LINE_SEGMENT($%::jsonb)`
+			  }
 			case this.dbi.DATA_TYPES.PGSQL_LINE_EQ_TYPE:
-			  return `YADAMU_AsLine($%)`
+			  return `YADAMU.AS_LINE_EQ($%)`
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_INT4_TYPE:
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_INT8_TYPE:
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_NUM_TYPE:
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_TIMESTAMP_TYPE:
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_TIMESTAMP_TZ_TYPE:
 			case this.dbi.DATA_TYPES.PGSQL_RANGE_DATE_TYPE:
-			  return `YADAMU_AsRange($%)::${dataTypeDefinition.type}`
+			  return `YADAMU.AS_RANGE($%)::${dataTypeDefinition.type}`
 			case this.dbi.DATA_TYPES.PGSQL_TEXTSEACH_VECTOR_TYPE:
-			  return `YADAMU_AsTsVector($%)`
+			  return `YADAMU.AS_TS_VECTOR($%)`
 			case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
 			  switch (dataTypeDefinitions[idx].typeQualifier) {
 				 case null:
@@ -217,4 +233,4 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
   }
 }
 
-export { PostgresStatementGenerator as default }
+export { PostgreStatementGenerator as default }

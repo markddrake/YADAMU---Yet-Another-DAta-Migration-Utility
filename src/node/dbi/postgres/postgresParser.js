@@ -4,8 +4,8 @@ import YadamuParser from '../base/yadamuParser.js'
 
 class PostgresParser extends YadamuParser {
     
-  constructor(queryInfo,yadamuLogger,parseDelay) {
-    super(queryInfo,yadamuLogger,parseDelay);     
+  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
+    super(dbi,queryInfo,yadamuLogger,parseDelay);     
   }
   
   generateTransformations(queryInfo) {
@@ -23,7 +23,12 @@ class PostgresParser extends YadamuParser {
 	})
   }
 
-  
+  /*
+  async doTransform(data) {
+	console.log(data)
+	return await super.doTransform(data)
+  }
+  */
 }
 
 export { PostgresParser as default }

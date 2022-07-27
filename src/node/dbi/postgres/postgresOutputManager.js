@@ -106,6 +106,37 @@ class PostgresOutputManager extends YadamuOutputManager  {
 		  return (col,idx) => {
 			return Buffer.isBuffer(col) ? col.readUInt32BE(0) : col
 		  }
+		case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
+		case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+		  if (!this.dbi.POSTGIS_INSTALLED) {
+		    switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+		      case 'WKB':
+		      case 'EWKB':
+ 		        return (col,idx) => {
+                  return Buffer.isBuffer(col) ? col : Buffer.from(col,'hex')
+		      }     
+              case "WKT":
+              case "EWKT":
+			    return NULL
+              case "GeoJSON":
+		        return (col,idx) => {
+			      return typeof col === 'object' ? val = JSON.stringify(col) : col
+		        }
+              default :
+                return null
+		    }
+		  }
+          return null
+		case this.dbi.DATA_TYPES.POINT_TYPE:
+		case this.dbi.DATA_TYPES.LINE_TYPE:
+		case this.dbi.DATA_TYPES.PATH_TYPE:
+		case this.dbi.DATA_TYPES.POLYGON_TYPE:
+		case this.dbi.DATA_TYPES.BOX_TYPE:
+		case this.dbi.DATA_TYPES.POLYGON_TYPE:
+		  if (!this.dbi.POSTGIS_INSTALLED) {
+			return YadamuSpatialLibrary.toGeoJSON(this.dbi.INBOUND_SPATIAL_FORMAT)
+		  }
+          return null
         default :
 		  return null
       }

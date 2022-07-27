@@ -4,25 +4,7 @@
 	"tasks": "qa/regression/tasks.json",
 	"recreateSchema": true,
 	"parameters": {},
-	"tests": [
-		{
-			"operation": "export",
-			"recreateSchema": true,
-			"createDirectory": true,
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "%operation%/%mode%/%connection%"
-			},
-			"source": "oracle11g",
-			"target": "file-staging",
-			"parameters": {
-				"DIRECTORY": "%operation%/json/%vendor%"
-			},
-			"tasks": [
-				"oracle"
-			]
-		},
-		{
+	"tests": [{
 			"operation": "import",
 			"source": "file-staging",
 			"target": "oracle11g",
@@ -34,8 +16,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle11g",
 			"target": "oracle11g",
 			"tasks": [
@@ -43,8 +24,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle19c",
 			"target": "oracle11g",
 			"tasks": [
@@ -52,8 +32,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle18c",
 			"target": "oracle11g",
 			"tasks": [
@@ -61,8 +40,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle12c",
 			"target": "oracle11g",
 			"tasks": [
@@ -70,8 +48,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle21c",
 			"target": "oracle11g",
 			"tasks": [
@@ -79,8 +56,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mssql19",
 			"target": "oracle11g",
 			"tasks": [
@@ -88,8 +64,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mssql17",
 			"target": "oracle11g",
 			"tasks": [
@@ -97,8 +72,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "postgres#1",
 			"target": "oracle11g",
 			"tasks": [
@@ -106,8 +80,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mysql#1",
 			"target": "oracle11g",
 			"tasks": [
@@ -115,8 +88,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mariadb#1",
 			"target": "oracle11g",
 			"tasks": [
@@ -124,8 +96,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mongodb#1",
 			"target": "oracle11g",
 			"parameters": {
@@ -136,8 +107,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle11g",
 			"targets": [
 				"oracle11g",
@@ -157,8 +127,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle11g",
 			"target": "oracle11g",
 			"stagingArea": "loader-staging",
@@ -172,6 +141,5 @@
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
-		}
-	]
+		}]
 }

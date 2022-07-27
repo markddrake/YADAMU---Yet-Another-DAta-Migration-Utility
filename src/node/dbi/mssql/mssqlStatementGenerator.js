@@ -60,7 +60,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 			},{
 			  name: 'TARGET_DATABASE', type: sql.VARCHAR,  value: this.targetSchema
 			},{
-              name: 'SPATIAL_FORMAT',  type: sql.NVARCHAR, value: this.dbi.INBOUND_SPATIAL_FORMAT
+              name: 'SPATIAL_FORMAT',  type: sql.NVARCHAR, value: this.SPATIAL_FORMAT
 	        },{ 
 			  name: 'DB_COLLATION',    type: sql.NVARCHAR, value: this.dbi.DB_COLLATION
 			}]
@@ -86,7 +86,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
       const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
       
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-      tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
+      tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
 	  
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
@@ -100,7 +100,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
             tableInfo.dml = tableInfo.dml + 'convert(XML,@C' + idx + ',1)' + ','
             break;
           case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
-            switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+            switch (this.SPATIAL_FORMAT) {
                case "WKT":
                case "EWKT":
                  tableInfo.dml = tableInfo.dml + 'geography::STGeomFromText(@C' + idx + ',4326)' + ','
@@ -117,7 +117,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
             }    
             break;          
           case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
-            switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+            switch (this.SPATIAL_FORMAT) {
                case "WKT":
                case "EWKT":
                  tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromText(@C' + idx + ',4326)' + ','
@@ -166,7 +166,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
               case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
               case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
 			    let spatialFunction
-                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                switch (this.SPATIAL_FORMAT) {
                   case "WKB":
                   case "EWKB":
                     spatialFunction = `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;

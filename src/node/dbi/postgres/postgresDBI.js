@@ -98,10 +98,39 @@ class PostgresDBI extends YadamuDBI {
   set POSTGIS_VERSION(v)              { this._POSTGIS_VERSION = v }
 							         
   get POSTGIS_INSTALLED()             { return this.POSTGIS_VERSION !== "Not Installed" }
+  // get POSTGIS_INSTALLED()          { return false }
 
   // Standard Spatial formatting only available when PostGIS is installed.
 
-  get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT :  "Native" };
+  // If PostGIS is not available SPATIAL_FORMAT is set to 'GeoJSON' and the following rules apply for Export
+ 
+  //   Geography and Geometry data types are not available to there is no native Storage of EWKT/WKT/EWKB/EWKB/GeoJSON
+  //   POINT, LINE_SEGMENT, PATH, BOX, POLYGON are converted from native format to GeoJSON using PG/PLSQL functions
+  //   LINE_EQUATION and CIRCLE are are converted from native format to GeoJSON using PG/PLSQL functions
+  
+  // If PostGIS is available SPATIAL_FORMAT is set based on this.parameters.SPATIAL_FORMAT and this.DATA_TYPES.storageOptions.SPATIAL_FORMAT
+ 
+  //   Geography and Geometry data types are available. Spatial data is converted to SPATIAL_FORMAT using PostGIS functions
+  //   POINT, LINE_SEGMENT, PATH, BOX, POLYGON are converted from native format to GeoJSON using PG/PLSQL functions and then to SPATIAL_FORMAT using PostGIS functions
+  //   LINE_EQUATION is converted from native format to GeoJSON using PG/PLSQL functions
+  //   CIRCLE is converted from native format to GeoJSON using PG/PLSQL functions or to POLYGON and SPATIAL_FORMAT
+ 
+  // If PostGIS is not available the following rules apply for Import
+
+  //   Geography and Geometry types are not available, WKT/EWKT is stored as CLOB, WKB,EWKB is stored as BLOB, GeoJSON is stored as JSON
+  //   POINT, LINE_SEGMENT, PATH, BOX and POLYGON will be converted to GeoJSON by the Driver and converted from GeoJSON to 'native' format using PG/PLSQL functions
+  //   LINE_EQUATION and CIRCLE are converted from GeoJSON to 'native' format using PG/PLSQL functions
+  
+  // If PostGIS is available the following rules apply for Import
+
+  //   Geography and Geometry data types are available. Spatial data is converted from SPATIAL_FORMAT using PostGIS functions
+  //   POINT, LINE_SEGMENT, PATH, BOX, POLYGON are converted from SPATIAL_FORMAT to native format
+  //   LINE_EQUATION is converted from SPATIAL_FORMAT to native format
+  //   CIRCLE is converted from native format to GeoJSON using PG/PLSQL functions or to POLYGON and SPATIAL_FORMAT
+
+  // get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT :  "Native" };
+  
+  get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED ? this.parameters.SPATIAL_FORMAT || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT : 'GeoJSON' };
   get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 							          
   get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || PostgresDataTypes.storageOptions.JSON_TYPE }
@@ -189,17 +218,16 @@ class PostgresDBI extends YadamuDBI {
 	try {
 	  operation = 'pg.Client()'
 	  stack = new Error().stack;
-      const pgClient = new Client(this.vendorProperties)
-					
+      this.connection = new Client(this.vendorProperties)
 	  operation = 'Client.connect()'
 	  stack = new Error().stack;
-      this.connection = await pgClient.connect()
-    
+      await this.connection.connect()
 	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      await this.configureConnection()
+      return this.connection
 	} catch (e) {
       throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,operation))
 	}
-    await configureConnection()
   }
   
   async getPostgisInfo() {
@@ -538,7 +566,7 @@ class PostgresDBI extends YadamuDBI {
 	  jsonStorageOption    : this.DATA_TYPES.storageOptions.JSON_TYPE
 	}
 	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
+  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU.YADAMU_IMPORT_JSONB' : 'YADAMU.YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
 	const typeMappings = await this.getVendorDataTypeMappings(PostgresStatementGenerator)
     
@@ -732,6 +760,23 @@ class PostgresDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
+    if (!this.POSTGIS_INSTALLED) {
+      switch (this.INBOUND_SPATIAL_FORMAT) {
+        case "WKB":
+        case "EWKB":
+          this.DATA_TYPES.SPATIAL_TYPE = this.DATA_TYPES.BLOB_TYPE
+		  break;
+        case "WKT":
+	    case "EWKT":
+  	      this.DATA_TYPES.SPATIAL_TYPE = this.DATA_TYPES.CLOB_TYPE
+		  break;
+        case "GeoJSON":
+  	      this.DATA_TYPES.SPATIAL_TYPE = this.DATA_TYPES.JSON_TYPE
+		  break;
+	  }
+	  this.DATA_TYPES.GEOGRAPHY_TYPE = this.DATA_TYPES.SPATIAL_TYPE
+	  this.DATA_TYPES.GEOMETRY_TYPE = this.DATA_TYPES.SPATIAL_TYPE
+	}	  
     return await super.generateStatementCache(PostgresStatementGenerator, schema)
   }
 

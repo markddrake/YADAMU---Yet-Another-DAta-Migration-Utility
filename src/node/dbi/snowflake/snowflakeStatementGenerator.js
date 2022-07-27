@@ -66,6 +66,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 
     let parserRequired = false;
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
 
     const dataTypes = tableMetadata.dataTypes
 	
@@ -140,7 +141,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
     , insertMode      : 'Batch'
     , parserRequired  : parserRequired
     , _BATCH_SIZE     : this.dbi.BATCH_SIZE
-    , _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
+    , _SPATIAL_FORMAT : this.SPATIAL_FORMAT
     }
 	return tableInfo
   }

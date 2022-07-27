@@ -7,6 +7,8 @@
 		"mysql": 6,
 		"oracle": 9,
 		"postgres": 6,
+		"yugabyte": 6,
+		"cockroach": 6,
 		"redshift": 6,
 		"snowflake": 9,
 		"vertica": 6
@@ -17,19 +19,31 @@
 			"oracle": 10,
 			"mongodb": 15,
 			"postgres": -18,
+			"yugabyte": -18,
+			"cockroach": -18,
 			"snowflake": 17
 		},
 		"mysql": {
 			"oracle": 10,
 			"postgres": -18,
+			"yugabyte": -18,
+			"cockroach": -18,
 			"snowflake": 17
 		},
 		"postgres": {
 			"snowflake": 13
 		},
+		"yugabyte": {
+			"snowflake": 13
+		},
+		"cockroach": {
+			"snowflake": 13
+		},
 		"mariadb": {
 			"oracle": 10,
 			"postgres": -18,
+			"yugabyte": -18,
+			"cockroach": -18,
 			"snowflake": 17
 		},
 		"mongodb": {
@@ -56,6 +70,14 @@
 		,   "snowflake" : 19
 		},
 		"postgres" : {
+			"mssql" : 19
+		,   "snowflake" : 19
+		},
+		"yugabyte" : {
+			"mssql" : 19
+		,   "snowflake" : 19
+		},
+		"cockroach" : {
 			"mssql" : 19
 		,   "snowflake" : 19
 		},
@@ -95,6 +117,12 @@
 		"postgres": {
 			"oracle": true
 		},
+		"yugabyte": {
+			"oracle": true
+		},
+		"cockroach": {
+			"oracle": true
+		},
 		"snowflake": {
 			"oracle": true
 		},
@@ -125,7 +153,13 @@
 		"postgres": {
 			"vertica": true
 		},
+		"yugabyte": {
+			"vertica": true
+		},
 		"snowflake": {
+			"vertica": true
+		},
+		"cockroach": {
 			"vertica": true
 		},
 		"vertica": {
@@ -141,6 +175,18 @@
 	"INFINITY_IS_NULL": {
 		"default": false,
 		"postgres": {
+	      "mariadb": true
+		, "mssql": true
+		, "mysql": true
+		, "db2": true
+		},
+		"yugabyte": {
+	      "mariadb": true
+		, "mssql": true
+		, "mysql": true
+		, "db2": true
+		},
+		"cockroach":{
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
@@ -176,16 +222,19 @@
 		"oracle": {
 			"oracle#21": true,
 			"mysql": true,
-			"snowflake": true
+			"snowflake": true,
+			"cockroach": true
 		},
 		"mariadb": {
 			"oracle#21": true,
 			"mysql": true,
-			"snowflake": true
+			"snowflake": true,
+			"cockroach": true
 		},
 		"mongodb": {
 			"oracle#21": true,
 			"postgres": true,
+			"yugabyte": true,
 			"mysql": true,
 			"snowflake": true
 		}

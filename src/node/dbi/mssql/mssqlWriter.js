@@ -27,7 +27,7 @@ class MsSQLWriter extends YadamuWriter {
   
   async _writeBatch(batch,rowCount) {
 	  	  
-    // console.log(this.constructor.name,'writeBatch()',this.tableInfo.bulkSupported,)
+    // console.log(this.constructor.name,'writeBatch()',this.tableInfo.insertMode)
     // console.dir(batch,{depth:null})
     
     if (this.tableInfo.insertMode === 'BCP') {

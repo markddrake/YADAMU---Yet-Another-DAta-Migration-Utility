@@ -154,7 +154,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.MULTI_POLYGON_TYPE:        
         case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:  
           let spatialFunction
-          switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+          switch (this.SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":
               spatialFunction = `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
@@ -239,7 +239,8 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
     
     let insertMode = 'Batch';
-    	
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+	
     const insertOperators = []
 
 	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
@@ -263,7 +264,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.MULTI_LINE_TYPE:           
         case this.dbi.DATA_TYPES.MULTI_POLYGON_TYPE:        
         case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:  
-          switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+          switch (this.SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":
               insertOperators.push('ST_GeomFromWKB(?)');
@@ -316,14 +317,14 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     const rowConstructor = `(${insertOperators.join(',')})`
 
     const tableInfo = {
-      ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
-    , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
-    , columnNames    :  tableMetadata.columnNames
-    , targetDataTypes:  targetDataTypes
-    , insertMode     :  insertMode
-	, rowConstructor :  rowConstructor
-    , _BATCH_SIZE    :  this.dbi.BATCH_SIZE
-    , _SPATIAL_FORMAT:  this.dbi.INBOUND_SPATIAL_FORMAT
+      ddl             : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
+    , dml             : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
+    , columnNames     : tableMetadata.columnNames
+    , targetDataTypes : targetDataTypes
+    , insertMode      : insertMode
+	, rowConstructor  : rowConstructor
+    , _BATCH_SIZE     : this.dbi.BATCH_SIZE
+    , _SPATIAL_FORMAT : this.SPATIAL_FORMAT
     }
     
     // Add Support for Copy based Operations

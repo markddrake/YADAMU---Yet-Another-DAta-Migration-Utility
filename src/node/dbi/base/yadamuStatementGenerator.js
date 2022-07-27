@@ -8,9 +8,12 @@ class YadamuStatementGenerator {
   get SOURCE_VENDOR()        { return this._TARGET_VENDOR }
   set SOURCE_VENDOR(v)       { this._TARGET_VENDOR = v }
   
+  get SPATIAL_FORMAT()        { return this._SPATIAL_FORMAT || this.dbi.INBOUND_SPATIAL_FORMAT }
+  set SPATIAL_FORMAT(v)       { this._SPATIAL_FORMAT = v }
+  
   /*
   **
-  ** Return an instance of the YadamuDataTypes class specific to the value of SOURCE_VENDOR
+  ** Return an ins eek nce of the YadamuDataTypes class specific to the value of SOURCE_VENDOR
   **
   ** Initially returns a promise (since it uses the import() function.
   ** The promise is resolved and _SOURCE_DATA_TYPES is updated with the resolved value in init()
@@ -73,7 +76,6 @@ class YadamuStatementGenerator {
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.yadamuLogger = yadamuLogger;   
-    
   }
   
   async init() {
@@ -89,7 +91,31 @@ class YadamuStatementGenerator {
     console.log(statementCache)
     
   } 
- 
+
+  getSpatialFormat(tableMetadata) {
+	 
+	if (tableMetadata.hasOwnProperty("source")) {
+   	  const spatialColumnList = tableMetadata.dataTypes.flatMap((dataType,idx) => { return (YadamuDataTypes.isSpatial(dataType) && (idx < tableMetadata.source.length)) ? [idx] : [] })
+      const spatialFormats = spatialColumnList.map((idx) => {
+		return YadamuDataTypes.isSpatial(tableMetadata.source.dataTypes[idx]) ?  this.dbi.INBOUND_SPATIAL_FORMAT  
+		     : YadamuDataTypes.isBinary(tableMetadata.source.dataTypes[idx])  ? 'WKB'  
+	         : YadamuDataTypes.isJSON(tableMetadata.source.dataTypes[idx])    ? 'GeoJSON'
+			 : 'WKT'
+	  })
+	  if (spatialFormats.length > 0) {
+  	    // ToDo ### Multiple spatial formats
+	    if (spatialFormats.length > 1)  {
+		  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Multiple spatial formats detected : ${spatialFormats}`)
+	    }
+	    if (this.dbi.INBOUND_SPATIAL_FORMAT !== spatialFormats[1]) {
+		  this.yadamuLogger.qa([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Spatial format mismatch detected :${this.dbi.INBOUND_SPATIAL_FORMAT} Vs ${spatialFormats}`)
+	    }		  
+	    return spatialFormats[0]
+	  }
+	}		  
+	return this.dbi.INBOUND_SPATIAL_FORMAT  
+  }
+  
   isJSON(dataType) {
     return YadamuDataTypes.isJSON(dataType)
   }
@@ -139,7 +165,7 @@ class YadamuStatementGenerator {
 	 ** Adjust data type based on size constraints
 	 **
 	 */
-	 	
+	 
     switch (targetDataType) {
       case this.dbi.DATA_TYPES.CHAR_TYPE:
       case this.dbi.DATA_TYPES.VARCHAR_TYPE:
@@ -192,10 +218,12 @@ class YadamuStatementGenerator {
 
 	  case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
 	  case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+	    const components = targetDataType.split(" ")
+	    const leadIn = components.shift()
         switch (true) {
           case (sizeConstraint.length === 0):                                     return targetDataType
-          case (sizeConstraint[0] > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return targetDataType.replace(' ',`(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION}) WITH TIME ZONE`)
-          default:                                                                return targetDataType.replace(' ',`(${sizeConstraint[0]}) WITH TIME ZONE`)
+          case (sizeConstraint[0] > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${leadIn}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION}) ${components.join(" ")}`
+          default:                                                                return `${leadIn}(${sizeConstraint[0]}) ${components.join(" ")}`
         }
       default:                                                                    return targetDataType
     }   
@@ -225,6 +253,7 @@ class YadamuStatementGenerator {
      }
 	 
 	 // If the soure and target vendor are the same no mapping operations are required ### this.dbi.DATATYPE_IDENTITY_MAPPING ???
+	
 	 
      if (this.dbi.DATABASE_VENDOR === this.SOURCE_VENDOR) {
        return [...tableMetadata.dataTypes]
@@ -237,7 +266,7 @@ class YadamuStatementGenerator {
 			             || this.TYPE_MAPPINGS.get(dataType.toUpperCase()) 
 	                     || this.mapUserDefinedDataType(dataType,tableMetadata.sizeConstraints[idx])
                          || this.yadamuLogger.logInternalError([this.dbi.DATABASE_VENDOR,`MAPPING NOT FOUND`],`Missing Mapping for "${dataType}" in mappings for "${this.SOURCE_VENDOR}".`)
-	   
+						   
 	   targetDataType = this.refactorBySizeConstraint(dataType,targetDataType,tableMetadata.sizeConstraints[idx])
        // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.SOURCE_VENDOR,dataType,tableMetadata.sizeConstraints[idx]],`Mapped to "${targetDataType}".`)
        return targetDataType
@@ -271,7 +300,7 @@ class YadamuStatementGenerator {
       
       if (dataTypeDefinition.length && (dataTypeDefinition.length > 0)) {
         const type = dataTypeDefinition.type.toLowerCase()
-        return (type.includes(' ') && !type.toLowerCase().startsWith('long')  &&!type.startsWith('bit')) ? type.replace(' ',`(${dataTypeDefinition.length}) `) : `${dataTypeDefinition.type}(${dataTypeDefinition.length})`
+        return (type.includes(' ') && !type.toLowerCase().startsWith('long')  && !type.toLowerCase().startsWith('bit') && !type.toLowerCase().startsWith('character')) ? type.replace(' ',`(${dataTypeDefinition.length}) `) : `${dataTypeDefinition.type}(${dataTypeDefinition.length})`
       }
     }
     else {
@@ -300,6 +329,7 @@ class YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 
     let insertMode = 'Batch';
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
    
     const insertOperators = []
     
@@ -321,7 +351,7 @@ class YadamuStatementGenerator {
     , targetDataTypes  : targetDataTypes
     , insertMode       : insertMode
     , _BATCH_SIZE      : this.dbi.BATCH_SIZE
-    , _SPATIAL_FORMAT  : this.dbi.INBOUND_SPATIAL_FORMAT
+    , _SPATIAL_FORMAT  : this.SPATIAL_FORMAT
     }
     
     return tableInfo

@@ -65,13 +65,11 @@ class OracleOutputManager extends YadamuOutputManager {
   generateTransformations(targetDataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-
+	
     let spatialFormat = this.SPATIAL_FORMAT	
-
     return targetDataTypes.map((targetDataType,idx) => {
 
       const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
-	
 	  switch (dataType.type.toUpperCase()) {
         case this.dbi.DATA_TYPES.SPATIAL_TYPE:
           // Metadata based decision
@@ -80,12 +78,12 @@ class OracleOutputManager extends YadamuOutputManager {
               // SDO_UTIL does not support GeoJSON in 11.x database
               spatialFormat = "WKT"
 			  return (col,idx) =>  {
-                return YadamuSpatialLibrary.geoJSONtoWKT(col)
+				return YadamuSpatialLibrary.geoJSONtoWKT(col)
               }
             case ((this.dbi.DATABASE_VERSION > 19) && (this.SPATIAL_FORMAT === 'EWKB')):
               spatialFormat = "WKB"
 			  return (col,idx) =>  {
-                return YadamuSpatialLibrary.ewkbToWKB(col)
+				return YadamuSpatialLibrary.ewkbToWKB(col)
               }
 			default:
               return null
@@ -94,7 +92,6 @@ class OracleOutputManager extends YadamuOutputManager {
           return (col,idx) =>  {
             return typeof col === 'object' ? JSON.stringify(col) : col
           }
-	      break;
         case this.dbi.DATA_TYPES.SET_TYPE:
         case this.dbi.DATA_TYPES.JSON_TYPE:
           // Convert JSON representation to String.
@@ -307,8 +304,8 @@ class OracleOutputManager extends YadamuOutputManager {
     if (this.tableInfo.numericBindPositions.length === 0) {
       this.checkNumericBinds = (row) => {}
     }
-
   }
+  
   cacheRow(row) {
 
     /*
@@ -339,6 +336,7 @@ class OracleOutputManager extends YadamuOutputManager {
     */
 
     // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.COPY_METRICS.cached],'cacheRow()')
+	
     // if (this.COPY_METRICS.received === 1) {console.log(row)}
 
     try {
@@ -396,8 +394,9 @@ class OracleOutputManager extends YadamuOutputManager {
       else {
         this.batch.rows.push(row);
       }
-      this.checkNumericBinds(row)
+	  this.checkNumericBinds(row)
       this.COPY_METRICS.cached++
+      // if (this.COPY_METRICS.received === 1) {console.log(row)}
     } catch (cause) {
       this.handleIterativeError('CACHE ONE',cause,this.COPY_METRICS.cached+1,row);
     }

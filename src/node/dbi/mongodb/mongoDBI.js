@@ -92,7 +92,6 @@ class MongoDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
  
-  get MONGO_STRIP_ID()         { return this.parameters.MONGO_STRIP_ID        || MongoConstants.MONGO_STRIP_ID}
   get DEFAULT_DATABASE()       { return this.parameters.DEFAULT_DATABASE      || MongoConstants.DEFAULT_DATABASE };
   get PORT()                   { return this.parameters.PORT                  || MongoConstants.PORT}
   get MONGO_SAMPLE_LIMIT()     { return this.parameters.MONGO_SAMPLE_LIMIT    || MongoConstants.MONGO_SAMPLE_LIMIT}
@@ -778,12 +777,13 @@ class MongoDBI extends YadamuDBI {
 			  tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
 			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.coalesceTypeInfo(typeInformation[0][col].type)
 				switch (dataType) {
+				   case 'null':
+			         dataType = 'string' 
+                     tableInfo.SIZE_CONSTRAINT_ARRAY.push([MongoConstants.DEFAULT_STRING_LENGTH]) 
+					 break
 				   case 'string':
 				   case 'binData':
 				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([this.roundP2(typeInformation[0][col].size)])
-					 break
-				   case 'null':
-                     tableInfo.SIZE_CONSTRAINT_ARRAY.push([MongoConstants.DEFAULT_STRING_LENGTH]) 
 					 break
 				   case 'objectId':
 				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([12]) 
@@ -800,7 +800,6 @@ class MongoDBI extends YadamuDBI {
 				   default:
 				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([typeInformation[0][col].size])
 				}
-			    dataType = dataType ===  'null' ? 'string' : dataType                  
 			    tableInfo.DATA_TYPE_ARRAY.push(dataType)
 			  })
             }

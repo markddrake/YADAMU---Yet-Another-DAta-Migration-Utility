@@ -71,6 +71,7 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
 
     let insertMode = 'Batch';
     let batchSize = this.dbi.BATCH_SIZE
+    this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
     
     const insertOperators = []
     
@@ -129,7 +130,7 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
     , targetDataTypes  : targetDataTypes
     , insertMode       : insertMode
     , _BATCH_SIZE      : batchSize
-    , _SPATIAL_FORMAT  : this.dbi.INBOUND_SPATIAL_FORMAT
+    , _SPATIAL_FORMAT  : this.SPATIAL_FORMAT
     }
     
 	return tableInfo

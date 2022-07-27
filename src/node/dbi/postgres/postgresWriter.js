@@ -1,4 +1,4 @@
-"use strict"
+-"use strict"
 
 import { performance } from 'perf_hooks';
 

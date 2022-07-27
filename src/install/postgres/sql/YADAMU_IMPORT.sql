@@ -1,5 +1,12 @@
 /*
 **
+** Create the YADAMU Schema
+**
+*/
+--
+create schema if not exists YADAMU;
+/*
+**
 ** Drop functions regardless of signature
 **
 */
@@ -11,8 +18,10 @@ declare
 begin
    SELECT count(*)::int
         , 'DROP FUNCTION ' || string_agg(oid::regprocedure::text, '; DROP FUNCTION ')
-   FROM   pg_proc
-   WHERE  UPPER(proname) in ('YADAMU_EXPORT','MAP_FOREIGN_DATA_TYPE','MAP_PGSQL_DATA_TYPE','GENERATE_STATEMENTS','YADAMU_IMPORT_JSON','YADAMU_IMPORT_JSONB','GENERATE_SQL','EXPORT_JSON','IMPORT_JSON','IMPORT_JSONB')
+    FROM  pg_proc
+    WHERE UPPER(pronamespace::regnamespace::text) = 'YADAMU' 
+      and UPPER(proname) not in ('YADAMU_INSTANCE_ID','YADAMU_INSTALLATION_TIMESTAMP')
+ 	  and prokind = 'f'
    INTO   _count, _sql;  -- only returned if trailing DROPs succeed
 
    if _count > 0 then
@@ -21,7 +30,8 @@ begin
    SELECT count(*)::int
         , 'DROP PROCEDURE ' || string_agg(oid::regprocedure::text, '; DROP PROCEDURE ')
    FROM   pg_proc
-   WHERE  UPPER(proname) in ('SET_VENDOR_TYPE_MAPPINGS')
+   WHERE  UPPER(pronamespace::regnamespace::text) = 'YADAMU'
+      and prokind = 'p'
    INTO   _count, _sql;  -- only returned if trailing DROPs succeed
 
    if _count > 0 then
@@ -30,6 +40,44 @@ begin
 end
 $$ 
 language plpgsql;
+--
+/*
+**
+** Yadamu Vendor
+**
+*/
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_VENDOR() 
+returns text
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case 
+         when version() like '%yugabyte%' then
+           'Yugabyte'
+		 else 
+		   'Postgres'
+	    end;
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.POSTGIS_INSTALLED() 
+returns boolean
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+declare
+  V_POSTGIS_VERSION    VARCHAR(512);
+begin
+  SELECT PostGIS_full_version() into V_POSTGIS_VERSION;
+  return true;
+exception
+  when undefined_function then
+    return false;
+  when others then
+    RAISE;
+end;
+$$ 
+LANGUAGE plpgsql;
 --
 /*
 **
@@ -43,7 +91,7 @@ declare
 begin
 
   begin
-    SELECT YADAMU_INSTANCE_ID() into V_YADAMU_INSTANCE_ID;
+    SELECT YADAMU.YADAMU_INSTANCE_ID() into V_YADAMU_INSTANCE_ID;
   exception
     when undefined_function then
       V_YADAMU_INSTANCE_ID := upper(gen_random_uuid()::CHAR(36));
@@ -51,7 +99,7 @@ begin
       RAISE;
    end;
    
-   COMMAND  := concat('CREATE OR REPLACE FUNCTION YADAMU_INSTANCE_ID() RETURNS CHARACTER VARYING STABLE AS $X$ select ''',V_YADAMU_INSTANCE_ID,''' $X$ LANGUAGE SQL');
+   COMMAND  := concat('CREATE OR REPLACE FUNCTION YADAMU.YADAMU_INSTANCE_ID() RETURNS CHARACTER VARYING STABLE AS $X$ select ''',V_YADAMU_INSTANCE_ID,''' $X$ LANGUAGE SQL');
    EXECUTE COMMAND;
 end $$;
 --
@@ -61,107 +109,154 @@ declare
    V_INSTALLATION_TIMESTAMP  character varying(27);
 begin
   V_INSTALLATION_TIMESTAMP := to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM');
-  COMMAND  := concat('CREATE OR REPLACE FUNCTION YADAMU_INSTALLATION_TIMESTAMP() RETURNS CHARACTER VARYING STABLE AS $X$ select ''',V_INSTALLATION_TIMESTAMP,''' $X$ LANGUAGE SQL');
+  COMMAND  := concat('CREATE OR REPLACE FUNCTION YADAMU.YADAMU_INSTALLATION_TIMESTAMP() RETURNS CHARACTER VARYING STABLE AS $X$ select ''',V_INSTALLATION_TIMESTAMP,''' $X$ LANGUAGE SQL');
   EXECUTE COMMAND;
 end $$;
 --
-CREATE OR REPLACE FUNCTION YADAMU_AsPointArray(polygon)
-returns point[]
+/*
+**
+** Geometric function needed when PostGIS is not installed
+**
+*/
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_IS_WKT() 
+returns boolean
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
---
--- Array of Points from Polygon
---
-select array_agg(POINT(V))
-  from unnest(string_to_array(ltrim(rtrim($1::VARCHAR,'))'),'(('),'),(')) V
+select true
 $$
 LANGUAGE SQL;
 --
-CREATE OR REPLACE FUNCTION YADAMU_AsPointArray(path)
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_IS_WKB() 
+returns boolean
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select true
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_IS_GEOJSON() 
+returns boolean
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select true
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_POINT_ARRAY(text)
+/*
+**
+** Array of Points from open or closed path
+**
+*/
 returns point[]
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
+select array_agg(point(v)) points
+  from unnest(string_to_array(left(right($1,-2),-2),'),(')) v
+$$
+LANGUAGE SQL;
 --
--- Array of Points from Path
+CREATE OR REPLACE FUNCTION YADAMU.AS_PATH(point[],boolean)
 --
-select array_agg(POINT(V))
-  from unnest(string_to_array(ltrim(rtrim($1::VARCHAR,')])'),'[('),'),(')) V
+-- Geneate a Path from an Array of Points
+-- 2nd paramter controls whether an open[] path or closed() path is generated: true indicates a closed path
+-- Does not check whether the array of points is cyclical
+--
+returns path
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case
+         when ($2) then
+           concat('(',string_agg(p::text,','),')')::path
+         else 
+           concat('[',string_agg(p::text,','),']')::path
+		 end 
+    from unnest($1) p
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_PATH(lseg)
+/*
+**
+** Convert Line Segment consisting of 2 points into an Open Path object consisting of 2 points
+** Enables conversion of lseg to geometry when using PostGIS.
+**
+*/
+returns path
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select YADAMU.AS_PATH(array_append(array_append(null::point[],$1[0]),$1[1]),false)
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_LINE_SEGMENT(path) 
+/*
+**
+** Convert Path consisting of 2 points into a Line Segment consisting of 2 points
+** Enables conversion of path to lseg when using PostGIS.
+*/
+returns LSeg
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select lseg(p[1],p[2])
+  from YADAMU.AS_POINT_ARRAY($1::text) p
 $$
 LANGUAGE SQL;
 --
 /*
 **
-** JSON Based Export/Import of TSVECTOR
+** GeoJSON conversions
 **
 */
---
-CREATE OR REPLACE FUNCTION YADAMU_AsJSON(tsvector) 
-returns jsonb
-STABLE RETURNS NULL ON NULL INPUT
-as
-$$
-select array_to_json(tsvector_to_array($1))::jsonb
-$$
-LANGUAGE SQL;
---
-CREATE OR REPLACE FUNCTION YADAMU_AsTSVector(jsonb) 
-returns tsvector
-STABLE RETURNS NULL ON NULL INPUT
-as
-$$
-select array_to_tsvector(array_agg(value)) from jsonb_array_elements_text($1)
-$$
-LANGUAGE SQL;
---
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(point) 
 /*
 **
-** JSON Based Export/Import of RANGE types
+** Convert a Point to GeoJSON Point object
 **
 */
-CREATE OR REPLACE FUNCTION YADAMU_AsJSON(anyRange) 
 returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
 select jsonb_build_object(
-  'hasLowerBound',
-  not lower_inf($1),
-  'lowerBound',
-  lower($1),
-  'includeLowerBound',
-  lower_inc($1),
-  'hasUpperBound',
-  not upper_inf($1),
-  'upperBound',  
-  upper($1),
-  'includeUpperBound',
-  upper_inc($1)
-)
+         'type',
+         'Point',
+         'coordinates',
+         jsonb_build_array(
+           ($1)[0],
+           ($1)[1]
+         )
+      )
 $$
 LANGUAGE SQL;
 --
-create or replace function YADAMU_AsRange(jsonb)
-returns character varying
+CREATE OR REPLACE FUNCTION YADAMU.AS_POINT(jsonb) 
+/*
+**
+** Convert GeoJSON Point object to a Point
+**
+*/
+returns point
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select case when ($1 ->> 'includeLowerBound')::boolean then '[' else '(' end
-	|| case when ($1 ->> 'hasLowerBound')::boolean  then '"' || ($1 ->> 'lowerBound') || '"' else '' end
-	|| ','
-	|| case when ($1 ->> 'hasUpperBound')::boolean then '"' || ($1 ->> 'upperBound') || '"' else '' end
-    || case when ($1 ->> 'includeUpperBound')::boolean then ']' else ')' end;
+select point(($1 #>> '{coordinates,0}')::double precision,($1 #>> '{coordinates,1}')::double precision)
 $$
 LANGUAGE SQL;
 --
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(line) 
 /*
 **
-** GeoJSON Based Export/Import of LINE 
+** Convert a LINE equation to a GeoJSON Feature object consisting of a GeoJSON point object and constant property
 **
 */
---
-CREATE OR REPLACE FUNCTION YADAMU_AsGEOJSON(line) 
 returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
@@ -190,7 +285,12 @@ select jsonb_build_object(
 $$
 LANGUAGE SQL;
 --
-CREATE OR REPLACE FUNCTION YADAMU_AsLine(jsonb) 
+CREATE OR REPLACE FUNCTION YADAMU.AS_LINE_EQ(jsonb) 
+/*
+**
+** Convert GeoJSON Feature object consisting of a GeoJSON point object and constant to a LINE equation
+**
+*/
 returns line
 STABLE RETURNS NULL ON NULL INPUT
 as
@@ -199,13 +299,355 @@ select ('{' || ($1 #>> '{geometry,coordinates,0}') || ',' || ($1 #>> '{geometry,
 $$
 LANGUAGE SQL;
 --
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(lseg) 
 /*
 **
-** GeoJSON Based Export/Import of CIRCLE 
+** Convert Line consisting of 2 points into a GEOJSON LineString object
+**
+*/
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select jsonb_build_object(
+         'type',
+         'LineString',
+         'coordinates',
+         jsonb_build_array(
+           jsonb_build_array(
+             (($1)[0])[0],
+             (($1)[0])[1]
+		   ),
+           jsonb_build_array(
+             (($1)[1])[0],
+             (($1)[1])[1]
+		   )
+        )
+      )
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_LINE_SEGMENT(jsonb) 
+/*
+**
+** Convert a GEOJSON LineString object into a Line consisting of 2 points
+** LineSegment is defined by the first 2 points in the LineString
+** Passing a Line String containing more than 2 points is not valid but is not trapped.
+**
+*/
+returns LSeg
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select lseg(point((c #> '{0,0}')::double precision,(c #> '{0,1}')::double precision),point((c #> '{1,0}')::double precision,(c #> '{1,1}')::double precision))
+  from jsonb_extract_path($1,'coordinates') c;
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(box) 
+/*
+**
+** Convert a Box consisting of 2 points to a GeoJSON Polygon consisting of 5 ordered points
+**
+*/
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select jsonb_build_object(
+         'type',
+         'Polygon',
+         'coordinates',
+         jsonb_build_array(
+           jsonb_build_array(
+             jsonb_build_array(
+               case 
+			     when ($1[0])[0] < ($1[1])[0] then
+			       ($1[0])[0]
+                 else 
+			       ($1[1])[0] 
+			   end,
+               case 
+			     when ($1[0])[1] < ($1[1])[1] then
+			       ($1[0])[1]
+                 else 
+			       ($1[1])[1]
+			   end
+			 ),
+             jsonb_build_array(
+               case 
+			     when ($1[0])[0] < ($1[1])[0] then
+			       ($1[0])[0]
+                 else 
+			       ($1[1])[0] 
+			   end,
+               case 
+			     when ($1[0])[1] < ($1[1])[1] then
+			       ($1[1])[1]
+                 else 
+			       ($1[0])[1]
+			   end
+			 ),
+             jsonb_build_array(
+               case 
+			     when ($1[0])[0] < ($1[1])[0] then
+			       ($1[1])[0]
+                 else 
+			       ($1[0])[0] 
+			   end,
+               case 
+			     when ($1[0])[1] < ($1[1])[1] then
+			       ($1[1])[1]
+                 else 
+			       ($1[0])[1]
+			   end
+			 ),
+             jsonb_build_array(
+               case 
+			     when ($1[0])[0] < ($1[1])[0] then
+			       ($1[1])[0]
+                 else 
+			       ($1[0])[0] 
+			   end,
+               case 
+			     when ($1[0])[1] < ($1[1])[1] then
+			       ($1[0])[1]
+                 else 
+			       ($1[1])[1]
+			   end
+			 ),
+			 jsonb_build_array(
+               case 
+			     when ($1[0])[0] < ($1[1])[0] then
+			       ($1[0])[0]
+                 else 
+			       ($1[1])[0] 
+			   end,
+               case 
+			     when ($1[0])[1] < ($1[1])[1] then
+			       ($1[0])[1]
+                 else 
+			       ($1[1])[1]
+			   end
+			 )
+           )
+		 )
+      )
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_BOX(jsonb) 
+/*
+**
+** Convert a GeoJSON Polygon consisting of 5 ordered points representing a BOX into a box containing the 1st and 3rd points
+**
+*/
+returns box
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select box(point(($1 #>> '{coordinates,0,0,0}')::double precision,($1 #>> '{coordinates,0,0,1}')::double precision),point(($1 #>> '{coordinates,0,2,0}')::double precision,($1 #>> '{coordinates,0,2,1}')::double precision))
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_CLOSED_POINT_ARRAY(point[])
+/*
+**
+** Close a point array if it is not already closed
+**
+*/
+returns point[]
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case
+         when (($1[1] ~= $1[array_length($1,1)])) then
+           $1
+         else
+           array_append($1,$1[1])
+       end
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(path) 
+/*
+**
+** Convert a path to GEOJSON. There are two variants of a path, open[] and closed().
+** 
+** A open path is mapped to a line string
+**
+** A Closed Path may need the first pointed appended to the set of points
+** 
+*/
+--
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select jsonb_build_object(
+         'type',
+         'LineString',
+         'coordinates',
+          json_agg(
+            json_build_array(p[0],p[1])
+          )
+       )
+       from unnest(case 
+	          when isOpen($1) then
+	       	    YADAMU.AS_POINT_ARRAY($1::text)
+		      else
+			    YADAMU.AS_CLOSED_POINT_ARRAY(YADAMU.AS_POINT_ARRAY($1::text))
+		      end
+			) p
+$$            
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(polygon) 
+/*
+**
+** Convert a Polygon to GEOJSON. ##TODO Handle cut-outs ????
+**
+*/
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select jsonb_build_object(
+         'type',
+         'Polygon',
+         'coordinates',
+		 json_build_array(
+           json_agg(
+             json_build_array(p[0],p[1])
+           )
+		 )
+       )
+       from unnest(YADAMU.AS_CLOSED_POINT_ARRAY(YADAMU.AS_POINT_ARRAY($1::text))) p
+$$            
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_OPEN_POINT_ARRAY(point[])
+/*
+**
+** Remove the last member from a cyclical array of points
+**
+*/
+returns point[]
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case 
+         when ($1[1] ~= $1[array_length($1,1)]) then
+		   trim_array($1,1)
+         else 
+           $1
+        end 
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_CLOSED_POINT_ARRAY(point[])
+/*
+**
+** Append the first member of an array to non-cyclical array of points
+**
+*/
+returns point[]
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case 
+         when ($1[1] ~= $1[array_length($1,1)]) then
+		   $1
+         else 
+           array_append($1,$1[1])
+        end 
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_OPEN_PATH(point[])
+/*
+**
+** Geneate an open[] path from an Array of Points. 
+** If the array of points is cyclical the last member 
+** of the array is removed before the path is generated 
+**
+*/
+returns path
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select concat('[',string_agg(p::text,','),']')::path
+  from unnest(YADAMU.AS_OPEN_POINT_ARRAY($1)) p
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_CLOSED_PATH(point[])
+/*
+**
+** Geneate a closed() path from an Array of Points. 
+** If the array of points is not cyclical the first member 
+** of the array is removed before the path is generated 
 **
 */
 --
-CREATE OR REPLACE FUNCTION YADAMU_AsGEOJSON(circle) 
+--
+returns path
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select concat('(',string_agg(p::text,','),')')::path
+  from unnest(YADAMU.AS_OPEN_POINT_ARRAY($1)) p
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_PATH(jsonb) 
+/*
+**
+** Geneate a path from a GeoJSON LineString
+** If the array of points is cyclical the last member 
+** of the array is removed and a closed path is generated 
+**
+*/
+returns path
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+with POINT_ARRAY 
+as (
+select array_agg(point((p ->> 0)::double precision,(p ->> 1)::double precision)) points
+  from jsonb_array_elements(jsonb_extract_path($1,'coordinates')) p
+)
+select case
+         when (points[1] ~= points[array_length(points,1)]) then
+           YADAMU.AS_CLOSED_PATH(points)
+         else 
+		   YADAMU.AS_OPEN_PATH(points)
+       end
+  from POINT_ARRAY
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_POLYGON(jsonb) 
+returns polygon
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+with POINT_ARRAY 
+as (
+select array_agg(point((p ->> 0)::double precision,(p ->> 1)::double precision)) points
+  from jsonb_array_elements(jsonb_extract_path($1,'coordinates','0')) p
+)
+select polygon(YADAMU.AS_CLOSED_PATH(points))
+  from POINT_ARRAY
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_GEOJSON(circle) 
+/*
+**
+** Convert a Circle to a GeoJSON Feature object consisting of a GeoJSON point object and a radius property
+**
+*/
 returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
@@ -234,38 +676,90 @@ select jsonb_build_object(
 $$
 LANGUAGE SQL;
 --
-CREATE OR REPLACE FUNCTION YADAMU_AsCircle(jsonb) 
+CREATE OR REPLACE FUNCTION YADAMU.AS_CIRCLE(jsonb) 
+/*
+**
+** Convert GeoJSON Feature object consisting of a GeoJSON point object and radius to a Circle
+**
+*/
 returns circle
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select ('<(' || ($1 #>> '{geometry,coordinates,0}') || ',' || ($1 #>> '{geometry,coordinates,1}') || '),' || ($1 #>> '{properties,radius}') || '>')::circle
-$$
-LANGUAGE SQL;
---
-CREATE OR REPLACE FUNCTION YADAMU_AsLSeg(path) 
-returns LSeg
-STABLE RETURNS NULL ON NULL INPUT
-as
---
--- PATH to LSEG
---
-$$
-with POINTS as (
-  select YADAMU_asPointArray($1) P
-)   
-select lseg(point(p[1]),point(p[2]))
-  from POINTS;
+select circle(point(($1 #>> '{geometry,coordinates,0}')::double precision,($1 #>> '{geometry,coordinates,1}')::double precision),($1 #>> '{properties,radius}')::double precision)
 $$
 LANGUAGE SQL;
 --
 /*
 **
-** Postgress YADAMU_EXPORT Function.
+** JSON Based Export/Import of TSVECTOR
 **
 */
 --
-create or replace function YADAMU_EXPORT(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_OPTIONS JSONB DEFAULT '{"circleAsPolygon": false}'::JSONB) 
+CREATE OR REPLACE FUNCTION YADAMU.AS_JSON(tsvector) 
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select array_to_json(tsvector_to_array($1))::jsonb
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_TS_VECTOR(jsonb) 
+returns tsvector
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select array_to_tsvector(array_agg(value)) from jsonb_array_elements_text($1)
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** JSON Based Export/Import of RANGE types
+**
+*/
+CREATE OR REPLACE FUNCTION YADAMU.AS_JSON(anyRange) 
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select jsonb_build_object(
+  'hasLowerBound',
+  not lower_inf($1),
+  'lowerBound',
+  lower($1),
+  'includeLowerBound',
+  lower_inc($1),
+  'hasUpperBound',
+  not upper_inf($1),
+  'upperBound',  
+  upper($1),
+  'includeUpperBound',
+  upper_inc($1)
+)
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_RANGE(jsonb)
+returns character varying
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case when ($1 ->> 'includeLowerBound')::boolean then '[' else '(' end
+    || case when ($1 ->> 'hasLowerBound')::boolean  then '"' || ($1 ->> 'lowerBound') || '"' else '' end
+    || ','
+    || case when ($1 ->> 'hasUpperBound')::boolean then '"' || ($1 ->> 'upperBound') || '"' else '' end
+    || case when ($1 ->> 'includeUpperBound')::boolean then ']' else ')' end;
+$$
+LANGUAGE SQL;
+/*
+**
+** YADAMU_EXPORT Function.
+**
+*/
+--
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_EXPORT(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_OPTIONS JSONB DEFAULT '{"circleAsPolygon": false}'::JSONB) 
 returns TABLE ( TABLE_SCHEMA VARCHAR, TABLE_NAME VARCHAR, COLUMN_NAME_ARRAY JSONB, DATA_TYPE_ARRAY JSONB, SIZE_CONSTRAINT_ARRAY JSONB, CLIENT_SELECT_LIST TEXT, ERRORS JSONB)
 as $$
 declare
@@ -274,20 +768,21 @@ declare
   PLPGSQL_CTX             TEXT;
   C_CHARACTER_MAX_LENGTH  int = 1*1024*1024*1024;
   V_SIZE_CONSTRAINTS      JSONB;
+  V_POSTGIS_INSTALLED     BOOLEAN := YADAMU.POSTGIS_INSTALLED();
 begin
-
+                                   
   for r in select t.table_schema "TABLE_SCHEMA"
                  ,t.table_name "TABLE_NAME"
-	             ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
-	             ,jsonb_agg(case 
-				              when ((c.data_type = 'character') and (c.character_maximum_length is null)) then
+                 ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
+                 ,jsonb_agg(case 
+                              when ((c.data_type = 'character') and (c.character_maximum_length is null)) then
                                 c.udt_name 
                               when c.data_type = 'USER-DEFINED' then
                                 c.udt_name 
                               when c.data_type = 'ARRAY' then
                                 e.data_type || ' ARRAY'
                               when ((c.data_type = 'interval') and (c.interval_type is not null)) then
-							    c.data_type || ' ' || c.interval_type
+                                c.data_type || ' ' || c.interval_type
                               else 
                                 c.data_type 
                             end 
@@ -302,14 +797,14 @@ begin
                                 jsonb_build_array(c.character_maximum_length)
                               when (c.datetime_precision is not null) then 
                                 jsonb_build_array(c.datetime_precision)
-							  when ((c.data_type in ('character','character varying','text','xml')) and (c.character_maximum_length is null)) then
-							    jsonb_build_array(C_CHARACTER_MAX_LENGTH)
-						      else
-							    jsonb_build_array()
+                              when ((c.data_type in ('character','character varying','text','xml')) and (c.character_maximum_length is null)) then
+                                jsonb_build_array(C_CHARACTER_MAX_LENGTH)
+                              else
+                                jsonb_build_array()
                             end
                             order by ordinal_position
                           ) "SIZE_CONSTRAINT_ARRAY"
-	             ,string_agg(case 
+                 ,string_agg(case 
                                when c.data_type = 'xml' then
                                   '"' || column_name || '"' || '::text'
                                when c.data_type in ('money') then
@@ -323,10 +818,10 @@ begin
                                when c.data_type in ('time without time zone') then
                                  'to_char ((''epoch''::date + "' || COLUMN_NAME || '")::timestamp at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US'') "' || COLUMN_NAME || '"'
                                when c.data_type in ('time with time zone') then
-							     'to_char ((''epoch''::date + "' || COLUMN_NAME || '")::timestamptz, ''YYYY-MM-DD"T"HH24:MI:SS.US'') "' || COLUMN_NAME || '"'
-							   when c.data_type like 'interval%' then
+                                 'to_char ((''epoch''::date + "' || COLUMN_NAME || '")::timestamptz, ''YYYY-MM-DD"T"HH24:MI:SS.US'') "' || COLUMN_NAME || '"'
+                               when c.data_type like 'interval%' then
                                  '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
-                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geometry')))  then
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geometry')) and V_POSTGIS_INSTALLED)  then
                                  case 
                                    when P_SPATIAL_FORMAT = 'WKB' then
                                      'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
@@ -338,10 +833,8 @@ begin
                                      'ST_AsEWKT("' || column_name || '") "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
                                      'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
-                                   else
-								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
                                  end
-                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geography')))  then
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geography')) and V_POSTGIS_INSTALLED)  then
                                  case 
                                    when P_SPATIAL_FORMAT = 'WKB' then
                                      'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
@@ -353,10 +846,8 @@ begin
                                      'ST_AsText("' || column_name || '") "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
                                      'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
-                                   else
-								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
                                  end
-                               when (c.data_type in ('point','path','polygon')) then
+                               when (c.data_type in ('point','path','polygon') and V_POSTGIS_INSTALLED) then
                                  case 
                                    when P_SPATIAL_FORMAT = 'WKB' then
                                      'ST_AsBinary("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
@@ -368,33 +859,23 @@ begin
                                      'ST_AsEWKT("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
                                      'ST_AsText("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
-                                   when P_SPATIAL_FORMAT = 'YadamuJSON' then
-								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
-                                   else
-								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
                                  end
-                               when (c.data_type = 'line') then
-                                 'YADAMU_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
- 							   when (c.data_type = 'lseg') then
+                               when ((c.data_type = 'lseg') and V_POSTGIS_INSTALLED) then
+                                 case
+                                   when P_SPATIAL_FORMAT = 'WKB' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsBinary(YADAMU.AS_PATH("' || column_name || '")::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsText(YADAMU.AS_PATH("' || column_name || '")::geometry,18) end "' || COLUMN_NAME || '"' 
+                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB(YADAMU.AS_PATH("' || column_name || '")::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT(YADAMU.AS_PATH("' || column_name || '")::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON(YADAMU.AS_PATH("' || column_name || '"))::geometry) end "' || COLUMN_NAME || '"'
+                                 end
+                               when ((c.data_type = 'box') and V_POSTGIS_INSTALLED) then
                                  case 
                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsBinary(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                   when P_SPATIAL_FORMAT = 'WKT' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsText(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
-                                   when P_SPATIAL_FORMAT = 'EWKB' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                   when P_SPATIAL_FORMAT = 'EWKT' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                   when P_SPATIAL_FORMAT = 'YadamuJSON' then
-								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
-                                   else
-								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
-                                 end
-                               when (c.data_type = 'box') then
-                                 case 
-								   when P_SPATIAL_FORMAT = 'WKB' then
                                      'ST_AsBinary(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'WKT' then
                                      'ST_AsText(polygon("' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
@@ -404,15 +885,11 @@ begin
                                      'ST_AsEWKT(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
                                      'ST_AsGeoJSON(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                   when P_SPATIAL_FORMAT = 'YadamuJSON' then
-								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
-                                   else
-								     '"' || column_name || '" ::VARCHAR "' || COLUMN_NAME || '"'
                                  end
-                               when (c.data_type = 'circle') then
+                               when ((c.data_type = 'circle') and V_POSTGIS_INSTALLED) then
                                  case 
-								   when ((P_OPTIONS ->> 'circleAsPolygon')::boolean = true) then
-								     case 
+                                   when ((P_OPTIONS ->> 'circleAsPolygon')::boolean = true) then
+                                     case 
                                        when P_SPATIAL_FORMAT = 'WKB' then
                                          'ST_AsBinary(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
                                        when P_SPATIAL_FORMAT = 'WKT' then
@@ -423,27 +900,32 @@ begin
                                          'ST_AsEWKT(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
                                        when P_SPATIAL_FORMAT = 'GeoJSON' then
                                          'ST_AsGeoJSON(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                       when P_SPATIAL_FORMAT = 'YadamuJSON' then
-								        'YADAMU_AsGeoJSON(polygon(32,"' || column_name || '")) "' || COLUMN_NAME || '"'
-                                       else
-								        '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
-								     end
-								   else 
-                                     'YADAMU_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
-							     end  
+                                     end
+                                   else 
+                                     'YADAMU.AS_GEOJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                                 end
+                               when (c.data_type in ('point','line','lseg','box','path','polygon')) then
+                                 'YADAMU.AS_GEOJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                               when (c.data_type = 'circle') then
+                                  case 
+                                    when ((P_OPTIONS ->> 'circleAsPolygon')::boolean = true) then
+                                      'YADAMU.AS_GEOJSON(polygon(32,"' || column_name || '")) "' || COLUMN_NAME || '"'
+                                    else 
+                                      'YADAMU.AS_GEOJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                                  end  
                                when (c.data_type in ('int4range','int8range','numrange','tsrange','tstzrange','daterange','tsvector')) then
-                                 'YADAMU_AsJSON("' || column_name || '") "' || COLUMN_NAME || '"'
-							   when (c.data_type in ('real')) then 
-     					         '"' || column_name || '"::double precision "' || COLUMN_NAME || '"'
+                                 'YADAMU.AS_JSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                               when (c.data_type in ('real')) then 
+                                 '"' || column_name || '"::double precision "' || COLUMN_NAME || '"'
                                else
                                  '"' || column_name || '"'
                              end,
-			                 ',' order by ordinal_position
+                             ',' order by ordinal_position
                                ) "CLIENT_SELECT_LIST"
             from information_schema.columns c
-  			left join information_schema.tables t 
-			  on ((t.table_schema, t.table_name) = (c.table_schema, c.table_name))
-	        left join information_schema.element_types e
+            left join information_schema.tables t 
+              on ((t.table_schema, t.table_name) = (c.table_schema, c.table_name))
+            left join information_schema.element_types e
               on ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier) = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))
            where t.table_type = 'BASE TABLE'
              and t.table_schema =  P_SCHEMA
@@ -453,14 +935,14 @@ begin
 
     /*
     **
-    ** Calculate the max length of bytea fields, since Postgres does not maintain a maximum length in the dictionary.
+    ** Calculate the max length of bytea fields, since Postgres based databases do not maintain a maximum length in the dictionary.
     **
     */
     select 'select jsonb_build_array(' 
         || string_agg(
-		     case
+             case
                when d.value = 'bytea' then 
-			     'case when max(octet_length("' || c.value || '")) is null then jsonb_build_array() else jsonb_build_array(max(octet_length("' || c.value || '"))) end'
+                 'case when max(octet_length("' || c.value || '")) is null then jsonb_build_array() else jsonb_build_array(max(octet_length("' || c.value || '"))) end'
                else
                  '''' || s.value || '''::jsonb'
              end
@@ -468,13 +950,13 @@ begin
            ) 
         || ') FROM "' || r."TABLE_SCHEMA" || '"."' || r."TABLE_NAME" || '"'
       from jsonb_array_elements_text(r."COLUMN_NAME_ARRAY") WITH ORDINALITY as c(value, idx)
-	  join jsonb_array_elements_text(r."DATA_TYPE_ARRAY")   WITH ORDINALITY as d(value, idx) on c.idx = d.idx
-	  join jsonb_array_elements_text(r."SIZE_CONSTRAINT_ARRAY")  WITH ORDINALITY as s(value, idx) on c.idx = s.idx
+      join jsonb_array_elements_text(r."DATA_TYPE_ARRAY")   WITH ORDINALITY as d(value, idx) on c.idx = d.idx
+      join jsonb_array_elements_text(r."SIZE_CONSTRAINT_ARRAY")  WITH ORDINALITY as s(value, idx) on c.idx = s.idx
       into V_SQL_STATEMENT
      where r."DATA_TYPE_ARRAY" ? 'bytea';
 
     if (V_SQL_STATEMENT is not NULL) then
-	  execute V_SQL_STATEMENT into V_SIZE_CONSTRAINTS;
+      execute V_SQL_STATEMENT into V_SIZE_CONSTRAINTS;
     else
       V_SIZE_CONSTRAINTS := r."SIZE_CONSTRAINT_ARRAY";
     end if;
@@ -500,11 +982,11 @@ $$ LANGUAGE plpgsql;
 --
 /*
 **
-** Postgress YADAMU_IMPORT_JSON Function.
+** YADAMU_IMPORT_JSON Function.
 **
 */
 --
-create or replace procedure SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS JSONB) 
+CREATE OR REPLACE PROCEDURE YADAMU. SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS JSONB) 
 as $$
 begin
 
@@ -518,11 +1000,11 @@ begin
   insert into TYPE_MAPPING
   select VALUE ->> 0 "VENDOR_TYPE", value ->> 1 "PGSQL_TYPE" 
     from jsonb_array_elements (P_TYPE_MAPPINGS);
-		 
+         
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function MAP_PGSQL_DATA_TYPE(P_VENDOR VARCHAR, P_PGSQL_DATA_TYPE  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_JSON_DATA_TYPE VARCHAR, P_POSTGIS_INSTALLED BOOLEAN) 
+CREATE OR REPLACE FUNCTION YADAMU.MAP_PGSQL_DATA_TYPE(P_VENDOR VARCHAR, P_PGSQL_DATA_TYPE  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_JSON_DATA_TYPE VARCHAR) 
 returns VARCHAR
 as $$
 declare
@@ -531,39 +1013,28 @@ declare
   C_UNBOUNDED_NUMERIC                 VARCHAR(32) = 'numeric';
   C_NUMERIC_PRECISION                   SMALLINT = 1000;
   C_NUMERIC_SCALE                       SMALLINT = 1000;
-
-  /*
-  C_CHAR_TYPE                         VARCHAR(32) = 'character';
-  
-  C_GEOMETRY_TYPE                     VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
-  C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
-  C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
-  C_MAX_CHARACTER_VARYING_TYPE        VARCHAR(32) = 'character varying(' || C_MAX_CHARACTER_VARYING_TYPE_LENGTH || ')';
-
-  V_DATA_TYPE                         VARCHAR(128);
-  */
   
 begin
   case 
     when ((P_PGSQL_DATA_TYPE is null) and (P_VENDOR = 'Oracle') and (P_DATA_TYPE like '"%"."%"')) then
-	  return C_ORACLE_OBJECT_TYPE;
+      return C_ORACLE_OBJECT_TYPE;
     when P_PGSQL_DATA_TYPE is null then
-      raise exception 'Postgres: Missing mapping for "%" datatype "%"', P_VENDOR, P_DATA_TYPE;
+      raise exception '%: Missing mapping for "%" datatype "%"', YADAMU.YADAMU_VENDOR(), P_VENDOR, P_DATA_TYPE;
     when P_PGSQL_DATA_TYPE = 'numeric'                                then return 
-	case 
+    case 
       when P_DATA_TYPE_LENGTH is NULL                                 then C_UNBOUNDED_NUMERIC 
-	  when ((P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION) 
-	   and (P_DATA_TYPE_SCALE  > C_NUMERIC_SCALE))                    then C_UNBOUNDED_NUMERIC
-	  when P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION                   then concat(P_PGSQL_DATA_TYPE,'(',cast(C_NUMERIC_PRECISION as CHAR(4)),',',cast(P_DATA_TYPE_SCALE as CHAR(4)),')')
-	   when P_DATA_TYPE_SCALE > C_NUMERIC_SCALE                       then concat(P_PGSQL_DATA_TYPE,'(',cast(P_DATA_TYPE_LENGTH as CHAR(4)),',',cast(C_NUMERIC_SCALE as CHAR(4)),')')
-	                                                                  else P_PGSQL_DATA_TYPE 
-	end;	
-	                                                                  else return P_PGSQL_DATA_TYPE;
+      when ((P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION) 
+       and (P_DATA_TYPE_SCALE  > C_NUMERIC_SCALE))                    then C_UNBOUNDED_NUMERIC
+      when P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION                   then concat(P_PGSQL_DATA_TYPE,'(',cast(C_NUMERIC_PRECISION as CHAR(4)),',',cast(P_DATA_TYPE_SCALE as CHAR(4)),')')
+       when P_DATA_TYPE_SCALE > C_NUMERIC_SCALE                       then concat(P_PGSQL_DATA_TYPE,'(',cast(P_DATA_TYPE_LENGTH as CHAR(4)),',',cast(C_NUMERIC_SCALE as CHAR(4)),')')
+                                                                      else P_PGSQL_DATA_TYPE 
+    end;    
+                                                                      else return P_PGSQL_DATA_TYPE;
   end case;
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function GENERATE_SQL(P_VENDOR VARCHAR,P_TARGET_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_SPATIAL_FORMAT VARCHAR, P_JSON_DATA_TYPE VARCHAR, P_BINARY_JSON BOOLEAN)
+CREATE OR REPLACE FUNCTION YADAMU.GENERATE_SQL(P_VENDOR VARCHAR,P_TARGET_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_SPATIAL_FORMAT VARCHAR, P_JSON_DATA_TYPE VARCHAR, P_BINARY_JSON BOOLEAN)
 returns JSONB
 as $$
 declare
@@ -571,20 +1042,8 @@ declare
   V_COLUMNS_CLAUSE     TEXT;
   V_INSERT_SELECT_LIST TEXT;
   V_TARGET_DATA_TYPES  JSONB;
-  V_POSTGIS_VERSION    VARCHAR(512);
-  V_POSTGIS_ENABLED    BOOLEAN = FALSE;
   C_MAX_BOUNDED_LENGTH INT = 10 * 1024 * 1024;
 begin
-
-  begin
-    SELECT PostGIS_full_version() into V_POSTGIS_VERSION;
-    V_POSTGIS_ENABLED = TRUE;
-  exception
-    when undefined_function then
-      V_POSTGIS_ENABLED = FALSE;
-    when others then
-      RAISE;
-  end;
 
   with
   SOURCE_TABLE_DEFINITIONS
@@ -592,24 +1051,24 @@ begin
     select c.IDX
           ,c.VALUE COLUMN_NAME
           ,t.VALUE DATA_TYPE
-		  ,case 
-		     when P_VENDOR = 'Postgres'  then
-			   t.VALUE 
-			 else 
-			   m."PGSQL_TYPE"
-		   end "PGSQL_TYPE"
+          ,case 
+             when P_VENDOR =  YADAMU.YADAMU_VENDOR() then
+               t.VALUE 
+             else 
+               m."PGSQL_TYPE"
+           end "PGSQL_TYPE"
           ,cast(s.VALUE ->> 0 as BIGINT) DATA_TYPE_LENGTH
           ,cast(s.VALUE ->> 1 as BIGINT) DATA_TYPE_SCALE
       from JSONB_ARRAY_ELEMENTS_TEXT(P_COLUMN_NAME_ARRAY)     WITH ORDINALITY as c(VALUE, IDX)
       join JSONB_ARRAY_ELEMENTS_TEXT(P_DATA_TYPE_ARRAY)       WITH ORDINALITY as t(VALUE, IDX) on c.IDX = t.IDX
       join JSONB_ARRAY_ELEMENTS(P_SIZE_CONSTRAINT_ARRAY)      WITH ORDINALITY as s(VALUE, IDX) on c.IDX = s.IDX
       left outer join TYPE_MAPPING m on lower(t.VALUE) = lower(m."VENDOR_TYPE")
-	  -- left outer join TYPE_MAPPING m on t.VALUE = m."VENDOR_TYPE"
+      -- left outer join TYPE_MAPPING m on t.VALUE = m."VENDOR_TYPE"
   ),
   TARGET_TABLE_DEFINITIONS
   as (
     select st.*,
-           MAP_PGSQL_DATA_TYPE(P_VENDOR,"PGSQL_TYPE",DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, P_JSON_DATA_TYPE, V_POSTGIS_ENABLED) TARGET_DATA_TYPE
+           YADAMU.MAP_PGSQL_DATA_TYPE(P_VENDOR,"PGSQL_TYPE",DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, P_JSON_DATA_TYPE) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
   select STRING_AGG('"' || COLUMN_NAME || '"',',' ORDER BY IDX) COLUMN_NAME_LIST,
@@ -629,8 +1088,8 @@ begin
                         '(6)'
                       when TARGET_DATA_TYPE like 'interval%' then 
                         ''
-				      when DATA_TYPE_LENGTH::numeric < 1 then
-					    ''
+                      when DATA_TYPE_LENGTH::numeric < 1 then
+                        ''
                       when DATA_TYPE_LENGTH is NOT NULL and DATA_TYPE_SCALE IS NOT NULL then 
                         '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
                       when DATA_TYPE_LENGTH is NOT NULL then 
@@ -681,7 +1140,7 @@ begin
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function YADAMU_IMPORT_JSONB(P_JSON jsonb, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb) 
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_IMPORT_JSONB(P_JSON jsonb, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb) 
 returns JSONB
 as $$
 declare
@@ -695,10 +1154,10 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
 
-  call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
+  call YADAMU.SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
 
   for r in select "tableName"
-                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,driverSettings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', TRUE) "TABLE_INFO"
+                 ,YADAMU.GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,driverSettings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                 "tableSchema"      VARCHAR, 
@@ -741,7 +1200,7 @@ exception
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function YADAMU_IMPORT_JSON(P_JSON json, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb) 
+CREATE OR REPLACE FUNCTION YADAMU.YADAMU_IMPORT_JSON(P_JSON json, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb) 
 returns JSONB
 as $$
 declare
@@ -755,10 +1214,10 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
 
-  call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
+  call YADAMU.SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
 
   for r in select "tableName"
-                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,driverSettings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', FALSE) "TABLE_INFO"
+                 ,YADAMU.GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,driverSettings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                "tableSchema"      VARCHAR, 
@@ -800,19 +1259,19 @@ exception
     return V_RESULTS;
 end;  
 $$ LANGUAGE plpgsql;
----
-create or replace function GENERATE_STATEMENTS(P_METADATA jsonb, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb)
+--
+CREATE OR REPLACE FUNCTION YADAMU.GENERATE_STATEMENTS(P_METADATA jsonb, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb)
 returns SETOF jsonb
 as $$
 declare
 begin
 
-  call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
+  call YADAMU.SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
 
   RETURN QUERY
     select jsonb_object_agg(
            "tableName",
-           GENERATE_SQL("vendor",P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonStorageOption', FALSE)
+           YADAMU.GENERATE_SQL("vendor",P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonStorageOption', FALSE)
          )
     from JSONB_EACH(P_METADATA -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
@@ -826,5 +1285,5 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-select YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP";
+select YADAMU.YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", YADAMU.YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP";
 --

@@ -333,7 +333,6 @@ class YadamuDBI extends EventEmitter {
   } 
   
   constructor(yadamu,manager,connectionSettings,parameters) {
-    
     super()
     this.DRIVER_ID = performance.now()
     yadamu.activeConnections.add(this)
