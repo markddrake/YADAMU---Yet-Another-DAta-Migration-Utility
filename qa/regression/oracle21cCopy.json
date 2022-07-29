@@ -1,0 +1,23 @@
+{
+    "operation": "dbRoundTrip",
+    "connections": "qa/regression/connections.json",
+    "tasks": "qa/regression/tasks.json",
+    "recreateSchema": true,
+    "parameters": {},
+    "tests": [{
+            "source": "oracle21c",
+            "target": "oracle21c",
+            "stagingArea": "loader-staging",
+            "reloadStagingArea" : false,
+            "emptyStringIsNull" : true,
+            "parameters": {
+                "REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
+                "DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+                "COMMIT_RATIO"            : 0
+            },          
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+        }
+    ]
+}

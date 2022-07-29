@@ -122,11 +122,17 @@ class DB2OutputManager extends YadamuOutputManager {
 			return typeof col === 'string' ? col.substring(0,10) : col.toISOString().substring(0,10)
 		  }
 		case this.dbi.DATA_TYPES.XML_TYPE:
-		case this.dbi.DATA_TYPES.CLOB_TYPE:
-		  paramDefinition.SQLType = this.dbi.DATA_TYPES.CLOB_TYPE
+		  paramDefinition.SQLType = this.dbi.DATA_TYPES.NCLOB_TYPE
 		case this.dbi.DATA_TYPES.CHAR_TYPE:
+		case this.dbi.DATA_TYPES.NCHAR_TYPE:
 		case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+		case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
+		case this.dbi.DATA_TYPES.CLOB_TYPE:
+		case this.dbi.DATA_TYPES.NCLOB_TYPE:
 	      return (col,idx) => {
+			// https://github.com/ibmdb/node-ibm_db/issues/875
+			// Disable Batch Mode if data contains empty strings 
+			this.tableInfo.insertMode = ((col.length > 0) || (this.tableInfo.insertMode !== 'Batch')) ?  this.tableInfo.insertMode : 'Iterative'
 			return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
 	    case this.dbi.DATA_TYPES.SPATIAL_TYPE:

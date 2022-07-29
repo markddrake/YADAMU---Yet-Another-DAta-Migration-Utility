@@ -11,7 +11,8 @@
 		"cockroach": 6,
 		"redshift": 6,
 		"snowflake": 9,
-		"vertica": 6
+		"vertica": 6,
+		"db2": 12
 	},
 	"SPATIAL_PRECISION": {
 		"default": 18,
@@ -249,22 +250,26 @@
 		}
 		,  "db2"       : "STRIP_XML_DECLARATION"
 	  }
-	, "oracle#11.2": {
-		"mssql"      : "SERIALIZE_AS_BLOB"
-	  }
-	, "oracle#12.2": {
-		"mssql"      : "SERIALIZE_AS_BLOB"
-	  }
-	, "postgres"     : {
-	    "mssql"      : "STRIP_XML_DECLARATION"
-	  , "teradata"   : "STRIP_XML_DECLARATION"
-      , "snowflake": {
-	      "VARIANT"  : "SNOWFLAKE_VARIANT"
-        }
-	,  "db2"       : "STRIP_XML_DECLARATION"
-    }
-	, "vertica": {
-        "mssql": "STRIP_XML_DECLARATION"
+	, "mssql": {
+		"db2"          : "TRIM_WHITESPACE"
+	  }	               
+	, "oracle#11.2":   {
+		"mssql"        : "SERIALIZE_AS_BLOB"
+	  }                
+	, "oracle#12.2":   {
+		"mssql"        : "SERIALIZE_AS_BLOB"
+  	  , "db2"          : "SERIALIZE_AS_BLOB"		
+	  }                
+	, "postgres"       : {
+	    "mssql"        : "STRIP_XML_DECLARATION"
+	  , "teradata"     : "STRIP_XML_DECLARATION"
+      , "snowflake":   {
+	      "VARIANT"    : "SNOWFLAKE_VARIANT"
+        }      
+	,  "db2"           : "STRIP_XML_DECLARATION"
+      }
+	, "vertica"        : {
+        "mssql"        : "STRIP_XML_DECLARATION"
 	  }
 	}
   , "OBJECTS_COMPARISON_RULE": {

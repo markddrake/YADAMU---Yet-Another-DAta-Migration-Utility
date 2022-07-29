@@ -1,4 +1,3 @@
-"use strict" 
 
 import YadamuConstants from '../../../lib/yadamuConstants.js';
 import DefaultStatmentLibrary from '../mysqlStatementLibrary.js'

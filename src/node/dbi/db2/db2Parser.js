@@ -1,4 +1,3 @@
-"use strict" 
 
 import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js' 
 
@@ -29,44 +28,6 @@ class DB2Parser extends YadamuParser {
              return (row,idx)  => {
                row[idx] = `${row[idx][12] === 'T' ? row[idx] : row[idx].replace(' ','T')}Z`
 		     }     
- 		 /*	 
-		 case this.dbi.DATA_TYPES.BLOB_TYPE:
-		   if (YadamuDataTypes.isSpatial(queryInfo.TARGET_DATA_TYPES[idx])) {
-			 switch (this.dbi.SPATIAL_FORMAT) {
-			   case 'WKT':
-			   case 'EWKT':
-			     return (row,idx) => {
-			     }
-			   case 'WKB':
-			   case 'EWKB':
-			     return (row,idx) => {
-			     }
-			   case 'GeoJSON':
-			     return (row,idx) => {
-  				   row[idx] = YadamuSpatialLibrary.bufferToGeoJSON(Buffer.from(row[idx]))
-			     }			   
-		     }
-		   }
-		   return null
-		 case this.dbi.DATA_TYPES.CLOB_TYPE:
-		   if (YadamuDataTypes.isSpatial(queryInfo.TARGET_DATA_TYPES[idx])) {
-			 switch (this.dbi.SPATIAL_FORMAT) {
-			   case 'WKT':
-			   case 'EWKT':
-			     return (row,idx) => {
-			     }
-			   case 'WKB':
-			   case 'EWKB':
-			     return (row,idx) => {
-					row[idx] = Buffer.from(row[idx],'hex')
-			     }
-			   case 'GeoJSON':
-			     return (row,idx) => {
-			     }			   
-		     }
-           }
-		   return null
-		 */
 		 case this.dbi.DATA_TYPES.JSON_TYPE:
 		   // Unwrap wrapped content.
 		   return (row,idx) => {

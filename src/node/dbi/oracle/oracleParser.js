@@ -1,4 +1,3 @@
-"use strict" 
 
 import { pipeline } from 'stream/promises';
 

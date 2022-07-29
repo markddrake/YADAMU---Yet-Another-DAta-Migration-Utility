@@ -1,4 +1,4 @@
-"use strict" 
+
 import {Readable} from 'stream';
 
 class ExampleReader extends Readable {

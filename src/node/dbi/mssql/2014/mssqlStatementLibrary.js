@@ -1,4 +1,3 @@
-"use strict" 
 
 import DefaultStatmentLibrary from '../mssqlStatementLibrary.js'
 

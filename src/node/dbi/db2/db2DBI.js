@@ -97,7 +97,6 @@ class DB2DBI extends YadamuDBI {
   async createConnectionPool() {	
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
 	this.connectionPool = new Pool()
-	this.badConnections = []
   }
   
   createConnectionString() {
@@ -124,14 +123,6 @@ class DB2DBI extends YadamuDBI {
 
     this.connection = await (this.isManager() ? this.getConnectionFromPool() : this.manager.getConnectionFromPool())
 	
-	/*
-	let retryCount = 0
-	while (await this.badConnection() && (retryCount < 5)) {
-	   console.log('Got Bad Connection')
-	   this.manager.badConnections.push(this.connection)
-	   this.connection = await (this.isManager() ? this.getConnectionFromPool() : this.manager.getConnectionFromPool())
-	}
-    */
 	
   }
   
@@ -185,11 +176,12 @@ class DB2DBI extends YadamuDBI {
     // Close a connection and return it to the connection pool
 
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
-	if (!(await this.badConnection())) {
+	if (await this.badConnection()) {
 	  // Do not return failed connections to the pool.
-      await this.connection.close()
+      await this.connection.realClose()
     }
 	
+    await this.connection.close()
   }
 	
   async closePool(options) {
@@ -571,6 +563,7 @@ class DB2DBI extends YadamuDBI {
     // Either return the databases native readable stream or use the DB2Reader to create a class that wraps a cursor or event stream in a Readable
 
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
+
     this.streamingStackTrace = new Error().stack;
     this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
 	return this.connection.queryStream(queryInfo.SQL_STATEMENT)

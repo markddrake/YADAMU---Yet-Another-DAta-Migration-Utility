@@ -1,0 +1,35 @@
+version: "3.3"
+services:
+
+ # docker run -itd --name DB2TEST --privileged=true -p 50001:50000 -e LICENSE=accept -e DB2INST1_PASSWORD=oracle -e DBNAME=yadamu -v DB2TEST_DATA:/database ibmcom/db2
+ IBMDB2-01:
+   container_name: IBMDB2-01
+   image:  yadamu/db2
+   security_opt:
+      - label:disable    
+   privileged: true
+   mem_limit: '12gb'
+   shm_size: '4gb'
+   networks:
+     - YADAMU-NET
+   ports:
+    - 50000:50000
+   environment:
+    DB2INST1_PASSWORD: oracle
+    LICENSE: accept
+    DBNAME: YADAMU
+    SAMPLEDB : "true"
+   volumes:
+     - YADAMU_01-SHARED:/mnt/shared
+     - IBMDB2-01-DATA:/database
+     
+   restart: always
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  IBMDB2-01-DATA:
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET

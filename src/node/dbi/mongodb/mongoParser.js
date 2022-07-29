@@ -1,4 +1,3 @@
-"use strict" 
 
 import YadamuParser from '../base/yadamuParser.js'
 

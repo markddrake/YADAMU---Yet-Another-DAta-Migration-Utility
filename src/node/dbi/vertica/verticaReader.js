@@ -1,4 +1,4 @@
-"use strict" 
+
 import {Readable} from 'stream';
 import pg from 'pg';
 const {Query,Pool} = pg;

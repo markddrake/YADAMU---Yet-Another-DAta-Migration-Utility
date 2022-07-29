@@ -15,7 +15,7 @@ const _SQL_CONFIGURE_CONNECTION = `SELECT service_level AS DATABASE_VERSION, fix
 
 const _SQL_SYSTEM_INFORMATION   = `select HOST_NAME as "hostName", CURRENT SERVER as "dbName", CURRENT TIMEZONE as "sessionTimeZone", SESSION_USER as "sessionUser", YADAMU.YADAMU_INSTANCE_ID() as "yadamuInstanceID", YADAMU.YADAMU_INSTALLATION_TIMESTAMP() as "yadamuInstallationTimestamp" from table(SYSPROC.DB_MEMBERS()) as members`
 
-const _SQL_SCHEMA_METADATA      = `select t."TABSCHEMA"   "TABLE_SCHEMA"
+const _SQL_SCHEMA_METADATA      = `select trim(trailing ' ' from t."TABSCHEMA")   "TABLE_SCHEMA"
                                          ,t."TABNAME"   "TABLE_NAME"
                                          ,'[' || listagg('"' || c."COLNAME" || '"',',') within group (order by c."COLNO") || ']' "COLUMN_NAME_ARRAY"
                                          ,'[' || listagg('"' || case 

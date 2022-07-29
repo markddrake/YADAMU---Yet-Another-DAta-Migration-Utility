@@ -65,5 +65,15 @@
   , "tasks": [
       "AdventureWorksAll"
     ]
+  },{
+    "source"                          : "postgres#1"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%",
+      "CIRCLE_FORMAT"                 : "CIRCLE"
+    }
+  , "tasks"                           : [
+      "postgresDataTypes"
+	]
   }]
 }

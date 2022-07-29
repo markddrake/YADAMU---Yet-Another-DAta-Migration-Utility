@@ -23,6 +23,8 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
 	    return `cast( ? as ${dataTypeDefinition.type})`
 	  case this.dbi.DATA_TYPES.JSON_TYPE:
 	    return 'SYSTOOLS.JSON2BSON(?)' 
+	  case this.dbi.DATA_TYPES.XML_TYPE:
+	    return 'XMLPARSE(DOCUMENT CAST(? AS CLOB) PRESERVE WHITESPACE)' 
       case this.dbi.DATA_TYPES.BINARY_TYPE:
 	  case this.dbi.DATA_TYPES.VARBINARY_TYPE:
 	    return 'HEXTORAW(?)' 

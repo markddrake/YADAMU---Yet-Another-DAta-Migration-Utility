@@ -1,4 +1,3 @@
-"use strict" 
 
 import { performance }       from 'perf_hooks';
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';

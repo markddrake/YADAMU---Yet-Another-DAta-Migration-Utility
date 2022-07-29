@@ -60,7 +60,7 @@ class DB2Writer extends YadamuWriter {
 			
 	**
 	*/
-
+	
 	if (this.tableInfo.insertMode === 'Batch') {
       try {    
         // await this.dbi.createSavePoint();
@@ -84,11 +84,11 @@ class DB2Writer extends YadamuWriter {
 
     for (let i=0; i< rowCount; i++) {
       try {
-	    const data = this.reassembleRow(batch,i)
-		const params = this.tableInfo.paramsTemplate.map((param,i) => {
-		  return param.SQLType === 1 ? data[i] : { ParamType: 'INPUT', SQLType : param.SQLType, Data : data[i] }
+	    const row = this.reassembleRow(batch,i)
+		this.tableInfo.paramsTemplate.forEach((param,idx)  => {
+		  row[idx] = param.SQLType === 1 ? row[idx] : { ParamType: 'INPUT', SQLType : param.SQLType, Data : row[idx] }
 		})
-		const results = await this.dbi.executeSQL(batch.sql,params)
+		const results = await this.dbi.executeSQL(batch.sql,row)
 		this.adjustRowCounts(1)
         this.dbi.SQL_TRACE.disable()
       } catch (cause) {
@@ -101,6 +101,7 @@ class DB2Writer extends YadamuWriter {
 	  }
     } 	
 	
+		
     this.dbi.SQL_TRACE.enable()
     this.dbi.SQL_TRACE.comment(`Statement executed ${insertCount} times.`)
     

@@ -13,12 +13,6 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 
 class DB2QA extends YadamuQALibrary.qaMixin(DB2DBI) {
-    
-    static get SQL_SCHEMA_TABLE_NAMES()    { return _SQL_SCHEMA_TABLE_NAMES }
-    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
-    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
-    static get SQL_SUCCESS()               { return _SQL_SUCCESS }
-    static get SQL_FAILED()                { return _SQL_FAILED }
 
 	static #_DBI_PARAMETERS
 	
@@ -64,8 +58,11 @@ class DB2QA extends YadamuQALibrary.qaMixin(DB2DBI) {
 
 	buildColumnLists(schemaInfo,rules) {
 		
+      const timestampLength = 20 + rules.TIMESTAMP_PRECISION;
+	  
 	  return schemaInfo.map((tableInfo) => {
 		  const dataTypes = JSON.parse(tableInfo.DATA_TYPE_ARRAY)
+		  const sizeConstraints = JSON.parse(tableInfo.SIZE_CONSTRAINT_ARRAY)
 		  return {
 			TABLE_NAME   : tableInfo.TABLE_NAME
 		  , COLUMN_LIST  : JSON.parse(tableInfo.COLUMN_NAME_ARRAY).map((columnName,idx) => { 
@@ -79,8 +76,10 @@ class DB2QA extends YadamuQALibrary.qaMixin(DB2DBI) {
 			   case this.DATA_TYPES.NCLOB_TYPE:
 			     return rules.EMPTY_STRING_IS_NULL ? `HASH(case when length("${columnName}") = 0 then NULL else "${columnName}" end,2) "${columnName}"` : `HASH("${columnName}",2)` 
 			   case this.DATA_TYPES.VARCHAR_TYPE:
-			   case this.DATA_TYPES.VARGRAPHIC_TYPE:
+			   case this.DATA_TYPES.NVARCHAR_TYPE:
 			      return rules.EMPTY_STRING_IS_NULL ? `case when "${columnName}" = '' then NULL else "${columnName}" end "${columnName}"` : `"${columnName}"`
+			   case this.DATA_TYPES.TIMESTAMP_TYPE:
+			      return rules.TIMESTAMP_PRECISION < sizeConstraints[idx][0] ? `substr(to_char("${columnName}",'YYYY-MM-DD HH24:MI:SS.FF12'),1,${timestampLength})` : `"${columnName}"`
 			   default:			   
 			     return `"${columnName}"`
 			  }
@@ -162,36 +161,3 @@ class DB2QA extends YadamuQALibrary.qaMixin(DB2DBI) {
 }
 
 export { DB2QA as default }
-
-const _SQL_SUCCESS =
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
-   from SCHEMA_COMPARE_RESULTS 
-  where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
-    and MISSING_ROWS = 0
-    and EXTRA_ROWS = 0
-    and SQLERRM is NULL
- order by TABLE_NAME`;
-
-const _SQL_FAILED = 
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS,  SQLERRM
-   from SCHEMA_COMPARE_RESULTS 
-  where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-     or MISSING_ROWS <> 0
-      or EXTRA_ROWS <> 0
-    or SQLERRM is NOT NULL
-  order by TABLE_NAME`;
-  
-const _SQL_SCHEMA_TABLE_NAMES = `select relname from pg_stat_user_tables where schemaname = $1`;
-
-// const _SQL_SCHEMA_TABLE_ROWS  = `select schemaname, relname, n_live_tup from pg_stat_user_tables where schemaname = $1`;
-
-const _SQL_SCHEMA_TABLE_ROWS = 
-`with ROW_COUNTS as (
-select table_schema, table_name,  query_to_xml(format('select count(*) as cnt from %I.%I', table_schema, table_name), false, true, '') as xml_count
-  from information_schema.tables
- where table_schema = $1 
-)
-select table_schema, table_name, (xpath('/row/cnt/text()', xml_count))[1]::text::int as row_count
-  from ROW_COUNTS`
-
-const _SQL_COMPARE_SCHEMAS    = `call COMPARE_SCHEMA($1,$2,$3)`

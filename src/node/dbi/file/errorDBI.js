@@ -1,4 +1,3 @@
-"use strict"
 
 import FileDBI            from './fileDBI.js'
 import ErrorOutputManager from './errorOutputManager.js';

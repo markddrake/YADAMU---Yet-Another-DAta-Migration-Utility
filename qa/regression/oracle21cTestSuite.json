@@ -1,177 +1,155 @@
 {
-	"operation": "dbRoundTrip",
-	"connections": "qa/regression/connections.json",
-	"tasks": "qa/regression/tasks.json",
-	"recreateSchema": true,
-	"parameters": {},
-	"tests": [
-		{
-			"operation": "export",
-			"recreateSchema": true,
-			"createDirectory": true,
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "%operation%/%mode%/%connection%"
-			},
-			"source": "oracle21c",
-			"target": "file-staging",
-			"parameters": {
-				"DIRECTORY": "%operation%/json/%vendor%"
-			},
-			"tasks": [
-				"oracle"
-			]
-		},
-		{
-			"operation": "import",
-			"source": "file-staging",
-			"target": "oracle21c",
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "export/json/%location%"
-			},
-			"tasks": [
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle21c",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle19c",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle18c",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle12c",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle11g",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "mssql19",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "mssql17",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "postgres#1",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "mysql#1",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "mariadb#1",
-			"target": "oracle21c",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "mongodb#1",
-			"target": "oracle21c",
-			"parameters": {
-				"MONGO_STRIP_ID": false
-			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle21c",
-			"targets": [
-				"oracle21c",
-				"oracle19c",
-				"oracle18c",
-				"oracle12c",
-				"oracle11g",
-				"mssql17",
-				"mssql19",
-				"postgres#1",
-				"mysql#1",
-				"mariadb#1",
-				"mongodb#1"
-			],
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "oracle21c",
-			"target": "oracle21c",
-			"stagingArea": "loader-staging",
-			"reloadStagingArea" : false,
-			"emptyStringIsNull" : true,
-			"parameters": {
-				"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-				"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
-				"COMMIT_RATIO"            : 0
-			},			
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		}
-	]
+    "operation": "dbRoundTrip",
+    "connections": "qa/regression/connections.json",
+    "tasks": "qa/regression/tasks.json",
+    "recreateSchema": true,
+    "parameters": {},
+    "tests": [{
+            "operation": "export",
+            "recreateSchema": true,
+            "createDirectory": true,
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "%operation%/%mode%/%connection%"
+            },
+            "source": "oracle21c",
+            "target": "file-staging",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%vendor%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },{
+            "operation": "import",
+            "source": "file-staging",
+            "target": "oracle21c",
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "export/json/%location%"
+            },
+            "tasks": [
+                "mysql",
+                "mssql"
+            ]
+        },{
+            "source": "oracle21c",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
+            "source": "oracle19c",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
+            "source": "oracle18c",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
+            "source": "oracle12c",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
+            "source": "oracle11g",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql17",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "oracle21c",
+            "parameters": {
+                "MONGO_STRIP_ID": false
+            },
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle21c",
+            "targets": [
+                "oracle21c",
+                "oracle19c",
+                "oracle18c",
+                "oracle12c",
+                "oracle11g",
+                "mssql17",
+                "mssql19",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        }}
+    ]
 }

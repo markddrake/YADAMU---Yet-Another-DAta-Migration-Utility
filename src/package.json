@@ -24,7 +24,7 @@
     "express": "^4.17.1",
     "express-session": "^1.17.1",
     "font-awesome": "^4.7.0",
-    "ibm_db": "^2.8.1",
+    "ibm_db": "^2.8.2",
     "install": "^0.13.0",
     "jquery": "^3.5.0",
     "mariadb": "^2.5.2",

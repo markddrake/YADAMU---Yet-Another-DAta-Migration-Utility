@@ -1,4 +1,3 @@
-"use strict"
 
 import sql from 'mssql';
 

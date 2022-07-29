@@ -1,4 +1,3 @@
-"use strict"
 
 import {DatabaseError} from '../../core/yadamuException.js'
 import SnowflakeConstants from './snowflakeConstants.js'

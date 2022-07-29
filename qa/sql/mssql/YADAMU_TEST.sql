@@ -461,14 +461,14 @@ as
 begin
   declare @XML_DECLARATION  nvarchar(21) = '<?xml version="1.0"?>';
   declare @RESULT           nvarchar(max);
+  set @RESULT = convert(nvarchar(max),@XML_VALUE,1);
   if (@XML_RULE = 'DECODE_AND_STRIP_DECLARATION') begin
-	set @RESULT = convert(nvarchar(max),@XML_VALUE,1);
 	if (left(@RESULT,len(@XML_DECLARATION)) = @XML_DECLARATION) begin
 	  set @RESULT = STUFF(@RESULT,1,len(@XML_DECLARATION),'');
     end
   end
-  else begin
-    set @RESULT = convert(nvarchar(max),@XML_VALUE,0);
+  if (@XML_RULE = 'TRIM_WHITESPACE') begin
+    set @RESULT = TRIM(CHAR(13)+CHAR(10) from @RESULT)
   end
   return @RESULT;
 end
@@ -545,7 +545,7 @@ begin
                         case 
                           when @SPATIAL_PRECISION = 18 then
                             concat('"',c.COLUMN_NAME,'".AsBinaryZM() "',c.COLUMN_NAME,'"')
-                           -- concat('"',c.COLUMN_NAME,'".AsTextZM() "',c.COLUMN_NAME,'"')
+                            -- concat('"',c.COLUMN_NAME,'".AsTextZM() "',c.COLUMN_NAME,'"')
                           else
                             concat('master.dbo.sp_geometryAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
