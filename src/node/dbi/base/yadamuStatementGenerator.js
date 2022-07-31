@@ -165,7 +165,7 @@ class YadamuStatementGenerator {
 	 ** Adjust data type based on size constraints
 	 **
 	 */
-	 
+ 
     switch (targetDataType) {
       case this.dbi.DATA_TYPES.CHAR_TYPE:
       case this.dbi.DATA_TYPES.VARCHAR_TYPE:
@@ -212,7 +212,7 @@ class YadamuStatementGenerator {
       case this.dbi.DATA_TYPES.DATETIME_TYPE:
       case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
         switch (true) {
-          case (sizeConstraint[0] > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${targetDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
+          case (sizeConstraint[0] > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return (targetDataType.indexOf(' ') > -1) ? targetDataType.replace(' ',`(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION}) `) : `${targetDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
           default:                                                                return targetDataType
         }
 
@@ -266,7 +266,6 @@ class YadamuStatementGenerator {
 			             || this.TYPE_MAPPINGS.get(dataType.toUpperCase()) 
 	                     || this.mapUserDefinedDataType(dataType,tableMetadata.sizeConstraints[idx])
                          || this.yadamuLogger.logInternalError([this.dbi.DATABASE_VENDOR,`MAPPING NOT FOUND`],`Missing Mapping for "${dataType}" in mappings for "${this.SOURCE_VENDOR}".`)
-						   
 	   targetDataType = this.refactorBySizeConstraint(dataType,targetDataType,tableMetadata.sizeConstraints[idx])
        // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.SOURCE_VENDOR,dataType,tableMetadata.sizeConstraints[idx]],`Mapped to "${targetDataType}".`)
        return targetDataType
@@ -274,7 +273,7 @@ class YadamuStatementGenerator {
   }
 	
   generateStorageClause(mappedDataType,sizeConstraint) {
-	  
+	 
     if (sizeConstraint.length > 0) {
 
       if (RegExp(/\(.*\)/).test(mappedDataType)) {

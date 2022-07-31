@@ -87,6 +87,8 @@ class OracleDataTypes extends YadamuDataTypes {
 	    return this.TIMESTAMP_TYPE
       case typeList.includes(this.TIME_TZ_TYPE):
 	    return this.TIME_TZ_TYPE
+      case typeList.includes(this.INTERVAL_TYPE):
+        return this.INTERVAL_TYPE
 	  default:
 	    const dataTypeDefinitions = YadamuDataTypes.decomposeDataTypes(typeList)
 		// Check for common case of NUMBER mapped to different sized integers: return largest

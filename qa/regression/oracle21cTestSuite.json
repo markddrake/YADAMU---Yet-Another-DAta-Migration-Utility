@@ -117,8 +117,7 @@
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
             "source": "mongodb#1",
             "target": "oracle21c",
             "parameters": {
@@ -129,8 +128,7 @@
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
             "source": "oracle21c",
             "targets": [
                 "oracle21c",
@@ -150,6 +148,6 @@
                 "mysql",
                 "mssql"
             ]
-        }}
+        }
     ]
 }

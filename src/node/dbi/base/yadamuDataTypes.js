@@ -1067,6 +1067,8 @@ class YadamuDataTypes {
         return this.TIME_TZ_TYPE
       case typeList.includes(this.DATETIME_TYPE):
         return this.DATETIME_TYPE
+      case typeList.includes(this.INTERVAL_TYPE):
+        return this.INTERVAL_TYPE
       default:
         console.log(this.constructor.name,'Type List Reduction failed for ',typeList)
     }

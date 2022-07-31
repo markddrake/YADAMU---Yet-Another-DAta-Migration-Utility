@@ -18,8 +18,6 @@ class PostgresWriter extends YadamuWriter {
       
   async _writeBatch(batch,rowCount) {
    
-	let repackBatch = false;
-
     // console.log(this.tableInfo,batch)
 
 	if (this.tableInfo.insertMode === 'Batch') {
@@ -40,7 +38,6 @@ class PostgresWriter extends YadamuWriter {
         await this.dbi.restoreSavePoint(cause);
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
-        repackBatch = true;
       }
     } 
      
@@ -49,8 +46,8 @@ class PostgresWriter extends YadamuWriter {
     const sqlStatement = this.tableInfo.dml + args
 	for (let row = 0; row < rowCount; row++) {
 	  const offset = row * this.tableInfo.columnCount
-      const nextRow  = repackBatch ? batch.slice(offset,offset + this.tableInfo.columnCount) : batch[row]
-      try {
+      const nextRow  = batch.slice(offset,offset + this.tableInfo.columnCount)
+	  try {
         await this.dbi.createSavePoint();
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);
         await this.dbi.releaseSavePoint();

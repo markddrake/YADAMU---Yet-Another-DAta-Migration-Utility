@@ -9,7 +9,7 @@ class PostgresConstants {
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-	  "CIRCLE_FORMAT"             : "POLYGON"  /* Portable as spatial type by leads to loss of fidelity  */
+	  "CIRCLE_FORMAT"             : "POLYGON"  /* Portable as spatial type but leads to loss of fidelity  */
 	, "POSTGRES_JSON_TYPE"        : "JSONB"
 	, "BYTEA_SIZING_MODEL"        : "100%"
 	, "TIMESTAMP_PRECISION"       : 6
