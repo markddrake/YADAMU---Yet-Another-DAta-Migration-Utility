@@ -24,10 +24,10 @@ Supported Databases :
 * MongoDB 4.0 and later
 * Snowflake Data Warehouse
 * Vertica 9 through Vertica 11
+* DB2 11 LUW
 
 * Amazon Redshift (Experimental)
 * Teradata 17 (Expermintal)
-* DB2 11 LUW (Experimental)
 
 Curerntly a work in progress
 
