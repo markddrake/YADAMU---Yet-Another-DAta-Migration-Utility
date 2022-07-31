@@ -23,6 +23,9 @@
 	"operation" : "export"
   , "source": "vertica10"
   , "target": "file-staging"
+  , "parameters"                      : {
+       "DIRECTORY"                     : "export/json/%vendor%"
+    }
   , "tasks": [
       "HR", "BI"
     ]

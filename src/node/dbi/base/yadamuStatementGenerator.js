@@ -93,9 +93,9 @@ class YadamuStatementGenerator {
   } 
 
   getSpatialFormat(tableMetadata) {
-	 
+	  
 	if (tableMetadata.hasOwnProperty("source")) {
-   	  const spatialColumnList = tableMetadata.dataTypes.flatMap((dataType,idx) => { return (YadamuDataTypes.isSpatial(dataType) && (idx < tableMetadata.source.length)) ? [idx] : [] })
+   	  const spatialColumnList = tableMetadata.dataTypes.flatMap((dataType,idx) => { return (YadamuDataTypes.isSpatial(dataType) && (idx < tableMetadata.source.dataTypes.length)) ? [idx] : [] })
       const spatialFormats = spatialColumnList.map((idx) => {
 		return YadamuDataTypes.isSpatial(tableMetadata.source.dataTypes[idx]) ?  this.dbi.INBOUND_SPATIAL_FORMAT  
 		     : YadamuDataTypes.isBinary(tableMetadata.source.dataTypes[idx])  ? 'WKB'  
@@ -103,12 +103,12 @@ class YadamuStatementGenerator {
 			 : 'WKT'
 	  })
 	  if (spatialFormats.length > 0) {
-  	    // ToDo ### Multiple spatial formats
-	    if (spatialFormats.length > 1)  {
+  	    // ToDo ### Multiple spatial formats 
+	    if ((spatialFormats.length > 1)  && (!spatialFormats.every((val) => { return val === spatialFormats[0] } )))  {
 		  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Multiple spatial formats detected : ${spatialFormats}`)
 	    }
 	    if (this.dbi.INBOUND_SPATIAL_FORMAT !== spatialFormats[1]) {
-		  this.yadamuLogger.qa([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Spatial format mismatch detected :${this.dbi.INBOUND_SPATIAL_FORMAT} Vs ${spatialFormats}`)
+		  this.yadamuLogger.qa([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Default Spatial Format overridden. Expected: ${this.dbi.INBOUND_SPATIAL_FORMAT}. Found: ${spatialFormats[0]}`)
 	    }		  
 	    return spatialFormats[0]
 	  }

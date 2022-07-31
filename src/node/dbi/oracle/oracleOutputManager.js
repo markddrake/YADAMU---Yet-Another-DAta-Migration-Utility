@@ -218,33 +218,32 @@ class OracleOutputManager extends YadamuOutputManager {
           case oracledb.BLOB:
             return (col,idx) =>  {
               /*
+			  **
+			  ** If necessary convert data to a Buffer. The following actions are preformed based on the type of data
               **
-              ** At this point we can have one of the following to deal with:
+              ** 1. A Buffer: No Action
+              ** 2. A JSON Object : Stringify Object and convert to a Buffer
+              ** 3. A String containing a Serialized JSON object: Conver to a Buffer
+              ** 4. A string containing HexBinary encoded content: Convert to a Buffer
               **
-              ** 1. A Buffer
-              ** 2. A string containing HexBinary encoded content
-              ** 3. A JSON Object
-              **
-              ** If we have a JSON object stringify it.
-              ** If we have a HexBinary representation of a Buffer convert it into a Buffer unless the resuling buffer would exceed the maximu size defined for a client cached object.
-              ** the maximum size of a client cached LOB.
-              ** If we have an object we need to serialize it and convert the serialization into a Buffer
               */
-              // Determine whether to bind content as Buffer or temporary BLOB
-              if ((typeof col === "object") && (!Buffer.isBuffer(col))) {
-                col = Buffer.from(JSON.stringify(col),'utf-8')
-              }
-              if ((typeof col === "string") /* && ((col.length/2) <= this.dbi.CACHELOB_MAX_SIZE) */) {
-                if (YadamuDataTypes.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON') {
-                  col = Buffer.from(col,'utf-8')
-                }
-                else {
-                  col = Buffer.from(col,'hex')
-                }
-              }
+			  if (!Buffer.isBuffer(col)) {
+				switch (true) {
+				  case (typeof col === 'object'):
+				    col = Buffer.from(JSON.stringify(col),'utf-8')
+				    break
+				  case ((typeof col === "string") && (YadamuDataTypes.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON')):
+                    col = Buffer.from(col,'utf-8')
+					break
+                  case (typeof col === "string"):
+                    col = Buffer.from(col,'hex')
+					break
+				}
+			  }
               this.batch.cachedLobCount++
               this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.CACHELOB_MAX_SIZE)
               return col
+              
             }
             break
           default:
@@ -337,18 +336,20 @@ class OracleOutputManager extends YadamuOutputManager {
 
     // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.COPY_METRICS.cached],'cacheRow()')
 	
-    // if (this.COPY_METRICS.received === 1) {console.log(row)}
+    // if (this.COPY_METRICS.received === 1) {console.log('Cache Row (1)\n',row)}
 
     try {
       this.bindRowAsLOB = false;
       if (this.tableInfo.lobColumns) {
-        // Bind Ordering and Row Ordering are the probably different. Use map to create a new array in BindOrdering when applying transformations
+        // Bind Ordering and Row Ordering may be different. LOBS need to follow scalar columns, regardless of the order of the columns in he table. Use map to create a new array in BindOrdering when applying transformations
         row = this.transformations.map((transformation,bindIdx) => {
           const rowIdx = this.tableInfo.bindOrdering[bindIdx]
           if (row[rowIdx] !== null) {
+			// Apply the column transformation
             if (transformation !== null) {
               row[rowIdx] = transformation(row[rowIdx],rowIdx);
             }
+			// Convert CLOB and BLOB values
             if (this.lobTransformations[bindIdx] !== null) {
               row[rowIdx] = this.lobTransformations[bindIdx](row[rowIdx],rowIdx);
             }
@@ -396,7 +397,7 @@ class OracleOutputManager extends YadamuOutputManager {
       }
 	  this.checkNumericBinds(row)
       this.COPY_METRICS.cached++
-      // if (this.COPY_METRICS.received === 1) {console.log(row)}
+      // if (this.COPY_METRICS.received === 1) {console.log('Cache Row (2)\n',row)}
     } catch (cause) {
       this.handleIterativeError('CACHE ONE',cause,this.COPY_METRICS.cached+1,row);
     }

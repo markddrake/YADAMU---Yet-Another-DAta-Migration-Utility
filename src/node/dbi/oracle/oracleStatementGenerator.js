@@ -162,7 +162,6 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
                return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }   
 		   }			   
          case this.dbi.DATA_TYPES.SPATIAL_TYPE:
-		 case this.dbi.DATA_TYPES.YADAMU_SPATIAL_TYPE:
 		   tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
 		   switch (this.SPATIAL_FORMAT) { 
@@ -374,6 +373,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
     tables.forEach((table,idx) => {
       
 	  const tableMetadata = this.metadata[table];
+	  this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
 	  
       const tableName = tableMetadata.tableName;
 	  const tableInfo = statementCache[tableName];
@@ -383,7 +383,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
       tableInfo.insertMode      = 'Batch';      
 	  tableInfo.dataFile        = tableMetadata.dataFile
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-	  tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+	  tableInfo._SPATIAL_FORMAT = this.SPATIAL_FORMAT
       
 	  const dataTypeDefinitions = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
       tableInfo.binds           = this.generateBinds(dataTypeDefinitions,tableInfo,tableMetadata);
@@ -451,7 +451,6 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 
         switch (targetDataType) {
           case this.dbi.DATA_TYPES.SPATIAL_TYPE:
-		  case this.dbi.DATA_TYPES.YADAMU_SPATIAL_TYPE:
 		     externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
 			 copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
 		     switch (this.SPATIAL_FORMAT) {       

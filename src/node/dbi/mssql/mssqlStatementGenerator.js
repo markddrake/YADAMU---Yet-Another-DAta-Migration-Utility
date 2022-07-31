@@ -77,6 +77,8 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 	const tables = Object.keys(this.metadata); 
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
+      this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+	  
       const tableName = tableMetadata.tableName;
       statementCache[tableName] = statementCache[tableName]
       const tableInfo = statementCache[tableName]; 
@@ -86,7 +88,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
       const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
       
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-      tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+      tableInfo._SPATIAL_FORMAT = this.SPATIAL_FORMAT
 	  
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";

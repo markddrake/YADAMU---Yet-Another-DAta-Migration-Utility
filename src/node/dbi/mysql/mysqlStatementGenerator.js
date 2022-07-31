@@ -40,6 +40,8 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
         const tableMetadata = this.metadata[table];
+        this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+
 		const tableName = tableMetadata.tableName;
         const tableInfo = statementCache[tableName];
 		tableInfo.columnNames = tableMetadata.columnNames
@@ -48,7 +50,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 		
         tableInfo.insertMode      = 'Batch';
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-        tableInfo._SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
+        tableInfo._SPATIAL_FORMAT = this.SPATIAL_FORMAT
 
         /*
         **
