@@ -386,23 +386,25 @@ class YugabyteDBI extends YadamuDBI {
 	    const result = await this.executeSQL(sqlStatement,batch)
 	    return result;
 	  }
-	  catch (e) {
-		console.log('Insert Batch',e)
-		if (e.transactionAborted() && (this.retryCount < this.RETRY_LIMIT)) {
-		  this.retryCount++
-          try {
-		    this.rollbackTransaction(e) 
-		  } catch (e) {
-		    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','TRANSACTION ABORTED','ROLLBACK TRANSACTION'],e)
-		  }
+	  catch (cause) {
+		if (cause.transactionAborted() && (retryCount < this.RETRY_LIMIT)) {
+		  let operation = 'ROLLBACK TRANSACTION'
 		  try {
-  			this.beginTransaction() 
-			continue
-		  } catch (e) {
-  		    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','TRANSACTION ABORTED','ROLLBACK TRANSACTION'],e)
+            this.rollbackTransaction(e) 
+		    operation = 'BEGIN TRANSACTION'
+ 		    this.beginTransaction() 
+  		    continue
+	      } catch(retryError) {
+            cause.cause = [cause.cause, retryError];
+  		    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','TRANSACTION ABORTED',operation],cause)
+		    throw cause
 		  }
+		  retryCount++
+		  this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,'BATCH INSERT','TRANSACTION ABORTED',retryCount],cause)
+		  this.yadamuLogger.info([this.DATABASE_VENDOR,'BATCH INSERT'],`Retrying operation.`)
+		  continue
 		}
-		throw e
+		throw cause
 	  }
 	}
   }

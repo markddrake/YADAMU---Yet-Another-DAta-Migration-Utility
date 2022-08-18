@@ -89,6 +89,14 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
   ;;
 
+  oracle19c)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cCopy
+  ;;
+
   oracle11g)
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gDataTypes
@@ -141,6 +149,12 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbTestSuite
+  ;;
+
+  cdb)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh cdbShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh cdbDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh cdbTestSuite
   ;;
 
   copy) 

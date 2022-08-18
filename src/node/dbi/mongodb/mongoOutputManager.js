@@ -51,7 +51,7 @@ class MongoOutputManager extends YadamuOutputManager {
   generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-  
+	
 	const transformations = dataTypes.map((dataType,idx) => {      
 	
 	   switch(dataType.toLowerCase()){
@@ -92,6 +92,10 @@ class MongoOutputManager extends YadamuOutputManager {
               return (col,idx) => {
         	    return WKX.Geometry.parse(col).toGeoJSON()
               }
+            case "GeoJSON":
+              return (col,idx) => {
+                return typeof col === 'string' && (col.length > 0) ? JSON.parse(col) : col
+              }
             default:
           }
 		  return null
@@ -99,6 +103,7 @@ class MongoOutputManager extends YadamuOutputManager {
           return (col,idx) => {
             return YadamuLibrary.toBoolean(col)
 	      }
+        case this.dbi.DATA_TYPES.JSON_TYPE:
         case this.dbi.DATA_TYPES.MONGO_OBJECT_TYPE:
         case this.dbi.DATA_TYPES.MONGO_ARRAY_TYPE:
           return (col,idx) => {

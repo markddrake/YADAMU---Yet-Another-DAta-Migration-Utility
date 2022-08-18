@@ -95,6 +95,7 @@ class YugabyteQA extends YadamuQALibrary.qaMixin(YugabyteDBI) {
   (select count(*) from (select ${table[1]} from "${target.schema}"."${table[0]}" except select ${table[1]} from "${source.schema}"."${table[0]}") T2) MISSING_ROWS`
   
         // console.log(sqlStatement)
+		
         try {
           let results = await this.executeSQL(sqlStatement);
   		  results = Object.values(results.rows[0])

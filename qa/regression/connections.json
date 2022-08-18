@@ -194,6 +194,15 @@
       , "port"                          : 5433
       }
     },
+    "croach#1"                          : {
+      "cockroach"                       : {
+        "user"                          : "root"
+      , "host"                          : "ROACH01-01"
+      , "database"                      : "yadamu"
+      , "password"                      : "oracle"
+      , "port"                          :  26257
+      }
+    },
 	"minio#1": {
 	  "awsS3": {
 		"accessKeyId"                   : "AKIAIOSFODNN7EXAMPLE"

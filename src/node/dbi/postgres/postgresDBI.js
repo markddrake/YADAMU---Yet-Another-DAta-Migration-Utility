@@ -292,6 +292,7 @@ class PostgresDBI extends YadamuDBI {
       } catch (e) {
         this.connection = undefined;
 		const err = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'Client.release()'))
+		this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
       }
 	}

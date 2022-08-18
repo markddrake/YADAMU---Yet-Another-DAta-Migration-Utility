@@ -38,17 +38,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
-			"source": "tera#1",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
+		},{
 			"source": "oracle19c",
 			"target": "tera#1",
 			"tasks": [
@@ -56,8 +46,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle18c",
 			"target": "tera#1",
 			"tasks": [
@@ -65,8 +54,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle12c",
 			"target": "tera#1",
 			"tasks": [
@@ -74,8 +62,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle11g",
 			"target": "tera#1",
 			"tasks": [
@@ -83,8 +70,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mssql19",
 			"target": "tera#1",
 			"tasks": [
@@ -92,8 +78,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mssql17",
 			"target": "tera#1",
 			"tasks": [
@@ -101,8 +86,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "postgres#1",
 			"target": "tera#1",
 			"tasks": [
@@ -110,8 +94,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mysql#1",
 			"target": "tera#1",
 			"tasks": [
@@ -119,8 +102,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mariadb#1",
 			"target": "tera#1",
 			"tasks": [
@@ -128,8 +110,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mongodb#1",
 			"target": "tera#1",
 			"parameters": {
@@ -140,8 +121,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "tera#1",
 			"targets": [
 				"tera#1",

@@ -17,14 +17,6 @@
 				"mssql"
 			]
 		},{
-			"source": "oracle11g",
-			"target": "oracle11g",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
 			"source": "oracle19c",
 			"target": "oracle11g",
 			"tasks": [

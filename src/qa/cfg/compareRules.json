@@ -38,6 +38,7 @@
 			"snowflake": 13
 		},
 		"cockroach": {
+			"oracle": 8,
 			"snowflake": 13
 		},
 		"mariadb": {

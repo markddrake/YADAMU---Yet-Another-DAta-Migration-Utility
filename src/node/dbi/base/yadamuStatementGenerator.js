@@ -107,7 +107,7 @@ class YadamuStatementGenerator {
 	    if ((spatialFormats.length > 1)  && (!spatialFormats.every((val) => { return val === spatialFormats[0] } )))  {
 		  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Multiple spatial formats detected : ${spatialFormats}`)
 	    }
-	    if (this.dbi.INBOUND_SPATIAL_FORMAT !== spatialFormats[1]) {
+	    if (this.dbi.INBOUND_SPATIAL_FORMAT !== spatialFormats[0]) {
 		  this.yadamuLogger.qa([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Default Spatial Format overridden. Expected: ${this.dbi.INBOUND_SPATIAL_FORMAT}. Found: ${spatialFormats[0]}`)
 	    }		  
 	    return spatialFormats[0]

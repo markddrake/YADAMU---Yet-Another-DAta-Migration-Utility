@@ -3,8 +3,7 @@
 	"connections": "connections.json",
 	"tasks": "tasks.json",
 	"recreateSchema": true,
-	"tests": [
-		{
+	"tests": [{
 			"operation": "import",
 			"source": "file-staging",
 			"target": "yugabyte#1",
@@ -17,8 +16,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"operation": "export",
 			"recreateSchema": true,
 			"createDirectory": true,
@@ -36,17 +34,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
-			"source": "yugabyte#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
+		},{
 			"source": "oracle19c",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -54,8 +42,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle18c",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -63,8 +50,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle12c",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -72,8 +58,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "oracle11g",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -81,8 +66,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mssql19",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -90,8 +74,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mssql17",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -99,8 +82,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "postgres#1",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -108,8 +90,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mysql#1",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -117,8 +98,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mariadb#1",
 			"target": "yugabyte#1",
 			"tasks": [
@@ -126,8 +106,7 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "mongodb#1",
 			"target": "yugabyte#1",
 			"parameters": {
@@ -138,11 +117,11 @@
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"source": "yugabyte#1",
 			"targets": [
-				"oracle19c",
+                "yugabyte#1",
+                "oracle19c",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",

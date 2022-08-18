@@ -16,13 +16,14 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
   }
   
   generateTableInfo(tableMetadata) {
-
+	 
     let insertMode = 'DOCUMENT';
     this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
     
     let columnNames = tableMetadata.columnNames
     let dataTypes = tableMetadata.dataTypes
     let sizeConstraints = tableMetadata.sizeConstraints
+	let targetDataTypes = this.getTargetDataTypes(tableMetadata)
 	
     /*
     **
@@ -31,15 +32,15 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
     **   
     */
 
-    if (((this.dbi.WRITE_TRANSFORMATION === 'ARRAY_TO_DOCUMENT') || this.emptyTable(tableMetadata)) && (tableMetadata.source)) {
+    if (((this.dbi.WRITE_TRANSFORMATION === 'ARRAY_TO_DOCUMENT') || this.emptyTable(tableMetadata)) && (tableMetadata.hasOwnProperty("source"))) {
       columnNames = tableMetadata.source.columnNames 
       dataTypes = tableMetadata.source.dataTypes;
       sizeConstraints = tableMetadata.source.sizeConstraints 
+	  targetDataTypes = this.getTargetDataTypes(tableMetadata.source)
     }
 
-	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
    	
-    if ((tableMetadata.columnNames.length === 1) && (dataTypes[0] === 'JSON')) {
+    if (tableMetadata.hasOwnProperty("source") && (tableMetadata.source.columnNames.length === 1) && (tableMetadata.source.dataTypes[0].toUpperCase() === "JSON")) 	{
         // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'   
         insertMode = 'DOCUMENT'
     }
