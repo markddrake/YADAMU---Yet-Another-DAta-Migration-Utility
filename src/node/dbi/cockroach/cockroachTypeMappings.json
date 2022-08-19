@@ -1,0 +1,54 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "character"                                        
+  , "VARCHAR_TYPE"                                         : "character varying"                                
+  , "BINARY_TYPE"                                          : "bytea"                                            
+                                                                                                             
+  , "SMALLINT_TYPE"                                        : "smallint"                                         
+  , "INTEGER_TYPE"                                         : "integer"                                          
+  , "BIGINT_TYPE"                                          : "bigint"                                           
+  , "FLOAT_TYPE"                                           : "real"                                             
+  , "DOUBLE_TYPE"                                          : "double precision"                                 
+  , "NUMERIC_TYPE"                                         : "numeric"                                          
+                                                                                                             
+  , "DATE_TYPE"                                            : "date"                                             
+  , "TIMESTAMP_TYPE"                                       : "timestamp without time zone"                      
+  , "TIMESTAMP_TZ_TYPE"                                    : "timestamp with time zone"                         
+  , "TIME_TYPE"                                            : "time without time zone"                           
+  , "TIME_TZ_TYPE"                                         : "time with time zone"                              
+  , "INTERVAL_TYPE"                                        : "interval"                                                        
+                                                                                                                         
+  , "BOOLEAN_TYPE"                                         : "boolean"                                          
+  , "BIT_STRING_TYPE"                                      : "bit"                                              
+  , "VARBIT_STRING_TYPE"                                   : "bit varying"                                      
+                                                                                                             
+  , "CLOB_TYPE"                                            : "text"                                             
+  , "BLOB_TYPE"                                            : "bytea"                                             
+                                                                                                             
+  , "JSON_TYPE"                                            : "jsonb"                                             
+                                                                                                             
+  , "GEOGRAPHY_TYPE"                                       : "geography"                                        
+  , "GEOMETRY_TYPE"                                        : "geometry"                                        
+  , "SPATIAL_TYPE"                                         : "geometry"                                        
+                                                                                                             
+  , "UUID_TYPE"                                            : "uuid"                                             
+                                                                                                             
+  , "PGSQL_INET_ADDR_TYPE"                                 : "inet"                                             
+                                                                                                             
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric"
+  , "MONGO_OBJECTID_TYPE"                                  : "bytea"
+  
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 1000000
+  , "NUMERIC_PRECISION"                                    : 1000
+  , "NUMERIC_SCALE"                                        : 1000
+  , "TIMESTAMP_PRECISION"                                  : 6
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "EWKB"
+  , "CIRCLE_FORMAT"                                        : "CIRCLE"
+  , "JSON_TYPE"                                            : "jsonb"
+  , "XML_TYPE"                                             : "text"
+  }
+}                                                                                                              

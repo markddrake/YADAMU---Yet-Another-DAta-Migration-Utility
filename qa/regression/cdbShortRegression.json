@@ -1,0 +1,35 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "connections.json"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+  , "parameters"                      : {
+    "DIRECTORY"                       : "export/json/%location%"
+  }
+, "tests" : [{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "croach#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "croach#1"
+  , "target": "file-staging"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/%vendor%"
+    }
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "croach#1"
+  , "target": "croach#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

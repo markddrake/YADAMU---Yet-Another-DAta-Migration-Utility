@@ -41,12 +41,14 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11ShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
@@ -73,12 +75,16 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11Copy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
     ;;	
   
   oracle21c)

@@ -16,6 +16,7 @@
 		"loader": "../dbi/loader/loaderDBI.js",
 		"awsS3": "../dbi/awsS3/awsS3DBI.js",
 		"azure": "../dbi/azure/azureDBI.js",
+		"cockroach": "../dbi/cockroach/cockroachDBI.js",
 		"oracle": "../dbi/oracle/oracleDBI.js",
 		"postgres": "../dbi/postgres/postgresDBI.js",
 		"vertica": "../dbi/vertica/verticaDBI.js",

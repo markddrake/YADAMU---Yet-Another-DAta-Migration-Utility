@@ -1,0 +1,67 @@
+version: '2.4'
+services:
+  ROACH01-01:
+    container_name: ROACH01-01
+    image:  cockroachdb/cockroach
+    command: start --insecure --store=node1 --join=ROACH01-01,ROACH01-02,ROACH01-03
+    mem_limit: '8gb'
+    shm_size: '1gb'
+    security_opt:
+     - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ROACH01-01-DATA:/cockroach/cockroach-data
+    restart: always
+
+  ROACH01-02:
+    container_name: ROACH01-02
+    image:  cockroachdb/cockroach
+    command: start --insecure --store=node2 --join=ROACH01-01,ROACH01-02,ROACH01-03 
+    mem_limit: '8gb'
+    shm_size: '1gb'
+    security_opt:
+     - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "26258:26257"
+      - "8081:8080"
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ROACH01-02-DATA:/cockroach/cockroach-data
+    restart: always
+
+  ROACH01-03:
+    container_name: ROACH01-03
+    image:  cockroachdb/cockroach
+    command: start --insecure --store=node3 --join=ROACH01-01,ROACH01-02,ROACH01-03 
+    mem_limit: '8gb'
+    shm_size: '1gb'
+    security_opt:
+     - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "26259:26257"
+      - "8082:8080"
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ROACH01-03-DATA:/cockroach/cockroach-data
+    restart: always
+    
+volumes:
+  ROACH01-01-DATA:
+  ROACH01-02-DATA:
+  ROACH01-03-DATA:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+

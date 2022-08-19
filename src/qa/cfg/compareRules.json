@@ -39,6 +39,7 @@
 		},
 		"cockroach": {
 			"oracle": 8,
+			"mongodb": 17,
 			"snowflake": 13
 		},
 		"mariadb": {
