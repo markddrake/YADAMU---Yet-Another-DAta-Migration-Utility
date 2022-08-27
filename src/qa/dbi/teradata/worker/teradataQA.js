@@ -94,7 +94,7 @@ class TeradataQA extends YadamuQALibrary.qaMixin(TeradataDBI) {
 	  compareResults.forEach((results,idx) => {
         const compareResult =  results[0]
         if ((parseInt(compareResult[1]) === parseInt(compareResult[2])) && (parseInt(compareResult[3]) === 0) && (parseInt(compareResult[4])  === 0)) {
-          report.successful.push(new Array(source.schema,target.schema,compareResult[0],compareResult[1]))
+          report.successful.push(new Array(source.schema,target.schema,compareResult[0],compareResult[2))
         }
         else {
           report.failed.push(new Array(source.schema,target.schema,...compareResult,''))

@@ -15,6 +15,8 @@ class SnowflakeError extends DatabaseError {
 
   lostConnection() {
     return (this.cause.isFatal && (this.cause.code && SnowflakeConstants.LOST_CONNECTION_ERROR.includes(this.cause.code)) && (this.cause.sqlState && SnowflakeConstants.LOST_CONNECTION_STATE.includes(this.cause.sqlState)))
+	    || ((this.cause.name === 'NetworkError') && (this.cause.code === 401001) && (this.cause.message.includes('Could not reach Snowflake')))
+	    || ((this.cause.name === 'NetworkError') && (this.cause.code === 402001) && (this.cause.message.includes('Could not reach S3/Blob')))	
   }
 
   serverUnavailable() {

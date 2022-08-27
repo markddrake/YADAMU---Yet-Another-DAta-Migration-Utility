@@ -123,7 +123,7 @@ class DB2QA extends YadamuQALibrary.qaMixin(DB2DBI) {
 	 compareResults.forEach((results,idx) => {
         const compareResult =  results
         if ((parseInt(compareResult[1]) === parseInt(compareResult[2])) && (parseInt(compareResult[3]) === 0) && (parseInt(compareResult[4])  === 0)) {
-          report.successful.push(new Array(source.schema,target.schema,...compareResult))
+          report.successful.push(new Array(source.schema,target.schema,compareResult[0],compareResult[2]))
         }
         else {
           report.failed.push(new Array(source.schema,target.schema,...compareResult,''))
