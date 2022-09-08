@@ -98,12 +98,11 @@ class MariadbDBI extends YadamuDBI {
     this.statementLibrary = undefined
   }
   
-  async testConnection(connectionProperties,parameters) {   
+  async testConnection() {   
     try {
-	  this.setConnectionProperties(connectionProperties)
       this.connection = await mariadb.createConnection(this.vendorProperties)
 	  await this.connection.end()
-	  super.setParameters(parameters)
+	  this.connection = undefined;
 	} catch (e) {
 	  throw (e)
 	} 

@@ -78,6 +78,9 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
@@ -155,6 +158,8 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbTestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh ydbCopy
   ;;
 
   cdb)
@@ -170,18 +175,22 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
   ;;
 
-  cmdLine) 
-    source  $YADAMU_SCRIPT_DIR/runCmdLineTests.sh
-  ;;
+  regression)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh $TESTNAME
+  ;; 
 
   custom)
     source $YADAMU_SCRIPT_DIR/runCustomTest.sh $TESTNAME
   ;; 
   
-  regression)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh $TESTNAME
-  ;; 
+  cmdLine) 
+    source  $YADAMU_SCRIPT_DIR/runCmdLineTests.sh
+  ;;
 
+  service)
+    source $YADAMU_SCRIPT_DIR/runServiceTests.sh $TESTNAME
+  ;; 
+  
   interactive)
     sleep 365d
   ;; 

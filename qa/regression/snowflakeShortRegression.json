@@ -19,6 +19,9 @@
 	"operation" : "export"
   , "source": "snow#1"
   , "target": "file-staging"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/%vendor%"
+    }
   , "tasks": [
       "HR", "BI"
     ]

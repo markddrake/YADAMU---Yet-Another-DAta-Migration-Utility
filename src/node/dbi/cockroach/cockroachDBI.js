@@ -180,8 +180,7 @@ class CockroachDBI extends YadamuDBI {
 	try {
       const pgClient = new Client(this.vendorProperties)
       await pgClient.connect()
-      await pgClient.end()     
-								  
+      await pgClient.end()       
 	} catch (e) {
       throw e;
 	}

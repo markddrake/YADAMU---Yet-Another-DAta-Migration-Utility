@@ -75,7 +75,7 @@ class ExampleDBI extends YadamuDBI {
   **
   */
   
-  async testConnection(connectionProperties) {   
+  async testConnection() {   
     // Validate the supplied connection properties
     throw new UnimplementedMethod('testConnection()',`YadamuDBI`,this.constructor.name)
   }

@@ -314,7 +314,7 @@ class YadamuLibrary {
 	
     switch (keys.length) {
       case 0:
-	    throw new new ConfigurationFileError('Empty Connection Object')
+	    throw new ConfigurationFileError('Empty Connection Object')
 	  case 1: 
         return keys[0]
   	  default:

@@ -115,13 +115,12 @@ class MySQLDBI extends YadamuDBI {
   **
   */
    
-  async testConnection(connectionProperties,parameters) {   
+  async testConnection() {   
     try {
-      this.setConnectionProperties(connectionProperties)
-      this.connection = this.getConnectionFromPool()
-      await this.openDatabaseConnection()
-      await this.connection.end()
-      super.setParameters(parameters)
+      this.connection = await mysql.createConnection(this.vendorProperties)
+	  await this.executeSQL('select 1');
+	  await this.connection.end()
+  	  this.connection = undefined
     } catch (e) {
       throw (e)
     } 
@@ -745,7 +744,7 @@ class MySQLDBI extends YadamuDBI {
     // Prevent Connections with Long Running streaming operations from timing out..
     dbi.yadamuLogger.info([`${this.constructor.name}.keepAlive()`],`Row [${dbi.parser.getCounter()}]`)
     try {
-      this.results = await dbi.executeSQL('select 1')
+      const results = await dbi.executeSQL('select 1')
     } catch (e) {
       // Don't care of timeout query fails
     }

@@ -3,6 +3,8 @@ version: '2'
 volumes:
   yb-master-data-1:
   yb-tserver-data-1:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
 
 services:
   yb-master:
@@ -11,6 +13,7 @@ services:
       mem_limit: '4Gb'
       volumes:
       - yb-master-data-1:/mnt/master
+      - YADAMU_01-SHARED:/mnt/shared
       command: [ "/home/yugabyte/bin/yb-master",
                 "--fs_data_dirs=/mnt/master",
                 "--master_addresses=yb-master-n1:7100",
@@ -30,6 +33,7 @@ services:
       mem_limit: '16gb'
       volumes:
       - yb-tserver-data-1:/mnt/tserver
+      - YADAMU_01-SHARED:/mnt/shared
       command: [ "/home/yugabyte/bin/yb-tserver",
                 "--fs_data_dirs=/mnt/tserver",
                 "--start_pgsql_proxy",

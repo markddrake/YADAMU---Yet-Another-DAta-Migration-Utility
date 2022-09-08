@@ -180,6 +180,7 @@ class Yadamu {
 	  process.on('unhandledRejection', this.yadamuAbort.bind(this))
 	  // process.on('unhandledRejection', this.yadamuAbort)
 	}
+	
     // Configure Paramters
     this.initializeParameters(configParameters || {})
     this.initializeLogging();    
@@ -202,6 +203,36 @@ class Yadamu {
       }
     };	
 
+  }
+
+  async reset(parameters) {
+	
+    this._IDENTIFIER_MAPPINGS = undefined
+    this._REJECTION_MANAGER = undefined;
+    this._WARNING_MANAGER = undefined;
+	
+    this.STATUS.startTime     = performance.now()
+    this.STATUS.warningRaised = false;
+    this.STATUS.errorRaised   = false;
+    this.STATUS.statusMsg     = 'successfully'
+	this.metrics = {}
+    	
+	this.initializeParameters(parameters)
+	this.initializeLogging();
+	
+    if (parameters && (parameters.PASSPHRASE || (parameters.ENCRYPTION === true))) {		
+	  await this.generateCryptoKey()
+	}
+  }
+  
+  clone() {
+	
+    this.REJECTION_MANAGER.close();
+	this.WARNING_MANAGER.close();
+
+	this.reset();
+	this.LOGGER.resetMetrics()	
+	return this;
   }
   
   yadamuAbort(err,promise) {

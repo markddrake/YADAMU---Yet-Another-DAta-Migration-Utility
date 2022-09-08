@@ -5,6 +5,7 @@ COPY docker/regression/tnsnames.ora .
 COPY qa/bin qa/bin
 COPY qa/mappings qa/mappings
 COPY qa/regression qa/regression
+COPY qa/service qa/service
 COPY qa/sql qa/sql
 COPY src src
 copy utilities utilities

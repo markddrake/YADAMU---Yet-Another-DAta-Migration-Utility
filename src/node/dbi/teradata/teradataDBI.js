@@ -97,14 +97,12 @@ class TeradataDBI extends YadamuDBI {
     })
   } 
 
-  async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties)
+  async testConnection() {   
     this.setDatabase()
     try {
       let connection = Teradata.createConnection(this.vendorProperties)
       connection = await this.establishConnection(connection)
       connection.destroy()
-      super.setParameters(parameters)
     } catch (e) {
       throw this.trackExceptions(new TeradataError(this.DRIVER_ID,e,'Teradata-SDK.connection.connect()'))
     }

@@ -1,0 +1,52 @@
+{
+	"operation": "dbRoundTrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"stagingArea": "loader-staging",
+	"recreateSchema": true,
+	"reloadStagingArea" : false,
+	"emptyStringIsNull" : true,
+	"parameters": {
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
+		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+		"TIMESTAMP_PRECISION"     : 6
+	},
+	
+	"tests": [{
+			"source": "oracle19c",
+			"target": "yugabyte#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mssql19",
+			"target": "yugabyte#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "postgres#1",
+			"target": "yugabyte#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mysql#1",
+			"target": "yugabyte#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mongodb#1",
+			"target": "yugabyte#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "yugabyte#1",
+			"target": "yugabyte#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		}]
+}

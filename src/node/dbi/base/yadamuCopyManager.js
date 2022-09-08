@@ -116,7 +116,7 @@ class YadamuCopyManager {
 
 	await this.dbi.initializeCopy(controlFile)
     
-	if (this.dbi.MODE != 'DDL_ONLY') {
+	if (this.dbi.MODE !== 'DDL_ONLY') {
 	  const taskList = Object.keys(statementCache).flatMap((table) => {
 		if (Array.isArray(statementCache[table].copy)) {
 	      return statementCache[table].copy.map((copyOperation) => { 

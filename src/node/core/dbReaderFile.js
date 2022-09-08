@@ -16,7 +16,14 @@ class DBReaderFile extends DBReader {
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
   }
-     
+    
+  removeLeakedListeners(stream,initialListeners,listener) {
+    
+	const leakedListeners =  stream.listeners(listener).filter((f)  => {return !initialListeners.includes(f)});
+	leakedListeners.forEach((f) => {stream.removeListener(listener,f)})
+	
+  } 	  
+	
   async pipelineTable(readerDBI,writerDBI,task) {
       
     // this.yadamuLogger.trace(['PIPELINE','SERIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
@@ -32,10 +39,23 @@ class DBReaderFile extends DBReader {
     // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)	  
     // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
 
-    pipelineMetrics.pipeStartTime = performance.now();
+
+
+    const terminalStream = yadamuPipeline[yadamuPipeline.length-1]
+    const initialListeners = {
+	  errorListeners : terminalStream.listeners('error')
+	, closeListeners : terminalStream.listeners('close')
+	, finishListeners : terminalStream.listeners('finsih')
+	}	 
+
+	pipelineMetrics.pipeStartTime = performance.now();
     await pipeline(yadamuPipeline,{end:false})
 	pipelineMetrics.pipeEndTime = performance.now();
-	  
+	
+	this.removeLeakedListeners(terminalStream,initialListeners.errorListeners,'error')
+	this.removeLeakedListeners(terminalStream,initialListeners.closeListeners,'close')
+	this.removeLeakedListeners(terminalStream,initialListeners.finishListeners,'finish')
+	
   }
 
   async pipelineTables(taskList,readerDBI,writerDBI) {

@@ -1,6 +1,6 @@
 "use strict" 
 
-import FileDBI from '../../YADAMU/file/node/fileDBI.js';
+import FileDBI from '../dbi/file/fileDBI.js';
 
 /*
 **
@@ -16,8 +16,13 @@ class HttpDBI extends FileDBI {
   get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().http }
   
   constructor(yadamu,httpStream) {
-    super(yadamu,yadamu.getYadamuDefaults().http)    
+
+    super(yadamu,{},{})    
 	this.httpStream = httpStream;
+  }
+  
+  createInputStream() {
+	 return this.httpStream
   }
 
   getInputStream() {
@@ -28,7 +33,6 @@ class HttpDBI extends FileDBI {
 
   async initializeImport() {
 	this.outputStream = this.httpStream;
-	this.outputStream.write(`{`)
   }
 
   closeInputStream() {      

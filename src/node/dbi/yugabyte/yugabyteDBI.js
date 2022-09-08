@@ -165,8 +165,7 @@ class YugabyteDBI extends YadamuDBI {
   **
   */
   
-  async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties)
+  async testConnection() {   
 	try {
       const pgClient = new Client(this.vendorProperties)
       await pgClient.connect()
@@ -808,7 +807,26 @@ class YugabyteDBI extends YadamuDBI {
 	  this.DATA_TYPES.GEOMETRY_TYPE = this.DATA_TYPES.SPATIAL_TYPE
 	}
 	
-    return await super.generateStatementCache(YugabyteStatementGenerator, schema)
+	const statementCache = await super.generateStatementCache(YugabyteStatementGenerator, schema)
+	
+	/*
+	**
+	** Yugabyte uses the Postgres StatementGenerator class.
+	** Postgres supports creating the foreign table, loading the data and then dropping the foreign table in a single transaction
+	** With Yugabyte this logic causes transaction retry errors to be raised when multiple connections are used to load multiple tables in parallel
+	** In Yugabyte we need to create all the foreign tables in a seperate transaction before attemping to load the data
+	** and then drop all the foreign tables in a seperate transaction onces the data load process is complete.
+	**
+	** Extract and cache the DDL operations required to create and drop the foreign tables from the statement cache.
+	** Foreign tables are created in initializeCopy() after the Server object has been created.
+	** Foreign tables are dropping in finalizeCopy() before the Server object is dropped.
+	**
+	*/
+	
+	this.dropStatementCache = []
+    this.createStatementCache = Object.values(statementCache).flatMap((tableInfo) => { return tableInfo.copy}).map((copyOperation) => { this.dropStatementCache.push(copyOperation.drop); return copyOperation.ddl })
+	
+	return statementCache
   }
 
   getOutputManager(tableName,metrics) {
@@ -832,6 +850,9 @@ class YugabyteDBI extends YadamuDBI {
   async initializeCopy() {
 	 await super.initializeCopy()
 	 await this.executeSQL(`create server if not exists "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)
+	 await this.beginTransaction();
+	 const results = await Promise.all(this.createStatementCache.map((statement) => {return this.executeSQL(statement) }))
+	 await this.commitTransaction();
   }
   
   async copyOperation(tableName,copyOperation,metrics) {
@@ -839,11 +860,19 @@ class YugabyteDBI extends YadamuDBI {
 	try {
 	  metrics.writerStartTime = performance.now()
 	  let results = await this.beginTransaction()
-	  results = await this.executeSQL(copyOperation.ddl)
+	  // results = await this.executeSQL(copyOperation.ddl)
+
+	  // await this.commitTransaction()
+	  // await this.beginTransaction()
+	  
 	  results = await this.executeSQL(copyOperation.dml)
 	  metrics.read = results.rowCount
 	  metrics.written = results.rowCount
-	  results = await this.executeSQL(copyOperation.drop)
+
+	  // await this.commitTransaction()
+	  // await this.beginTransaction()
+	  
+	  // results = await this.executeSQL(copyOperation.drop)
 	  metrics.writerEndTime = performance.now()
 	  results = await this.commitTransaction()
 	  metrics.committed = metrics.written 
@@ -863,7 +892,10 @@ class YugabyteDBI extends YadamuDBI {
 
   async finalizeCopy() {
 	 await super.finalizeCopy()
-	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `)
+	 await this.beginTransaction();
+	 const results = await Promise.all(this.dropStatementCache.map((statement) => { return this.executeSQL(statement) }))
+	 await this.commitTransaction();
+	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" cascade`)
   }
 
 }

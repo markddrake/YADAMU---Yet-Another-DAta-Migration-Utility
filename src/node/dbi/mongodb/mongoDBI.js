@@ -442,11 +442,10 @@ class MongoDBI extends YadamuDBI {
     }
   }
     
-  async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties)
+  async testConnection() {   
     // ### Test Database connection
 	try {
-      await this.connect()
+      await this.connect(this.vendorProperties)
       await this.closePool()
 	} catch (e) {
       throw e;

@@ -1,26 +1,21 @@
-"use strict";
 
-import path from 'path';
-import http from 'http';
-import express from 'express';
-import cookieParser from 'cookie-parser';
-import session from 'express-session';
-import bodyParser from 'body-parser';
-import serveStatic from 'serve-static';
+import path         from 'path'
+import http         from 'http'
+import express      from 'express'
+import cookieParser from 'cookie-parser'
+import session      from 'express-session'
+import bodyParser   from 'body-parser'
+import serveStatic  from 'serve-static'
 
-import router from './yadamuRouter.js';
+import {
+  getRouter
+, log
+, handleException
+}                     from './router.js';
 
 const app  = express();
 
-function writeLogEntry(module,comment) {
-	
-  const message = ( comment === undefined) ? module : module + ": " + comment
-  console.log(new Date().toISOString() + ": index." + message);
-}
-
 function initApp() {
-
-  const moduleId = 'initApp()';
 
   var port = process.env.PORT || 3000;
   
@@ -33,7 +28,7 @@ function initApp() {
   app.use(cookieParser());
   app.use(session({ secret: 'boo', resave: false, saveUninitialized: false}));
 
-  app.use('/yadamu', router.getRouter());
+  app.use('/yadamu', getRouter());
 
   // app.use('/frameworks', serveStatic(__dirname + '/node_modules'));  
   // app.use('/frameworks', serveStatic(__dirname.substring(0, __dirname.lastIndexOf(path.sep))));
@@ -48,19 +43,14 @@ function initApp() {
   });
 
 
-  app.use(handleError);
+  app.use(handleException);
 	
   
   httpServer.listen(port,() => {
-    writeLogEntry(moduleId,'Listening on localhost:' + port);
+    log('Listening on localhost:' + port);
   });
 }
 
-function handleError(err, req, res, next) {
-  console.log('handleError\n',err);
-  res.status(500).send({message: 'An error has occurred, please contact support if the error persists'});
-  res.end();
-}
 
 process.on('unhandledRejection', (reason, p) => {
   console.log("Unhandled Rejection:\nPromise:\n ", p, "\nReason:");

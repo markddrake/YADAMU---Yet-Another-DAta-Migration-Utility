@@ -107,7 +107,8 @@ class DB2OutputManager extends YadamuOutputManager {
 		case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
 		  return (col,idx) => {
 			let val = ((typeof col === 'object') && (typeof col.toISOString === 'function')) ? col.toISOString() : col
-		    val = val.replace('T','-').replace('Z','')
+		    val = val.replace('T','-').replace('Z','').replace(/\+00:00$/,'').replace(/-00:00$/,'')
+			
 			return val
 		  }	       
 		case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:

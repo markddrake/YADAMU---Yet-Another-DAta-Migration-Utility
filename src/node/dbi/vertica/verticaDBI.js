@@ -123,13 +123,11 @@ class VerticaDBI extends YadamuDBI {
   **
   */
   
-  async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties)
+  async testConnection() {   
 	try {
       const pgClient = new Client(this.vendorProperties)
       await pgClient.connect()
       await pgClient.end()     
-								  
 	} catch (e) {
       throw e;
 	}

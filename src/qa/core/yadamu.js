@@ -92,26 +92,6 @@ class Yadamu extends _Yadamu {
 	
   }
   
-  async reset(testParameters) {
-	
-    this._IDENTIFIER_MAPPINGS = undefined
-    this._REJECTION_MANAGER = undefined;
-    this._WARNING_MANAGER = undefined;
-	
-    this.STATUS.startTime     = performance.now()
-    this.STATUS.warningRaised = false;
-    this.STATUS.errorRaised   = false;
-    this.STATUS.statusMsg     = 'successfully'
-	this.metrics = {}
-    	
-	this.initializeParameters(testParameters)
-	this.initializeLogging();
-	
-    if (testParameters.PASSPHRASE || testParameters.ENCRYPTION === true) {		
-	  await this.generateCryptoKey()
-	}
-  }
-
   initializeSQLTrace() {
 	if ((this.STATUS.sqlLogger instanceof NullWriter) && this.parameters.SQL_TRACE) {
        this.STATUS.sqlLogger = undefined

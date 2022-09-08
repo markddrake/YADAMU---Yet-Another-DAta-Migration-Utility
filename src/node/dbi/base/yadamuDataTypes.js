@@ -3,7 +3,8 @@ import fs                     from 'fs'
 
 import {
   dirname,
-  join
+  join,
+  resolve
 }                             from 'path'
 
 import { 
@@ -48,7 +49,9 @@ class YadamuDataTypes {
        
   get TYPE_CONFIGURATION()        { 
     this._TYPE_CONFIGURATION = this._TYPE_CONFIGURATION || (() => {
-      this._TYPE_CONFIGURATION = JSON.parse(fs.readFileSync(DataTypeConfiguration[this.DATABASE_VENDOR].file))
+      // this._TYPE_CONFIGURATION = JSON.parse(fs.readFileSync(DataTypeConfiguration[this.DATABASE_VENDOR].file))
+	  const dataTypeMappingsFile= resolve(__dirname,'../../../../',DataTypeConfiguration[this.DATABASE_VENDOR].file)
+      this._TYPE_CONFIGURATION = JSON.parse(fs.readFileSync(dataTypeMappingsFile))
       return this._TYPE_CONFIGURATION
     })()
     return this._TYPE_CONFIGURATION

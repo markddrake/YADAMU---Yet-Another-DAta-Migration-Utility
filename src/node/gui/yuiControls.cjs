@@ -13,6 +13,7 @@ window.$ = window.jQuery = require('jquery')
 
 window.validSource = false;
 window.validTarget = false;
+window.encryption = false;
 
 window.configuration = { 
   connections          : {
@@ -158,7 +159,7 @@ function updateConfiguration(connectionType,connectionProperties,parameters) {
   const mode = connectionType.substring(0,connectionType.indexOf('-'));
   const db = connectionType.substring(connectionType.indexOf('-')+1);
   
-  window.configuration.connections[mode] = { [db] : pwdRedacated }
+  window.configuration.connections[mode] = pwdRedacated 
   const schemaInfo = {}
   
   switch (mode) {
@@ -206,7 +207,7 @@ function testConnection(button,status,connection,connectionProperties,parameters
   status.classList.remove('bi-times-circle')
 
   const state = ipcRenderer.sendSync(connection,connectionProperties,parameters);
-  
+  console.log(state)
   if (state === 'success') {
     valid = true
     status.classList.add('bi-check-circle')
@@ -241,7 +242,7 @@ function validateOracleSource(button) {
     parameters.FROM_USER = parameters.FROM_USER.toUpperCase();
   }	
  
-  window.validSource = testConnection(button,status,'source-oracle',{ oracle: connectionProperties},parameters)  
+  window.validSource = testConnection(button,status,'source-oracle',{ oracle : connectionProperties},parameters)  
   setCopyState()
   
 }
@@ -265,7 +266,7 @@ function validateOracleTarget(button) {
     parameters.TO_USER = parameters.TO_USER.toUpperCase();
   }	
  
-  window.validTarget = testConnection(button,status,'target-oracle',{ oracle: connectionProperties},parameters)  
+  window.validTarget = testConnection(button,status,'target-oracle',connectionProperties,parameters)  
   setCopyState()
   
 }
@@ -312,13 +313,181 @@ function validatePostgresTarget(button) {
 
 }
 
-function validateMsSQLSource(button) {
+function validateVerticaSource(button) {
 
+  button.disabled = true;
+  const status = document.getElementById('source-vertica-status')
+  const connectionProperties = {
+    user      : document.getElementById('source-vertica-user').value
+  , host      : document.getElementById('source-vertica-host').value
+  , database  : document.getElementById('source-vertica-database').value
+  , password  : document.getElementById('source-vertica-password').value
+  , port      : document.getElementById('source-vertica-port').value
+  };
+  
+  const parameters = {
+	FROM_USER : document.getElementById('source-vertica-schema').value
+  }
+ 
+  window.validSource = testConnection(button,status,'source-vertica',{ vertica: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateVerticaTarget(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('target-vertica-status')
+  const connectionProperties = {
+    user      : document.getElementById('target-vertica-user').value
+  , host      : document.getElementById('target-vertica-host').value
+  , database  : document.getElementById('target-vertica-database').value
+  , password  : document.getElementById('target-vertica-password').value
+  , port      : document.getElementById('target-vertica-port').value
+  };
+  
+  const parameters = {
+	TO_USER : document.getElementById('target-vertica-schema').value
+  }
+ 
+  window.validTarget = testConnection(button,status,'target-vertica',{ vertica: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateYugabyteSource(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('source-yugabyte-status')
+  const connectionProperties = {
+    user      : document.getElementById('source-yugabyte-user').value
+  , host      : document.getElementById('source-yugabyte-host').value
+  , database  : document.getElementById('source-yugabyte-database').value
+  , password  : document.getElementById('source-yugabyte-password').value
+  , port      : document.getElementById('source-yugabyte-port').value
+  };
+  
+  const parameters = {
+	FROM_USER : document.getElementById('source-yugabyte-schema').value
+  }
+ 
+  window.validSource = testConnection(button,status,'source-yugabyte',{ yugabyte: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateYugabyteTarget(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('target-yugabyte-status')
+  const connectionProperties = {
+    user      : document.getElementById('target-yugabyte-user').value
+  , host      : document.getElementById('target-yugabyte-host').value
+  , database  : document.getElementById('target-yugabyte-database').value
+  , password  : document.getElementById('target-yugabyte-password').value
+  , port      : document.getElementById('target-yugabyte-port').value
+  };
+  
+  const parameters = {
+	TO_USER : document.getElementById('target-yugabyte-schema').value
+  }
+ 
+  window.validTarget = testConnection(button,status,'target-yugabyte',{ yugabyte: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateCockroachSource(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('source-cockroach-status')
+  const connectionProperties = {
+    user      : document.getElementById('source-cockroach-user').value
+  , host      : document.getElementById('source-cockroach-host').value
+  , database  : document.getElementById('source-cockroach-database').value
+  , password  : document.getElementById('source-cockroach-password').value
+  , port      : document.getElementById('source-cockroach-port').value
+  };
+  
+  const parameters = {
+	FROM_USER : document.getElementById('source-cockroach-schema').value
+  }
+ 
+  window.validSource = testConnection(button,status,'source-cockroach',{ cockroach: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateCockroachTarget(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('target-cockroach-status')
+  const connectionProperties = {
+    user      : document.getElementById('target-cockroach-user').value
+  , host      : document.getElementById('target-cockroach-host').value
+  , database  : document.getElementById('target-cockroach-database').value
+  , password  : document.getElementById('target-cockroach-password').value
+  , port      : document.getElementById('target-cockroach-port').value
+  };
+  
+  const parameters = {
+	TO_USER : document.getElementById('target-cockroach-schema').value
+  }
+ 
+  window.validTarget = testConnection(button,status,'target-cockroach',{ cockroach: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateIBMDB2Source(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('source-ibmdb2-status')
+  const connectionProperties = {
+    user      : document.getElementById('source-ibmdb2-user').value
+  , host      : document.getElementById('source-ibmdb2-host').value
+  , database  : document.getElementById('source-ibmdb2-database').value
+  , password  : document.getElementById('source-ibmdb2-password').value
+  , port      : document.getElementById('source-ibmdb2-port').value
+  };
+  
+  const parameters = {
+	FROM_USER : document.getElementById('source-ibmdb2-schema').value
+  }
+ 
+  window.validSource = testConnection(button,status,'source-ibmdb2',{ ibmdb2: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateIBMDB2Target(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('target-ibmdb2-status')
+  const connectionProperties = {
+    user      : document.getElementById('target-ibmdb2-user').value
+  , host      : document.getElementById('target-ibmdb2-host').value
+  , database  : document.getElementById('target-ibmdb2-database').value
+  , password  : document.getElementById('target-ibmdb2-password').value
+  , port      : document.getElementById('target-ibmdb2-port').value
+  };
+  
+  const parameters = {
+	TO_USER : document.getElementById('target-ibmdb2-schema').value
+  }
+ 
+  window.validTarget = testConnection(button,status,'target-ibmdb2',{ ibmdb2: connectionProperties},parameters)  
+  setCopyState()
+
+}
+
+function validateMsSQLSource(button) {
   button.disabled = true;
   const status = document.getElementById('source-mssql-status')
   const connectionProperties = {
     user                       : document.getElementById('source-mssql-user').value
   , server                     : document.getElementById('source-mssql-host').value
+  , port                       : parseInt(document.getElementById('source-mssql-port').value)
   , database                   : document.getElementById('source-mssql-database').value
   , password                   : document.getElementById('source-mssql-password').value
   , requestTimeout             : 360000000
@@ -338,12 +507,12 @@ function validateMsSQLSource(button) {
 }
 
 function validateMsSQLTarget(button) {
-
   button.disabled = true;
   const status = document.getElementById('target-mssql-status')
   const connectionProperties = {
     user                       : document.getElementById('target-mssql-user').value
   , server                     : document.getElementById('target-mssql-host').value
+  , port                       : parseInt(document.getElementById('target-mssql-port').value)
   , database                   : document.getElementById('target-mssql-database').value
   , password                   : document.getElementById('target-mssql-password').value
   , requestTimeout             : 360000000
@@ -361,7 +530,6 @@ function validateMsSQLTarget(button) {
   setCopyState()
 
 }
-
 function validateMySQLSource(button) {
 
   button.disabled = true;
@@ -547,7 +715,12 @@ function validateMongoDBTarget(button) {
 }
 
 function doCopy() {
-  const result = ipcRenderer.sendSync('copy');
+
+  const parameters = {
+	ENCRYPTION : window.encryption
+  }
+ 
+  const result = ipcRenderer.sendSync('copy',parameters);
   if (result === 'success') {
 	dialog.showMessageBox(undefined, {type : 'info', title : 'Copy Operation status', message : 'Operation completed successfully'})
   }

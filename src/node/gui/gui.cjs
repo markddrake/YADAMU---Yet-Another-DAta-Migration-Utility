@@ -39,13 +39,13 @@ async function main() {
   try {
 	// Override default Electron processing of uncaughtException
     process.on('uncaughtException', function (e) { console.log(e);finalize()});
-	let importedModule = await import('./node/gui/yadamuGUI.js')
+	let importedModule = await import('./yadamuGUI.js')
 	YadamuGUI = importedModule.default
-	importedModule = await import('./node/gui/logWriter.js');
+	importedModule = await import('./logWriter.js');
 	LogWriter = importedModule.default
-	importedModule = await import('./node/lib/yadamuLibrary.js')
+	importedModule = await import('../lib/yadamuLibrary.js')
 	YadamuLibrary = importedModule.default
-	importedModule = await import('./node/dbi/file/fileDBI.js')
+	importedModule = await import('../dbi/file/fileDBI.js')
 	FileDBI = importedModule.default
 	electronCmd = new YadamuGUI();
     try {
@@ -149,18 +149,17 @@ async function createWindow (operation,configuration) {
   })
 }
 
-async function validateOracle(connectionProps,parameters) {
-
-  const OracleDBI = await import('./dbi/oracle/oracleDBI.js')
-  const oracleDBI = new OracleDBI.default(yadamu);
-  await oracleDBI.testConnection(connectionProps,parameters)
-  return oracleDBI
+async function validateConnection(dbiClassPath,connectionSettings,parameters) {
+  const DBI = await import(dbiClassPath)
+  const connectionInfo = Object.assign({}, connectionSettings);
+  const dbi = new DBI.default(yadamu,null,connectionInfo,parameters);
+  await dbi.testConnection()
+  return dbi
 }
 
- 
 ipcMain.on('source-oracle', async function (event, connectionProps, parameters) {
   try{
-	sourceDBI = await validateOracle(connectionProps,parameters);
+	sourceDBI = await validateConnection('../dbi/oracle/oracleDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -169,24 +168,16 @@ ipcMain.on('source-oracle', async function (event, connectionProps, parameters) 
 
 ipcMain.on('target-oracle', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validateOracle(connectionProps,parameters);
+	targetDBI = await validateConnection('../dbi/oracle/oracleDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
   }
 })
 
-async function validatePostgres(connectionProps,parameters) {
-
-  const PostgresDBI = await import('./dbi/postgres/postgresDBI.js')
-  const postgresDBI = new PostgresDBI.default(yadamu);
-  await postgresDBI.testConnection(connectionProps,parameters)
-  return postgresDBI
-}
-
-ipcMain.on('source-postgres', async function (event, connectionProps, parameters) {
+ipcMain.on('source-postgres', async (event, connectionProps, parameters) => {
   try{
-	sourceDBI = await validatePostgres(connectionProps,parameters);
+    sourceDBI = await validateConnection('../dbi/postgres/postgresDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -195,24 +186,89 @@ ipcMain.on('source-postgres', async function (event, connectionProps, parameters
 
 ipcMain.on('target-postgres', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validatePostgres(connectionProps,parameters);
+    targetDBI = await validateConnection('../dbi/postgres/postgresDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
   }
 })
 
-async function validateMsSQL(connectionProps,parameters) {
+ipcMain.on('source-vertica', async function (event, connectionProps, parameters) {
+  try{
+    sourceDBI = await validateConnection('../dbi/vertica/verticaDBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
 
-  const MsSQLDBI = await import('./dbi/mssql/mssqlDBI.js')
-  const mssqlDBI = new MsSQLDBI.default(yadamu);
-  await mssqlDBI.testConnection(connectionProps,parameters)
-  return mssqlDBI
-}
+ipcMain.on('target-vertica', async function (event, connectionProps, parameters) {
+  try{
+	targetDBI = await validateConnection('../dbi/vertica/verticaDBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('source-yugabyte', async function (event, connectionProps, parameters) {
+  try{
+	sourceDBI = await validateConnection('../dbi/yugabyte/yugabyteDBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('target-yugabyte', async function (event, connectionProps, parameters) {
+  try{
+	targetDBI = await validateConnection('../dbi/yugabyte/yugabyteDBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('source-cockroach', async function (event, connectionProps, parameters) {
+  try{
+	sourceDBI = await validateConnection('../dbi/cockroach/cockroachDBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('target-cockroach', async function (event, connectionProps, parameters) {
+  try{
+	targetDBI = await validateConnection('../dbi/cockroach/cockroachDBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+
+ipcMain.on('source-ibmdb2', async function (event, connectionProps, parameters) {
+  try{
+	sourceDBI = await validateConnection('../dbi/db2/db2DBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('target-ibmdb2', async function (event, connectionProps, parameters) {
+  try{
+	targetDBI = await validateConnection('../dbi/db2/db2DBI.js',connectionProps,parameters)
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
 
 ipcMain.on('source-mssql', async function (event, connectionProps, parameters) {
   try{
-	sourceDBI = await validateMsSQL(connectionProps,parameters);
+	sourceDBI = await validateConnection('../dbi/mssql/mssqlDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -221,24 +277,16 @@ ipcMain.on('source-mssql', async function (event, connectionProps, parameters) {
 
 ipcMain.on('target-mssql', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validateMsSQL(connectionProps,parameters);
+	targetDBI = await validateConnection('../dbi/mssql/mssqlDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
   }
 })
 
-async function validateMySQL(connectionProps,parameters) {
-
-  const MySQLDBI = await import('./dbi/mysql/mysqlDBI.js')
-  const mysqlDBI = new MySQLDBI.default(yadamu);
-  await mysqlDBI.testConnection(connectionProps,parameters)
-  return mysqlDBI
-}
-
 ipcMain.on('source-mysql', async function (event, connectionProps, parameters) {
   try{
-	sourceDBI = await validateMySQL(connectionProps,parameters);
+	sourceDBI = await validateConnection('../dbi/mysql/mysqlDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -247,24 +295,16 @@ ipcMain.on('source-mysql', async function (event, connectionProps, parameters) {
 
 ipcMain.on('target-mysql', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validateMySQL(connectionProps,parameters);
+	targetDBI = await validateConnection('../dbi/mysql/mysqlDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
   }
 })
 
-async function validateMariaDB(connectionProps,parameters) {
-
-  const MariaDBI = await import('./dbi/mariadb/mariadbDBI.js')
-  const mariaDBI = new MariaDBI.default(yadamu);
-  await mariaDBI.testConnection(connectionProps,parameters)
-  return mariaDBI
-}
-
 ipcMain.on('source-mariadb', async function (event, connectionProps, parameters) {
   try{
-	sourceDBI = await validateMariaDB(connectionProps,parameters);
+	sourceDBI = await validateConnection('../dbi/mariadb/mariadbDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -273,24 +313,16 @@ ipcMain.on('source-mariadb', async function (event, connectionProps, parameters)
 
 ipcMain.on('target-mariadb', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validateMariaDB(connectionProps,parameters);
+	targetDBI = await validateConnection('../dbi/mariadb/mariadbDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
   }
 })
 
-async function validatesnowflake(connectionProps,parameters) {
-
-  const SnowflakeDBI = await import('./dbi/snowflake/snowflakeDBI.js')
-  const snowflakeDBI = new SnowflakeDBI.default(yadamu);
-  await snowflakeDBI.testConnection(connectionProps,parameters)
-  return snowflakeDBI
-}
-
 ipcMain.on('source-snowflake', async function (event, connectionProps, parameters) {
   try{
-	sourceDBI = await validatesnowflake(connectionProps,parameters);
+	sourceDBI = await validateConnection('../dbi/snowflake/snowflakeDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -299,33 +331,26 @@ ipcMain.on('source-snowflake', async function (event, connectionProps, parameter
 
 ipcMain.on('target-snowflake', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validatesnowflake(connectionProps,parameters);
+	targetDBI = await validateConnection('../dbi/snowflake/snowflakeDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
   }
 })
 
-async function validateMongoDB(connectionProps,parameters) {
-
-  const MongoDBI = await import('./dbi/mongodb/mongoDBI.js')
-  const mongoDBI = new MongoDBI.default(yadamu);
-  await mongoDBI.testConnection(connectionProps,parameters)
-  return mongoDBI
-}
-
 ipcMain.on('source-mongodb', async function (event, connectionProps, parameters) {
   try{
-	sourceDBI = await validateMongoDB(connectionProps,parameters);
+	sourceDBI = await validateConnection('../dbi/mongodb/mongoDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
+  
   }
 })
 
 ipcMain.on('target-mongodb', async function (event, connectionProps, parameters) {
   try{
-	targetDBI = await validateMongoDB(connectionProps,parameters);
+	targetDBI = await validateConnection('../dbi/mongodb/mongoDBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
 	event.returnValue = e.message
@@ -353,24 +378,30 @@ ipcMain.on('target-filename',function (event, parameters) {
 })
 
 
-ipcMain.on('copy', async function (event) {
+ipcMain.on('copy', async function (event, parameters) {
 	
 	try {
 	  const startTime = new Date().getTime();
+	  yadamu.reset(parameters)
+	  // TODO Allow user to specify encryption algorithim and key
+	  yadamu.parameters.ENCRYPTION = false;
+	  
       await yadamu.doPumpOperation(sourceDBI,targetDBI)
 	  const elapsedTime = new Date().getTime() - startTime;
 	  const status = yadamu.STATUS
 	  switch (status.operationSuccessful) {
         case true:
-	      yadamuLogger.info([`YadamuUI.onCopy()`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(elapsedTime)}.`);
+	      yadamuLogger.info(['YADAMU-GUI'],`Operation completed "${status.statusMsg}"`);
           event.returnValue = 'success'
 	      break;
 	    case false:
-	      yadamuLogger.error([`${this.constructor.name}`,`.on('copy')`],`Copy operation failed. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+	      yadamuLogger.error(['YADAMU-GUI'],`Operation failed. "${status.err.message}"`);
    	      event.returnValue = status.err.message
 		  break;
 	    default:
 	  }
+      yadamuLogger.info(['YADAMU-GUI'],`Elapsed time: ${YadamuLibrary.stringifyDuration(elapsedTime)}.`);
+	  
 	} catch (e) {console.log(e)}
 })
 

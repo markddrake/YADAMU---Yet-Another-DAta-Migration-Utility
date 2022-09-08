@@ -160,13 +160,11 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties)
-	try {
+  async testConnection() {   
+    try {
       const pgClient = new Client(this.vendorProperties)
       await pgClient.connect()
-      await pgClient.end()     
-								  
+      await pgClient.end()     							  
 	} catch (e) {
       throw e;
 	}

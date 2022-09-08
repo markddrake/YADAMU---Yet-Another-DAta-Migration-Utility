@@ -1,6 +1,28 @@
 version: "2.4"
 services:
 
+  YADAMU-SVR:
+    container_name: YADAMU-SVC
+    image:  yadamu/service
+    command: [ "/usr/src/YADAMU/bin/service.sh",
+               "CONFIG=src/node/cfg/serviceConfiguration.json",
+               "ENCRYPTION=false"]
+    mem_limit: '4gb'
+    shm_size: '64mb'
+    security_opt:
+      - seccomp:unconfined
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    environment:
+      TNS_ADMIN: /usr/src/YADAMU
+      YADAMU_PASSPHRAS: yabasc
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "3000:3000"
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+    restart: always
+
   ORA2103-01: 
     container_name: ORA2103-01
     # image:  oracle/database:21.3.0-ee
@@ -302,7 +324,7 @@ services:
   AZURE-01: 
     container_name: AZURE-01
     image:   mcr.microsoft.com/azure-storage/azurite 
-    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --loose
+    command: azurite-blob --blobHost 0.0.0.0 --loose --blobPort 10000 
     networks:
       - YADAMU-NET
     ports: 

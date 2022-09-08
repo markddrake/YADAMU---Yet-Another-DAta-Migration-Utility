@@ -159,13 +159,11 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
 
-  async testConnection(connectionProperties,parameters) {   
+  async testConnection() {   
     try {
-      this.setConnectionProperties(connectionProperties)
       this.setTargetDatabase()
       const connection = await sql.connect(this.vendorProperties)
       await sql.close()
-      super.setParameters(parameters)
     } catch (e) {
       await sql.close()
       throw (e)

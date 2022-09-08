@@ -1,0 +1,48 @@
+{
+  "connections": {
+    "oracle19c": {
+      "oracle": {
+        "user": "SYSTEM",
+        "connectString": "ORA1903",
+        "password": "oracle"
+      }
+    },
+    "postgres#1": {
+      "postgres": {
+        "user": "postgres",
+        "host": "PGSQL14-01",
+        "database": "yadamu",
+        "password": "oracle",
+        "port": "5432"
+      }
+    },
+    "stagingArea"                       : {
+      "file"                            : {
+		"directory"                     : "/mnt/shared/stagingArea/service"
+	  }
+	}
+  },
+  "schemas": {
+    "HR": {
+      "schema": "HR"
+    },
+    "HR1": {
+      "schema": "HR1"
+    }
+  },
+  "jobs": [
+    {
+      "source": {
+        "connection": "oracle19c",
+        "schema": "HR"
+      },
+      "target": {
+        "connection": "postgres#1",
+        "schema": "HR1"
+      },
+      "parameters": {
+        "MODE": "DATA_ONLY"
+      }
+    }
+  ]
+}

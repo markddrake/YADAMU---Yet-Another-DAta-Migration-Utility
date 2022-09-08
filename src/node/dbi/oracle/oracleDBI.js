@@ -291,12 +291,10 @@ class OracleDBI extends YadamuDBI {
     }
   }
 
-  async testConnection(connectionProperties,parameters) {
-    super.setConnectionProperties(connectionProperties)
+  async testConnection() {
 	try {
       const conn = await oracledb.getConnection(this.vendorProperties)
       await conn.close()
-	  super.setParameters(parameters)
 	} catch (e) {
       throw e;
 	}

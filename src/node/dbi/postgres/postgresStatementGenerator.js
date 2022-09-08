@@ -51,8 +51,7 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
 		tableInfo.insertMode      = 'Batch';
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE > maxBatchSize ? maxBatchSize : this.dbi.BATCH_SIZE
 		tableInfo._SPATIAL_FORMAT = this.SPATIAL_FORMAT
-        
-        
+                
         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';    
         tableInfo.sizeConstraints = tableMetadata.sizeConstraints
 		

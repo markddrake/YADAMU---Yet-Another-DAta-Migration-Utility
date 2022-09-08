@@ -62,6 +62,8 @@ class SnowflakeDBI extends YadamuDBI {
   get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return SnowflakeConstants.STATEMENT_TERMINATOR };
 
+  get CURRENT_DATABASE()       { return this.parameters.YADAMU_DATABASE ||this.vendorProperties.database }
+
   // Enable configuration via command line parameters
 
   // SNOWFLAKE XML TYPE can be set to TEXT to avoid multiple XML Fidelity issues with persisting XML data as VARIANT
@@ -127,14 +129,17 @@ class SnowflakeDBI extends YadamuDBI {
     })
   } 
 
-  async testConnection(connectionProperties,parameters) {   
-    super.setConnectionProperties(connectionProperties)
-	this.setDatabase()
+  async _reconnect() {
+    await super._reconnect()
+	await this.useDatabase(this.CURRENT_DATABASE)
+  }
+
+  async testConnection() {   
+    this.setDatabase()
 	try {
       let connection = snowflake.createConnection(this.vendorProperties)
       connection = await this.establishConnection(connection)
       connection.destroy()
-	  super.setParameters(parameters)
 	} catch (e) {
 	  throw e
 	}
@@ -271,7 +276,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true)   
-    await this.useDatabase(this.parameters.YADAMU_DATABASE ||this.vendorProperties.database )
+    await this.useDatabase(this.CURRENT_DATABASE)
 	this.statementLibrary = new this.StatementLibrary(this)
 	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }
@@ -531,7 +536,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
  
   async initializeWorker(manager) {
 	await super.initializeWorker(manager)
-	await this.useDatabase(this.parameters.YADAMU_DATABASE)
+	await this.useDatabase(this.CURRENT_DATABASE)
   }
   
   classFactory(yadamu) {

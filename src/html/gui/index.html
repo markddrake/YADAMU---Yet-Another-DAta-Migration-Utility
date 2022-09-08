@@ -7,456 +7,837 @@
     <link rel="stylesheet" href="../../node_modules/bootstrap-icons/font/bootstrap-icons.css">
   </head>
   <body>
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col">
-  	    <div class="form-group">
-        <label>Source</label>
-        <ul class="nav nav-pills mb-3" id="source-tab" role=tablist">
-          <li class="nav-item">
-            <a class="nav-link active" id="source-tab-file" data-bs-toggle="pill" href="#source-file" role="tab" aria-controls="source-pane-file" aria-selected="true">File</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-oracle" data-bs-toggle="pill" href="#source-oracle" role="tab" aria-controls="source-pane-oracle" aria-selected="false">Oracle</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-postgres" data-bs-toggle="pill" href="#source-postgres" role="tab" aria-controls="source-pane-postgres" aria-selected="false">Postgres</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-mssql" data-bs-toggle="pill" href="#source-mssql" role="tab" aria-controls="source-pane-mssql" aria-selected="false">SQL Server</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-mysql" data-bs-toggle="pill" href="#source-mysql" role="tab" aria-controls="source-pane-mysql" aria-selected="false">MySQL</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-mariadb" data-bs-toggle="pill" href="#source-mariadb" role="tab" aria-controls="source-pane-mariadb" aria-selected="false">MariaDB</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-snowflake" data-bs-toggle="pill" href="#source-snowflake" role="tab" aria-controls="source-pane-snowflake" aria-selected="false">SnowFlake</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="source-tab-mongodb" data-bs-toggle="pill" href="#source-mongodb" role="tab" aria-controls="source-pane-mongodb" aria-selected="false">MongoDB</a>
-          </li>
-        </ul>
-        <div class="tab-content" id="source-tab-content">
-          <div class="tab-pane fade show active" id="source-file" role="tabpanel" aria-labelledby="source-tab-file">
-            <div class="input-group mb-3">
-                <input type="text" id="source-filename" name="source-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
-            <button onclick="selectSourceFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col">
+          <nav class="navbar">
+		    <a class="navbar-brand" href="#">Source</a>
+		    <div class="nav-item dropdown">
+              <a class="nav-link navbar-toggler-icon" href="#" data-bs-target="#sourceOptions" data-bs-auto-close="true"  role="button" data-bs-toggle="dropdown" aria-expanded="false"></a>
+              <ul class="dropdown-menu  dropdown-menu-end"  id="sourceOptions">
+                <li >
+                  <a class="dropdown-item active" id="select-source-file" data-bs-toggle="collapse" data-bs-target="#source-file" href="#source-file">File</a> 
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-cockroach" data-bs-toggle="collapse" data-bs-target="#source-cockroach">CockRoachDB</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-ibmdb2" data-bs-toggle="collapse" data-bs-target="#source-ibmdb2">IBM DB2</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-mariadb" data-bs-toggle="collapse" data-bs-target="#source-mariadb">MariaDB</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-mongodb" data-bs-toggle="collapse" data-bs-target="#source-mongodb">MongoDB</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-mysql" data-bs-toggle="collapse" data-bs-target="#source-mysql">MySQL</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-oracle" data-bs-toggle="collapse" data-bs-target="#source-oracle">Oracle</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-postgres" data-bs-toggle="collapse" data-bs-target="#source-postgres">Postgres</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-snowflake" data-bs-toggle="collapse" data-bs-target="#source-snowflake">Snowflake</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-mssql" data-bs-toggle="collapse" data-bs-target="#source-mssql">SQL Server</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-vertica" data-bs-toggle="collapse" data-bs-target="#source-vertica">Vertica</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-source-yugabyte" data-bs-toggle="collapse" data-bs-target="#source-yugabyte">Yugabyte</a>
+                </li>
+              </ul>
+            </div>
+          </nav>
+      
+          <div class="accordian" id="source-cards">
+            <div class="accordion-item">
+              <div class="accordion-collapse collapse show" data-bs-parent="#source-cards" id="source-file">
+                <div class="accordian-body" id="body-source-file" aria-labelledby="select-source-file">
+                  <label class="form-label" for="form-source-file">File:</label>
+                  <form id="form-source-file">
+                    <div class="input-group mb-3">
+                      <input type="text" id="source-filename" name="source-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
+                      <button onclick="selectSourceFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
+                    </div>
+				  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-oracle">
+                <div class="accordian-body" id="body-source-oracle" aria-labelledby="select-source-oracle">
+                  <label class="form-label" for="form-source-oracle">Oracle:</label>
+                  <form id="form-source-oracle" oninput="resetSourceState('source-oracle-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-oracle-user" class="form-control text-uppercase" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="source-oracle-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-oracle-connectString" class="form-control" placeholder="Service" aria-label="Service" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-oracle-schema" class="form-control text-uppercase" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="source-oracle-caseSensitive">
+                        <label class="form-check-label" for="source-oracle-caseSensitive">Case Sensitive</label>
+                    </div>
+                    <div class="float-right">
+                    <button type="button" id="source-oracle-testConnection"onclick="validateOracleSource(this)" class="btn btn-primary">Test Connection
+                      <i id="source-oracle-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                    </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-postgres">
+                <div class="accordian-body" id="body-source-postgres" aria-labelledby="select-source-postgres">
+                  <label class="form-label" for="form-source-postgres">Postgres:</label>
+                  <form id="form-source-postgres" oninput="resetSourceState('source-postgres-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-postgres-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="source-postgres-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-postgres-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" min="0" step="1" id="source-postgres-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5432">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-postgres-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-postgres-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="source-postgres-testConnection" type="button" onclick="validatePostgresSource(this)" class="btn btn-primary pull-right">Test Connection
+                      <i id="source-postgres-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-vertica">
+                <div class="accordian-body" id="body-source-vertica" aria-labelledby="select-source-vertica">
+                  <label class="form-label" for="form-source-vertica">Vertica:</label>
+                  <form id="form-source-vertica" oninput="resetSourceState('source-vertica-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-vertica-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="source-vertica-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-vertica-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" min="0" step="1" id="source-vertica-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5434">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-vertica-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="VMart">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-vertica-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="source-vertica-testConnection" type="button" onclick="validateVerticaSource(this)" class="btn btn-primary pull-right">Test Connection
+                      <i id="source-vertica-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-yugabyte">
+                <div class="accordian-body" id="body-source-yugabyte" aria-labelledby="select-source-yugabyte">
+                  <label class="form-label" for="form-source-yugabyte">Yugabyte:</label>
+                  <form id="form-source-yugabyte" oninput="resetSourceState('source-yugabyte-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-yugabyte-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="source-yugabyte-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-yugabyte-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="number" min="0" step="1" min="0" step="1" id="source-yugabyte-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5533">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-yugabyte-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-yugabyte-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="source-yugabyte-testConnection" type="button" onclick="validateYugabyteSource(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="source-yugabyte-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-cockroach">
+                <div class="accordian-body" id="body-source-cockroach" aria-labelledby="select-source-cockroach">
+                  <label class="form-label" for="form-source-cockroach">Cockroach:</label>
+                  <form id="form-source-cockroach" oninput="resetSourceState('source-cockroach-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-cockroach-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="source-cockroach-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-cockroach-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="number" min="0" step="1" min="0" step="1" id="source-cockroach-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="26257">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-cockroach-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-cockroach-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="source-cockroach-testConnection" type="button" onclick="validateCockroachSource(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="source-cockroach-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-ibmdb2">
+                <div class="accordian-body" id="body-source-ibmdb2" aria-labelledby="select-source-ibmdb2">
+                  <label class="form-label" for="form-source-ibmdb2">IBM DB2:</label>
+                  <form id="form-source-ibmdb2" oninput="resetSourceState('source-ibmdb2-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-ibmdb2-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="source-ibmdb2-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-ibmdb2-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input  type="number" min="0" step="1"min="0" step="1" id="source-ibmdb2-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="50000">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-ibmdb2-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="sample">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="source-ibmdb2-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="source-ibmdb2-testConnection" type="button" onclick="validateIBMDB2Source(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="source-ibmdb2-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-mssql">
+                <div class="accordian-body" id="body-source-mssql" aria-labelledby="select-source-mssql">
+                  <label class="form-label" for="form-source-mssql">SQL Server:</label>
+                  <form id="form-source-mssql" oninput="resetSourceState('source-mssql-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mssql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="source-mssql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mssql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" id="source-mssql-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="1433">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mssql-database" class="form-control" placeholder="Database" aria-label="database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mssql-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="source-mssql-testConnection" type="button" onclick="validateMsSQLSource(this)" class="btn btn-primary">Test Connection
+                      <i id="source-mssql-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-mysql">
+                <div class="accordian-body" id="body-source-mysql" aria-labelledby="select-source-mysql">
+                  <label class="form-label" for="form-source-mysql">MySQL:</label>
+                  <form id="form-source-mysql" oninput="resetSourceState('source-mysql-status')">
+                  <div class="input-group mb-3">
+                      <input type="text" id="source-mysql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                     <input type="password" id="source-mysql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                      <input type="text" id="source-mysql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                      <input type="number" min="0" step="1" id="source-mysql-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3306">
+                  </div>
+                  <div class="input-group mb-3">
+                      <input type="text" id="source-mysql-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                      <input type="text" id="source-mysql-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
+                  </div>          
+                  <div class="float-right">
+                  <button  id="source-mysql-testConnection" type="button" onclick="validateMySQLSource(this)" class="btn btn-primary">Test Connection
+                    <i id="source-mysql-status"class="bi bi-question-circle"></i>
+                  </button>
+                  </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-mariadb">
+                <div class="accordian-body" id="body-source-mariadb" aria-labelledby="select-source-mariadb">
+                  <label class="form-label" for="form-source-mariadb">MariaDB:</label>
+                  <form id="form-source-mariadb" oninput="resetSourceState('source-mariadb-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mariadb-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="source-mariadb-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mariadb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" id="source-mariadb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3307">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mariadb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mariadb-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="source-mariadb-testConnection"  type="button" onclick="validateMariaDBSource(this)" class="btn btn-primary">Test Connection
+                      <i id="source-mariadb-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-snowflake">
+                <div class="accordian-body" id="body-source-snowflake" aria-labelledby="select-source-snowflake">
+                  <label class="form-label" for="form-source-snowflake">Snowflake:</label>
+                  <form id="form-source-snowflake" oninput="resetSourceState('source-snowflake-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-snowflake-account" class="form-control" placeholder="Account" aria-label="Account" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-snowflake-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="source-snowflake-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="text" id="source-snowflake-warehouse" class="form-control" placeholder="Warehouse" aria-label="Warehouse" aria-describedby="basic-addon1" value = "DEMO_WH">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-snowflake-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="DEMO_DB">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-snowflake-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1" value="PUBLIC">
+                    </div>
+                    <div class="float-right">
+                    <button id="source-snowflake-testConnection"  type="button" onclick="validatesnowflakeSource(this)" class="btn btn-primary">Test Connection
+                      <i id="source-snowflake-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                    </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#source-cards" id="source-mongodb">
+                <div class="accordian-body" id="body-source-mongodb" aria-labelledby="select-source-mongodb">
+                  <label class="form-label" for="form-source-mongodb">MongoDB:</label>
+                  <form id="form-source-mongodb" oninput="resetSourceState('source-mongodb-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" id="source-mongodb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="27017">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="source-mongodb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="source-mongodb-testConnection"  type="button" onclick="validateMongoDBSource(this)" class="btn btn-primary">Test Connection
+                      <i id="source-mongodb-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="tab-pane fade" id="source-oracle" role="tabpanel" aria-labelledby="source-tab-oracle">
-            <form id="source-oracle" oninput="resetSourceState('source-oracle-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-oracle-user" class="form-control text-uppercase" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+        </div>
+		
+        <div class="col">
+          <nav class="navbar">
+		    <a class="navbar-brand" href="#">Target</a>
+		    <div class="nav-item dropdown">
+              <a class="nav-link navbar-toggler-icon" href="#" data-bs-target="#targetOptions" data-bs-auto-close="true"  role="button" data-bs-toggle="dropdown" aria-expanded="false"></a>
+              <ul class="dropdown-menu  dropdown-menu-end"  id="targetOptions">
+                <li >
+                  <a class="dropdown-item active" id="select-target-file" data-bs-toggle="collapse" data-bs-target="#target-file" href="#target-file">File</a> 
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-cockroach" data-bs-toggle="collapse" data-bs-target="#target-cockroach">CockRoachDB</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-ibmdb2" data-bs-toggle="collapse" data-bs-target="#target-ibmdb2">IBM DB2</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-mariadb" data-bs-toggle="collapse" data-bs-target="#target-mariadb">MariaDB</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-mongodb" data-bs-toggle="collapse" data-bs-target="#target-mongodb">MongoDB</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-mysql" data-bs-toggle="collapse" data-bs-target="#target-mysql">MySQL</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-oracle" data-bs-toggle="collapse" data-bs-target="#target-oracle">Oracle</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-postgres" data-bs-toggle="collapse" data-bs-target="#target-postgres">Postgres</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-snowflake" data-bs-toggle="collapse" data-bs-target="#target-snowflake">Snowflake</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-mssql" data-bs-toggle="collapse" data-bs-target="#target-mssql">SQL Server</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-vertica" data-bs-toggle="collapse" data-bs-target="#target-vertica">Vertica</a>
+                </li>
+                <li >
+                  <a class="dropdown-item" id="select-target-yugabyte" data-bs-toggle="collapse" data-bs-target="#target-yugabyte">Yugabyte</a>
+                </li>
+              </ul>
             </div>
-            <div class="input-group mb-3">
-               <input type="password" id="source-oracle-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-oracle-connectString" class="form-control" placeholder="Service" aria-label="Service" aria-describedby="basic-addon1">
-            </div>
-			<div class="input-group mb-3">
-                <input type="text" id="source-oracle-schema" class="form-control text-uppercase" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="source-oracle-caseSensitive">
-				<label class="form-check-label" for="source-oracle-caseSensitive">Case Sensitive</label>
-			</div>
-			<div class="float-right">
-            <button type="button" id="source-oracle-testConnection"onclick="validateOracleSource(this)" class="btn btn-primary">Test Connection
-			  <i id="source-oracle-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="source-postgres" role="tabpanel" aria-labelledby="source-tab-postgres">
-            <form id="source-postgres" oninput="resetSourceState('source-postgres-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-postgres-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="source-postgres-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-postgres-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input  min="0" step="1" id="source-postgres-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5432">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-postgres-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="postgres">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-postgres-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-			<button id="source-postgres-testConnection" type="button" onclick="validatePostgresSource(this)" class="btn btn-primary pull-right">Test Connection
-			  <i id="source-postgres-status"class="bi bi-question-circle"></i>
-			</button>
-			</div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="source-mssql" role="tabpanel" aria-labelledby="source-tab-mssql">
-            <form id="source-mssql" oninput="resetSourceState('source-mssql-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-mssql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="source-mssql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mssql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mssql-database" class="form-control" placeholder="Database" aria-label="database" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mssql-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="source-mssql-testConnection" type="button" onclick="validateMsSQLSource(this)" class="btn btn-primary">Test Connection
-			  <i id="source-mssql-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="source-mysql" role="tabpanel" aria-labelledby="source-tab-mysql">
-            <form id="source-mysql" oninput="resetSourceState('source-mysql-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-mysql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="source-mysql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mysql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="number" min="0" step="1" id="source-mysql-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3306">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mysql-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mysql-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
-            </div>          
-			<div class="float-right">
-            <button  id="source-mysql-testConnection" type="button" onclick="validateMySQLSource(this)" class="btn btn-primary">Test Connection
-			  <i id="source-mysql-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="source-mariadb" role="tabpanel" aria-labelledby="source-tab-mariadb">
-            <form id="source-mariadb" oninput="resetSourceState('source-mariadb-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-mariadb-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="source-mariadb-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mariadb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="number" min="0" step="1" id="source-mariadb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3307">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mariadb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mariadb-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="source-mariadb-testConnection"  type="button" onclick="validateMariaDBSource(this)" class="btn btn-primary">Test Connection
-			  <i id="source-mariadb-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="source-snowflake" role="tabpanel" aria-labelledby="source-tab-snowflake">
-            <form id="source-snowflake" oninput="resetSourceState('source-snowflake-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-snowflake-account" class="form-control" placeholder="Account" aria-label="Account" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-snowflake-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="source-snowflake-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="text" id="source-snowflake-warehouse" class="form-control" placeholder="Warehouse" aria-label="Warehouse" aria-describedby="basic-addon1" value = "DEMO_WH">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-snowflake-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="DEMO_DB">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-snowflake-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1" value="PUBLIC">
-            </div>
-			<div class="float-right">
-            <button id="source-snowflake-testConnection"  type="button" onclick="validatesnowflakeSource(this)" class="btn btn-primary">Test Connection
-			  <i id="source-snowflake-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-		  <div class="tab-pane fade" id="source-mongodb" role="tabpanel" aria-labelledby="source-tab-mongodb">
-            <form id="source-mongodb" oninput="resetSourceState('source-mongodb-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="source-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="number" min="0" step="1" id="source-mongodb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="27017">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="source-mongodb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="source-mongodb-testConnection"  type="button" onclick="validateMongoDBSource(this)" class="btn btn-primary">Test Connection
-			  <i id="source-mongodb-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
+          </nav>
 
-        </div>
-	  </div>
-    </div>
-    <div class="col">
-	  <div class="form-group">
-       <label>Target</label>
-        <ul class="nav nav-pills mb-3" id="target-tab" role=tablist">
-          <li class="nav-item">
-            <a class="nav-link active" id="target-tab-file" data-bs-toggle="pill" href="#target-file" role="tab" aria-controls="target-pane-file" aria-selected="true">File</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-oracle" role="tab" aria-controls="target-pane-oracle" aria-selected="false">Oracle</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-postgres" data-bs-toggle="pill" href="#target-postgres" role="tab" aria-controls="target-pane-postgres" aria-selected="false">Postgres</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-mssql" role="tab" aria-controls="target-pane-mssql" aria-selected="false">SQL Server</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-mysql" role="tab" aria-controls="target-pane-mysql" aria-selected="false">MySQL</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-mariadb" role="tab" aria-controls="target-pane-mariadb" aria-selected="false">MariaDB</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-snowflake" data-bs-toggle="pill" href="#target-snowflake" role="tab" aria-controls="target-pane-snowflake" aria-selected="false">SnowFlake</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="target-tab-mongodb" data-bs-toggle="pill" href="#target-mongodb" role="tab" aria-controls="target-pane-mongodb" aria-selected="false">MongoDB</a>
-          </li>
-        </ul>
-        <div class="tab-content" id="target-tab-content">
-          <div class="tab-pane fade show active" id="target-file" role="tabpanel" aria-labelledby="target-tab-file">
-            <div class="input-group mb-3">
-                <input type="text" id="target-filename" name="target-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
-            <button onclick="selectTargetFile(this);"><i class="bi bi-file-earmark-arrow-up"></i></button>
+          <div class="accordian" id="target-cards">
+            <div class="accordion-item">
+              <div class="accordion-collapse collapse show" data-bs-parent="#target-cards" id="target-file">
+                <div class="accordian-body" id="body-target-file" aria-labelledby="select-target-file">
+				  <label class="form-label" for="form-target-file">File</label>
+                  <form id="form-target-file">
+                    <div class="input-group mb-3">
+                      <input type="text" id="target-filename" name="target-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
+                      <button onclick="selectTargetFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
+                    </div>
+				  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-oracle">
+                <div class="accordian-body" id="body-target-oracle" aria-labelledby="select-target-oracle">
+				  <label class="form-label">Oracle</label>
+                  <form id="target-oracle" oninput="resetTargetState('target-oracle-status')">
+                  <div class="input-group mb-3">
+                      <input type="text" id="target-oracle-user" class="form-control text-uppercase" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                     <input type="password" id="target-oracle-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                      <input type="text" id="target-oracle-connectString" class="form-control" placeholder="Service" aria-label="Service" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="input-group mb-3">
+                      <input type="text" id="target-oracle-schema" class="form-control text-uppercase" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                  </div>
+                  <div class="form-check">
+                      <input type="checkbox" class="form-check-input" id="target-oracle-caseSensitive">
+                      <label class="form-check-label" for="target-oracle-caseSensitive">Case Sensitive</label>
+                  </div>
+                  <div class="float-right">
+                  <button type="button" id="target-oracle-testConnection"onclick="validateOracleTarget(this)" class="btn btn-primary">Test Connection
+                    <i id="target-oracle-status"class="bi bi-question-circle"></i>
+                  </button>
+                  </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-postgres">
+                <div class="accordian-body" id="body-target-postgres" aria-labelledby="select-target-postgres">
+                  <label class="form-label" for="form-target-postgres">Postgres:</label>
+                  <form id="form-target-postgres" oninput="resetTargetState('target-postgres-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-postgres-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="target-postgres-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-postgres-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input  type="number" min="0" step="1"min="0" step="1" id="target-postgres-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5432">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-postgres-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-postgres-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="target-postgres-testConnection" type="button" onclick="validatePostgresTarget(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="target-postgres-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-vertica">
+                <div class="accordian-body" id="body-target-vertica" aria-labelledby="select-target-vertica">
+                  <label class="form-label" for="form-target-vertica">Vertica:</label>
+                  <form id="form-target-vertica" oninput="resetTargetState('target-vertica-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-vertica-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="target-vertica-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-vertica-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="number" min="0" step="1" min="0" step="1" id="target-vertica-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5434">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-vertica-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="VMart">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-vertica-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="target-vertica-testConnection" type="button" onclick="validateVerticaTarget(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="target-vertica-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-yugabyte">
+                <div class="accordian-body" id="body-target-yugabyte" aria-labelledby="select-target-yugabyte">
+                  <label class="form-label" for="form-target-yugabyte">Yugabyte:</label>
+                  <form id="form-target-yugabyte" oninput="resetTargetState('target-yugabyte-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-yugabyte-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="target-yugabyte-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-yugabyte-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input  type="number" min="0" step="1"min="0" step="1" id="target-yugabyte-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5533">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-yugabyte-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-yugabyte-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="target-yugabyte-testConnection" type="button" onclick="validateYugabyteTarget(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="target-yugabyte-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-cockroach">
+                <div class="accordian-body" id="body-target-cockroach" aria-labelledby="select-target-cockroach">
+                  <label class="form-label" for="form-target-cockroach">Cockroach:</label>
+                  <form id="form-target-cockroach" oninput="resetTargetState('target-cockroach-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-cockroach-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="target-cockroach-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-cockroach-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input  type="number" min="0" step="1" min="0" step="1" id="target-cockroach-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="26257">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-cockroach-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-cockroach-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="target-cockroach-testConnection" type="button" onclick="validateCockroachTarget(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="target-cockroach-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-ibmdb2">
+                <div class="accordian-body" id="body-target-ibmdb2" aria-labelledby="select-target-ibmdb2">
+                  <label class="form-label" for="form-target-ibmdb2">IBM DB2:</label>
+                  <form id="form-target-ibmdb2" oninput="resetTargetState('target-ibmdb2-status')">
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-ibmdb2-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                        <input type="password" id="target-ibmdb2-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-ibmdb2-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input  type="number" min="0" step="1"min="0" step="1" id="target-ibmdb2-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="50000">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-ibmdb2-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="sample">
+                     </div>
+                     <div class="input-group mb-3">
+                         <input type="text" id="target-ibmdb2-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                     </div>
+                     <div class="float-right">
+                     <button id="target-ibmdb2-testConnection" type="button" onclick="validateIBMDB2Target(this)" class="btn btn-primary pull-right">Test Connection
+                       <i id="target-ibmdb2-status"class="bi bi-question-circle"></i>
+                     </button>
+                     </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-mssql">
+                <div class="accordian-body" id="body-target-mssql" aria-labelledby="select-target-mssql">
+                  <label class="form-label" for="form-target-mssql">SQL Server:</label>
+                  <form id="form-target-mssql" oninput="resetTargetState('target-mssql-status')">
+                    <div class="input-group mb-3">
+                      <input type="text" id="target-mssql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                      <input type="password" id="target-mssql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                      <input type="text" id="target-mssql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                      <input  type="number" min="0" step="1" id="target-mssql-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="1433">
+                    </div>
+                    <div class="input-group mb-3">
+                      <input type="text" id="target-mssql-database" class="form-control" placeholder="Database" aria-label="database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                      <input type="text" id="target-mssql-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="target-mssql-testConnection" type="button" onclick="validateMsSQLTarget(this)" class="btn btn-primary">Test Connection
+                      <i id="target-mssql-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-mysql">
+                <div class="accordian-body" id="body-target-mysql" aria-labelledby="select-target-mysql">
+                  <label class="form-label" for="form-target-mysql">MySQL:</label>
+                  <form id="form-target-mysql" oninput="resetTargetState('target-mysql-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mysql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="target-mysql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mysql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" id="target-mysql-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3306">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mysql-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mysql-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
+                    </div>          
+                    <div class="float-right">
+                    <button  id="target-mysql-testConnection" type="button" onclick="validateMySQLTarget(this)" class="btn btn-primary">Test Connection
+                      <i id="target-mysql-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-mariadb">
+                <div class="accordian-body" id="body-target-mariadb" aria-labelledby="select-target-mariadb">
+                  <label class="form-label" for="form-target-mariadb">MariaDB:</label>
+                  <form id="form-target-mariadb" oninput="resetTargetState('target-mariadb-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mariadb-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="target-mariadb-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mariadb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" id="target-mariadb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3307">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mariadb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mariadb-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="target-mariadb-testConnection"  type="button" onclick="validateMariaDBTarget(this)" class="btn btn-primary">Test Connection
+                      <i id="target-mariadb-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-snowflake">
+                <div class="accordian-body" id="body-target-snowflake" aria-labelledby="select-target-snowflake">
+                  <label class="form-label" for="form-target-mongodb">Snowflake:</label>
+                  <form id="form-target-snowflake" oninput="resetTargetState('target-snowflake-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-snowflake-account" class="form-control" placeholder="Account" aria-label="Account" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-snowflake-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="password" id="target-snowflake-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                       <input type="text" id="target-snowflake-warehouse" class="form-control" placeholder="Warehouse" aria-label="Warehouse" aria-describedby="basic-addon1" value = "DEMO_WH">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-snowflake-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="DEMO_DB">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-snowflake-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1" value="PUBLIC">
+                    </div>
+                    <div class="float-right">
+                    <button id="target-snowflake-testConnection"  type="button" onclick="validatesnowflakeTarget(this)" class="btn btn-primary">Test Connection
+                      <i id="target-snowflake-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">  
+              <div class="accordion-collapse collapse" data-bs-parent="#target-cards" id="target-mongodb">
+                <div class="accordian-body" id="body-target-mongodb" aria-labelledby="select-target-mongodb">
+                  <label class="form-label" for="form-target-mongodb">MongoDB:</label>
+                  <form id="form-target-mongodb" oninput="resetTargetState('target-mongodb-status')">
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="number" min="0" step="1" id="target-mongodb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="27017">
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="target-mongodb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+                    </div>
+                    <div class="float-right">
+                    <button id="target-mongodb-testConnection"  type="button" onclick="validateMongoDBTarget(this)" class="btn btn-primary">Test Connection
+                      <i id="target-mongodb-status"class="bi bi-question-circle"></i>
+                    </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="tab-pane fade" id="target-oracle" role="tabpanel" aria-labelledby="target-tab-oracle">
-            <form id="target-oracle" oninput="resetTargetState('target-oracle-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-oracle-user" class="form-control text-uppercase" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="target-oracle-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-oracle-connectString" class="form-control" placeholder="Service" aria-label="Service" aria-describedby="basic-addon1">
-            </div>
-			<div class="input-group mb-3">
-                <input type="text" id="target-oracle-schema" class="form-control text-uppercase" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="target-oracle-caseSensitive">
-				<label class="form-check-label" for="target-oracle-caseSensitive">Case Sensitive</label>
-			</div>
-			<div class="float-right">
-            <button id="target-oracle-testConnection"  type="button" onclick="validateOracleTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-oracle-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="target-postgres" role="tabpanel" aria-labelledby="target-tab-postgres">
-            <form id="target-postgres"  oninput="resetTargetState('target-postgres-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-postgres-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="target-postgres-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-postgres-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input  min="0" step="1" id="target-postgres-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="5432">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-postgres-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="postgres">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-postgres-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="target-postgres-testConnection" type="button" onclick="validatePostgresTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-postgres-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="target-mssql" role="tabpanel" aria-labelledby="target-tab-mssql">
-            <form id="target-mssql"  oninput="resetTargetState('target-mssql-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-mssql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="target-mssql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mssql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mssql-database" class="form-control" placeholder="Database" aria-label="database" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mssql-schema" class="form-control" placeholder="Schema" aria-label="schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="target-mssql-testConnection" type="button" onclick="validateMsSQLTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-mssql-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="target-mysql" role="tabpanel" aria-labelledby="target-tab-mysql">
-            <form id="target-mysql"  oninput="resetTargetState('target-mysql-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-mysql-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="target-mysql-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mysql-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="number" min="0" step="1" id="target-mysql-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3306">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mysql-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mysql-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
-            </div>          
-			<div class="float-right">
-            <button id="target-mysql-testConnection" type="button" onclick="validateMySQLTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-mysql-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="target-mariadb" role="tabpanel" aria-labelledby="target-tab-mariadb">
-            <form id="target-mariadb" oninput="resetTargetState('target-mariadb-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-mariadb-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="target-mariadb-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mariadb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="number" min="0" step="1" id="target-mariadb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="3307">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mariadb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mariadb-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="target-mariadb-testConnection" type="button" onclick="validateMariaDBTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-mariadb-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="target-snowflake" role="tabpanel" aria-labelledby="target-tab-snowflake">
-            <form id="target-snowflake" oninput="resetTargetState('target-snowflake-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-snowflake-account" class="form-control" placeholder="Account" aria-label="Account" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-snowflake-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="password" id="target-snowflake-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-               <input type="text" id="target-snowflake-warehouse" class="form-control" placeholder="Warehouse" aria-label="Warehouse" aria-describedby="basic-addon1" value="DEMO_WH">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-snowflake-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="DEMO_DB">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-snowflake-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1" value="PUBLIC">
-            </div>
-			<div class="float-right">
-            <button id="target-snowflake-testConnection" type="button" onclick="validatesnowflakeTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-snowflake-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-          <div class="tab-pane fade" id="target-mongodb" role="tabpanel" aria-labelledby="target-tab-mongodb">
-            <form id="target-mongodb" oninput="resetTargetState('target-mongodb-status')">
-            <div class="input-group mb-3">
-                <input type="text" id="target-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
-            </div>
-            <div class="input-group mb-3">
-                <input type="number" min="0" step="1" id="target-mongodb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="27017">
-            </div>
-            <div class="input-group mb-3">
-                <input type="text" id="target-mongodb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
-            </div>
-			<div class="float-right">
-            <button id="target-mongodb-testConnection" type="button" onclick="validateMongoDBTarget(this)" class="btn btn-primary">Test Connection
-			  <i id="target-mongodb-status"class="bi bi-question-circle"></i>
-			</button>
-            </div>
-            </form>
-          </div>
-        </div>
+		</div>
       </div>
-	</div>
-    </div>
-	<div style="margin:0; padding:0; height:10px;"></div>
-    <div class="row float-right">
-      <div class="col">
-  	    <div class="form-group mb-3">
-	      <button id="openLogWindow" type="button" onclick="openLogWindow()" class="btn btn-primary">
-			<i class="bi bi-binoculars-fill"></i>
-	      </button>
-	      <button id="doCopy" type="button" onclick="doCopy()" class="btn btn-primary" disabled>
-		    <i class="bi bi-gear-fill"></i>
-	      </button>
-	      <button id="save-config" type="button" onclick="saveConfiguration(this)" class="btn btn-primary" disabled>
-	     	<i class="bi bi-save2-fill"></i>
-	      </button>
+	  <div style="margin:0; padding:0; height:10px;"></div>
+      <div class="row float-right">
+        <div class="col">
+  	      <div class="form-group mb-3">
+	        <button id="secureMode" type="button" onclick="toggleSecureMode()" class="btn btn-primary">
+			  <i class="bi bi-unlock-fill"></i>
+	        </button>
+	        <button id="openLogWindow" type="button" onclick="openLogWindow()" class="btn btn-primary">
+			  <i class="bi bi-binoculars-fill"></i>
+	        </button>
+	        <button id="doCopy" type="button" onclick="doCopy()" class="btn btn-primary" disabled>
+		      <i class="bi bi-gear-fill"></i>
+	        </button>
+	        <button id="save-config" type="button" onclick="saveConfiguration(this)" class="btn btn-primary" disabled>
+	     	  <i class="bi bi-save2-fill"></i>
+	        </button>
+	      </div>
 	    </div>
-	  </div>
-	</div> 
-  </div>
-  <script src="../../node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="../../js/gui/yuiControls.cjs"></script>
+	  </div> 
+    </div>
+    <script src="../../node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../../node/gui/yuiControls.cjs"></script>
   </body>
 </html>

@@ -2,6 +2,5 @@
 !bin/*.sh
 !src/install
 !src/node
-src/deprecated
-src/gui
-src/server
+/src/node/gui
+/src/node/server
