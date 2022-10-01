@@ -20,8 +20,8 @@ const _SQL_SYSTEM_INFORMATION = `{fn teradata_nativesql}Database version {fn ter
 // const SQL_SYSTEM_INFORMATION = `help session`;
 
 const _SQL_SCHEMA_INFORMATION = 
-`select TRIM(c.DatabaseName) "TABLE_SCHEMA"
-       ,TRIM(c.TableName)    "TABLE_NAME"
+`select TRIM(t.DatabaseName) "TABLE_SCHEMA"
+       ,TRIM(t.TableName)    "TABLE_NAME"
        ,'[' || TRIM(TRAILING ',' FROM (XMLAGG('"' || TRIM(ColumnName) || '",' ORDER BY ColumnId) (VARCHAR(32000)))) || ']' "COLUMN_NAME_ARRAY"
        ,'[' || TRIM(TRAILING ',' FROM (XMLAGG('"' || case when ColumnType = 'UD' then TRIM(ColumnUDTName) else  TRIM(ColumnType) end || '",' ORDER BY ColumnId) (VARCHAR(32000))))  || ']' "DATA_TYPE_ARRAY"
        ,'[' || TRIM(TRAILING ',' FROM (XMLAGG(case
@@ -45,12 +45,12 @@ const _SQL_SCHEMA_INFORMATION =
                                        end 
                                      ORDER BY ColumnId) (VARCHAR(32000)))) || ']' "SIZE_CONSTRAINT_ARRARY"
        ,TRIM(TRAILING ',' FROM (XMLAGG('"' || TRIM(ColumnName) || '",' ORDER BY ColumnId) (VARCHAR(32000)))) "CLIENT_SELECT_LIST"
-  from DBC.ColumnsVX c
-  JOIN DBC.TablesVX t 
+  from DBC.ColumnsV c
+  JOIN DBC.TablesV t 
     on c.DatabaseName = t.DatabaseName
    and c.TableName = t.TableName
  where t.DatabaseName = ?
-  group by c.DatabaseName, c.TableName`;
+  group by t.DatabaseName, t.TableName`;
   
 const _SQL_BEGIN_TRANSACTION    = `{fn teradata_nativesql}{fn teradata_autocommit_off}`;
 

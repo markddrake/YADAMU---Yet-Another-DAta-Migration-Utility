@@ -31,9 +31,8 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
   }
   
   refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint) {
-
+	  
     const dataType = super.refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint)
-      
     switch (dataType) {
       case this.dbi.DATA_TYPES.CLOB_TYPE:
         return ((sizeConstraint.length > 0) && (sizeConstraint[0] > 0)) ? `${dataType}(${sizeConstraint[0] > this.dbi.DATA_TYPES.CLOB_LENGTH ? this.dbi.DATA_TYPES.CLOB_LENGTH : sizeConstraint[0]})` : dataType
@@ -42,6 +41,10 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
 	  case this.dbi.DATA_TYPES.NUMERIC_TYPE:
 	  case this.dbi.DATA_TYPES.DECIMAL_TYPE:
 	    return (sizeConstraint.length === 0) ? this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE : dataType
+      case this.dbi.DATA_TYPES.TIME_TYPE:
+      case this.dbi.DATA_TYPES.DATETIME_TYPE:
+      case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+        return targetDataType
       default:
         return dataType
     }
@@ -63,8 +66,15 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
   
   translateDataType(dataType) {
     const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType)
-    dataTypeDefinition.type = this.dbi.DATA_TYPES.sqlDataTypeNames[dataTypeDefinition.type] || dataTypeDefinition.type 
-	return YadamuDataTypes.recomposeDataType(dataTypeDefinition)
+	switch (dataTypeDefinition.type) {
+	  case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
+	    return `TIME${dataTypeDefinition.hasOwnProperty('length') ? `(${dataTypeDefinition.length})` : ``} WITH TIME ZONE`
+	  case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+	    return `TIMESTAMP${dataTypeDefinition.hasOwnProperty('length') ? `(${dataTypeDefinition.length})` : ``} WITH TIME ZONE`
+      default:
+        dataTypeDefinition.type = this.dbi.DATA_TYPES.sqlDataTypeNames[dataTypeDefinition.type] || dataTypeDefinition.type 
+		return YadamuDataTypes.recomposeDataType(dataTypeDefinition)
+	}		   
   }	  
   
   generateTableInfo(tableMetadata) {

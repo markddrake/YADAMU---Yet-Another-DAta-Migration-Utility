@@ -53,60 +53,6 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
       const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.vendorProperties.password}`;
       await this.executeSQL(createUser,{});      
     }  
-
-    async getRowCounts(target) {
-        
-      let args = {target:`"${target.schema}"`}
-      await this.executeSQL(OracleQA.SQL_GATHER_SCHEMA_STATS,args)
-      
-      args = {target:target.schema}
-      const results = await this.executeSQL(OracleQA.SQL_SCHEMA_TABLE_ROWS,args)
-      
-      return results.rows.map((row,idx) => {          
-        return [target.schema,row[0],parseInt(row[1])]
-      })
-      
-    }
-
-	async compareSchemas(source,target,rules) {
-		
-	  let compareRules = this.yadamu.getCompareRules(rules)	  
-	  
-	  compareRules.objectsRule   = rules.OBJECTS_COMPARISON_RULE || 'SKIP'
-      compareRules.excludeMViews = ((rules.OPERATION  !== 'DBROUNDTRIP') && (rules.MODE === 'DATA_ONLY'))
-   	  
-	  compareRules = this.JSON_PARSING_SUPPORTED ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
-
-	  const args = {
-		P_SOURCE_SCHEMA        : source.schema,
-		P_TARGET_SCHEMA        : target.schema,
-		P_RULES                : compareRules
-	  }
-	        
-      const report = {
-        successful : []
-       ,failed     : []
-      }
-
-	  await this.executeSQL(OracleQA.SQL_COMPARE_SCHEMAS,args)      
-
-      const successful = await this.executeSQL(OracleQA.SQL_SUCCESS,{})
-            
-      report.successful = successful.rows.map((row,idx) => {          
-        return [row[0],row[1],row[2],parseInt(row[4])]
-      })
-        
-	  
-	  const options = {fetchInfo:[{type: oracledb.STRING, maxSize: 128},{type: oracledb.STRING, maxSize: 128},{type: oracledb.STRING, maxSize: 128},{type: oracledb.STRING, maxSize: 12},{type: oracledb.NUMBER},{type: oracledb.NUMBER},{type: oracledb.NUMBER},{type: oracledb.NUMBER},{type: oracledb.STRING, maxSize: 16*1024*1024}]}
-      // const failed = await this.executeSQL(OracleQA.SQL_FAILED,{},options)      
-      const failed = await this.executeSQL(OracleQA.SQL_FAILED,{})      
-      report.failed = await Promise.all(failed.rows.map(async (row,idx) => {
-		const result = [row[0],row[1],row[2],parseInt(row[4]),parseInt(row[5]),parseInt(row[6]),parseInt(row[7]),((row[8] === null) || (typeof row[8] === 'string')) ? row[8] : row[8].getData()]
-		return await Promise.all(result)
-      }))
-	  
-      return report
-    }
      
     classFactory(yadamu) {
       return new OracleQA(yadamu,this,this.connectionParameters,this.parameters)
@@ -151,7 +97,6 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
     }
 }
 	
-
 export { OracleQA as default }
 
 const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_RULES); end;`;

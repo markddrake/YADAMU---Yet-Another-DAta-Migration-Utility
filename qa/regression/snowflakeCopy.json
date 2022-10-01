@@ -5,7 +5,6 @@
 	"stagingArea": "awsS3-staging",
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
-	"emptyStringIsNull" : true,
 	"parameters": {
         "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/%targetConnection%/%sourceConnection%/csv",
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",

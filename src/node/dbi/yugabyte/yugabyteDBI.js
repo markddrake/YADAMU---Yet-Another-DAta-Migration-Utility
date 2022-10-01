@@ -61,10 +61,10 @@ import YugabyteStatementLibrary      from '../postgres/postgresStatementLibrary.
 import YugabyteOutputManager         from '../postgres/postgresOutputManager.js'
 import YugabyteStatementGenerator    from '../postgres/postgresStatementGenerator.js'
 
-
 import YugabyteError                 from './yugabyteException.js'
 import YugabyteDataTypes             from './yugabyteDataTypes.js'
 import YugabyteConstants             from './yugabyteConstants.js'
+import YugabyteCompare               from './yugabyteCompare.js'
 
 class YugabyteDBI extends YadamuDBI {
     
@@ -824,7 +824,7 @@ class YugabyteDBI extends YadamuDBI {
 	*/
 	
 	this.dropStatementCache = []
-    this.createStatementCache = Object.values(statementCache).flatMap((tableInfo) => { return tableInfo.copy}).map((copyOperation) => { this.dropStatementCache.push(copyOperation.drop); return copyOperation.ddl })
+    this.createStatementCache = Object.values(statementCache).flatMap((tableInfo) => { return tableInfo.copy || []}).map((copyOperation) => { this.dropStatementCache.push(copyOperation.drop); return copyOperation.ddl })
 	
 	return statementCache
   }
@@ -897,6 +897,12 @@ class YugabyteDBI extends YadamuDBI {
 	 await this.commitTransaction();
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" cascade`)
   }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new YugabyteCompare(this,configuration)
+  }
+	  
 
 }
 

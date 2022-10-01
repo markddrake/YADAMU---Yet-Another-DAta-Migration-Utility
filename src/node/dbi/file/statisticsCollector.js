@@ -1,11 +1,14 @@
-"use strict"
 
-import fs from 'fs';
-import path from 'path';
-import { performance } from 'perf_hooks';
-import { Writable } from 'stream'
+import fs                   from 'fs';
+import path                 from 'path';
 
-import YadamuLogger from '../../../node/core/yadamuLogger.js';
+import { 
+  performance 
+}                           from 'perf_hooks';
+
+import { 
+  Writable 
+}                           from 'stream'
 
 class StatisticsCollector extends Writable {
   

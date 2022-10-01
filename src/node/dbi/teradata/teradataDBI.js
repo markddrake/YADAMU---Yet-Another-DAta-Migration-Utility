@@ -41,7 +41,8 @@ import TeradataParser                 from './teradataParser.js'
 import TeradataOutputManager          from './teradataOutputManager.js'
 import TeradataWriter                 from './teradataWriter.js'
 import TeradataStatementGenerator     from './teradataStatementGenerator.js'
-import StatementLibrary               from './teradataStatementLibrary.js'
+import TeradataStatementLibrary       from './teradataStatementLibrary.js'
+import TeradataCompare                from './teradataCompare.js'
 
 import { 
   TeradataError 
@@ -69,6 +70,7 @@ class TeradataDBI extends YadamuDBI {
   get STATEMENT_TERMINATOR()      { return TeradataConstants.STATEMENT_TERMINATOR };
 
   get DATATYPE_IDENTITY_MAPPING() { return false }
+  get FETCH_SIZE()                { return this.parameters.TERDATA_FETCH_SIZE || TeradataConstants.FETCH_SIZE}
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
@@ -146,7 +148,7 @@ class TeradataDBI extends YadamuDBI {
   
   async configureConnection() {    
     
-	const results = await this.executeSQL(StatementLibrary.SQL_SYSTEM_INFORMATION,[])
+	const results = await this.executeSQL(TeradataStatementLibrary.SQL_SYSTEM_INFORMATION,[])
 	this._DATABASE_VERSION = results[0][0].slice('Database Version'.length+1)
   }
 
@@ -186,6 +188,7 @@ class TeradataDBI extends YadamuDBI {
 		results.push(await this.executeSQL(ddlStatement,{}))
       }
     } catch (e) {
+      console.log(e)
 	 const exceptionFile = this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
 	 await this.yadamuLogger.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
 	 results = e;
@@ -258,7 +261,7 @@ class TeradataDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
      
     this.setTransactionCursor()
-    await this.executeSQL(StatementLibrary.SQL_BEGIN_TRANSACTION,[])
+    await this.executeSQL(TeradataStatementLibrary.SQL_BEGIN_TRANSACTION,[])
     await super.beginTransaction()
 
   }
@@ -274,7 +277,7 @@ class TeradataDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     super.commitTransaction()
-    await this.executeSQL(StatementLibrary.SQL_COMMIT_TRANSACTION,[])
+    await this.executeSQL(TeradataStatementLibrary.SQL_COMMIT_TRANSACTION,[])
     this.resetTransactionCursor()
 	
   }
@@ -304,7 +307,7 @@ class TeradataDBI extends YadamuDBI {
      
     try {
       super.rollbackTransaction()
-      await this.executeSQL(StatementLibrary.SQL_ROLLBACK_TRANSACTION,[])
+      await this.executeSQL(TeradataStatementLibrary.SQL_ROLLBACK_TRANSACTION,[])
       this.resetTransactionCursor()
     } catch (newIssue) {
       this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)                                  
@@ -335,7 +338,7 @@ class TeradataDBI extends YadamuDBI {
   
     // Get Information about the target server
    
-    const results = await this.executeSQL(StatementLibrary.SQL_SYSTEM_INFORMATION,[])
+    const results = await this.executeSQL(TeradataStatementLibrary.SQL_SYSTEM_INFORMATION,[])
     const sysInfo = results[0]
 
 	return Object.assign(
@@ -356,7 +359,7 @@ class TeradataDBI extends YadamuDBI {
   
   async getSchemaMetadata() {
 
-    let schemaInfo = await this.executeSQL(StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
+    let schemaInfo = await this.executeSQL(TeradataStatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
 	schemaInfo = schemaInfo.map((table) => {
 	  return {
 	    TABLE_SCHEMA          : table[0]
@@ -416,6 +419,11 @@ class TeradataDBI extends YadamuDBI {
   
   classFactory(yadamu) {
 	return new TeradataDBI(yadamu,this,this.connectionParameters,this.parameters)
+  }
+
+  async getComparator(configuration) {
+	 await this.initialize()	 
+	 return new TeradataCompare(this,configuration)
   }
   
 }

@@ -1,0 +1,28 @@
+{
+  "connections"                    : {
+	"sourceConnection"             : {
+	}	
+  , "targetConnection"             : {
+	}	
+  }
+ ,"schemas"                        : {
+	"sourceSchema"                 : {
+	}	
+  , "sourceSchema"                 : {
+	}	
+  }
+ ,"parameters"                     : {
+  }
+ ,"jobs"                           : [{
+     "source"                      : {
+       "connection"                : "sourceConnection"
+     , "schema"                    : "sourceSchema"
+     }
+     ,"target"                     : {
+       "connection"                : "targetConnection"
+     , "schema"                    : "targetSchema"
+     }
+     ,"parameters"                 : {
+     }
+   }]
+}

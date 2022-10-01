@@ -55,6 +55,7 @@ import DBIConstants                   from '../base/dbiConstants.js'
 import JSONParser                     from './jsonParser.js'
 import StreamSwitcher                 from './streamSwitcher.js'
 import JSONOutputManager              from './jsonOutputManager.js'
+import FileCompare                    from './fileCompare.js'
 
 import {
   FileError, 
@@ -679,6 +680,11 @@ class FileDBI extends YadamuDBI {
   
   async closePool() { /* OVERRIDE */ }
   
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new FileCompare(this,configuration)
+  }
+	  
 }
 
 export { FileDBI as default }

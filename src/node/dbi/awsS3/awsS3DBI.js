@@ -124,6 +124,10 @@ class AWSS3DBI extends CloudDBI {
     return JSON.parse(fileContents.Body.toString())
   }
 
+  getContentLength(props) {
+    return props.ContentLength
+  }
+
   classFactory(yadamu) {
 	return new AWSS3DBI(yadamu,this,this.connectionParameters,this.parameters)
   }

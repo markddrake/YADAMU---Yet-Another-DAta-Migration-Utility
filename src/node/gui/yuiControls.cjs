@@ -207,7 +207,6 @@ function testConnection(button,status,connection,connectionProperties,parameters
   status.classList.remove('bi-times-circle')
 
   const state = ipcRenderer.sendSync(connection,connectionProperties,parameters);
-  console.log(state)
   if (state === 'success') {
     valid = true
     status.classList.add('bi-check-circle')
@@ -454,8 +453,7 @@ function validateIBMDB2Source(button) {
   const parameters = {
 	FROM_USER : document.getElementById('source-ibmdb2-schema').value
   }
- 
-  window.validSource = testConnection(button,status,'source-ibmdb2',{ ibmdb2: connectionProperties},parameters)  
+  window.validSource = testConnection(button,status,'source-ibmdb2',{ db2: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -476,7 +474,7 @@ function validateIBMDB2Target(button) {
 	TO_USER : document.getElementById('target-ibmdb2-schema').value
   }
  
-  window.validTarget = testConnection(button,status,'target-ibmdb2',{ ibmdb2: connectionProperties},parameters)  
+  window.validTarget = testConnection(button,status,'target-ibmdb2',{ db2: connectionProperties},parameters)  
   setCopyState()
 
 }

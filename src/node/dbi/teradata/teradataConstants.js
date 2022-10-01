@@ -13,6 +13,7 @@ class TeradataConstants {
   static get STATIC_DEFAULTS() {
     this._STATIC_DEFAULTS = this._STATIC_DEFAULTS || Object.freeze({
 	  BOOLEAN_STORAGE_OPTION      : "BYTEINT"
+	, FETCH_SIZE                  : 50
     })
     return this._STATIC_DEFAULTS;
  }
@@ -25,6 +26,7 @@ class TeradataConstants {
  }
 
   static get BOOLEAN_STORAGE_OPTION()              { return this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION}
+  static get FETCH_SIZE()                          { return this.DBI_PARAMETERS.FETCH_SIZE}
   
 }
 

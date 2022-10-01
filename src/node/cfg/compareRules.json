@@ -107,6 +107,7 @@
 		"default": false,
 		"mariadb": {
 			"oracle": true
+		,	"csv"   : true
 		},
 		"mongodb": {
 			"oracle": true
@@ -116,6 +117,7 @@
 		},
 		"mysql": {
 			"oracle": true
+		,	"csv"   : true
 		},
 		"postgres": {
 			"oracle": true
@@ -131,6 +133,7 @@
 		},
 		"vertica": {
 			"oracle": true
+		,	"csv"   : true
 		},
 		"terdata": {
 			"oracle": true
@@ -138,6 +141,13 @@
 		"db2": {
 			"oracle": true
 		}
+	},
+	"CSV_EMPTY_STRING_IS_NULL": {
+		"default": false,
+		"mariadb" : true,
+		"oracle"  : true,
+		"mysql"   : true,
+		"vertica" : true
 	},
 	"MIN_BIGINT_IS_NULL": {
 		"default": false,
@@ -163,9 +173,6 @@
 			"vertica": true
 		},
 		"cockroach": {
-			"vertica": true
-		},
-		"vertica": {
 			"vertica": true
 		},
 		"terdata": {

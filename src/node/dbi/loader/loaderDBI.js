@@ -45,6 +45,7 @@ import {
 /* Vendor Specific DBI Implimentation */                                   
 
 import LoaderConstants                from './loaderConstants.js'
+import LoaderCompare                  from './loaderCompare.js'
 import JSONParser                     from './jsonParser.js'
 import LoaderParser                   from './loaderParser.js'
 import JSONOutputManager              from './jsonOutputManager.js'
@@ -92,6 +93,24 @@ class IVReader extends PassThrough {
   
   _transform = this.extractIV
     
+}
+
+class CloudService {
+	
+  constructor() {
+  }
+  
+  async getObject(objectPath) {
+	return await fsp.readFile(objectPath,{encoding: 'utf8'})
+  }
+  
+  async createReadStream(path) {
+    return new Promise((resolve,reject) => {
+	  const stack = new Error().stack
+      const is = fs.createReadStream(path);
+      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,path) : new FileError(this.DRIVER_ID,err,stack,path) )})
+    })
+  }
 }
 
 class LoaderDBI extends YadamuDBI {
@@ -698,13 +717,44 @@ class LoaderDBI extends YadamuDBI {
   
   async configureConnection() { /* OVERRIDE */ }
   
-  async createConnectionPool() { /* OVERRIDE */ }
+  async createConnectionPool() { 
+  	// Enabled Method sharing with Cloud based implementations/
+	this.cloudService = new CloudService()
+  }
   
   async getConnectionFromPool() { /* OVERRIDE */ }
   
   async closeConnection() { /* OVERRIDE */ }
   
   async closePool() { /* OVERRIDE */ }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new LoaderCompare(this,configuration)
+  }
+	    
+  async compareInputStreams(filename) {
+         
+    const streams = []
+    const is = await this.getInputStream(filename);
+    streams.push(is)
+      
+    if (this.ENCRYPTED_INPUT) {
+      const iv = await this.loadInitializationVector(filename)
+      streams.push(new IVReader(this.IV_LENGTH))
+      // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+      const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+      streams.push(decipherStream);
+    }
+   
+    if (this.COMPRESSED_INPUT) {
+      streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
+    }
+      
+    return streams
+    
+  }
+    	  
 }
 
 export {LoaderDBI as default }

@@ -14,16 +14,24 @@ class DB2Parser extends YadamuParser {
 	  
 	return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 	  switch (dataType) {
+		 /*
+		 **
+		 ** Starting with ibm_db release 3.x binary types are returned as BUFFER 
+		 **
+
 		 case this.dbi.DATA_TYPES. BLOB_TYPE:
 		   return (row,idx)  => {
              row[idx] = Buffer.from(row[idx],'hex')
-		   }     
+		   }      
 		 case this.dbi.DATA_TYPES.VARBINARY_TYPE:
 		 case this.dbi.DATA_TYPES.BINARY_TYPE:
-		 case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+		 // case dbi.DATA_TYPES.IBMDB2_CHAR_AS_BIT:
 		   return (row,idx)  => {
              row[idx] = Buffer.from(row[idx],'hex')
 		   }     
+		 
+		 **
+		 */
 		 case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
              return (row,idx)  => {
                row[idx] = `${row[idx][12] === 'T' ? row[idx] : row[idx].replace(' ','T')}Z`

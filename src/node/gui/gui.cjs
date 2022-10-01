@@ -29,7 +29,7 @@ app.on('window-all-closed', () => {
 
 async function finalize(yadamu) {
 	
-  await electronCmd.close();
+  await yadamu.close();
   app.quit();
   
 }
@@ -253,6 +253,7 @@ ipcMain.on('source-ibmdb2', async function (event, connectionProps, parameters) 
 	sourceDBI = await validateConnection('../dbi/db2/db2DBI.js',connectionProps,parameters)
     event.returnValue = 'success'
   } catch (e) {
+    console.log(e)
 	event.returnValue = e.message
   }
 })

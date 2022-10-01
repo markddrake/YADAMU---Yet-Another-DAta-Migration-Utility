@@ -147,7 +147,6 @@
 			"target": "tera#1",
 			"stagingArea": "loader-staging",
 			"reloadStagingArea": false,
-			"emptyStringIsNull": true,
 			"parameters": {
 				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
 				"DIRECTORY": "loader/%targetConnection%/%sourceConnection%/csv",

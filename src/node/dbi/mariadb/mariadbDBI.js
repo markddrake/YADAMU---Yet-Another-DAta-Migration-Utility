@@ -34,6 +34,7 @@ import MariadbOutputManager           from './mariadbOutputManager.js'
 import MariadbWriter                  from './mariadbWriter.js'
 import MariadbStatementLibrary        from './mariadbStatementLibrary.js'
 import MariadbStatementGenerator      from './mariadbStatementGenerator.js'
+import MariadbCompare                 from './mariadbCompare.js'
 
 class MariadbDBI extends YadamuDBI {
     
@@ -590,6 +591,11 @@ class MariadbDBI extends YadamuDBI {
 	const results = await this.executeSQL(`select connection_id() "pid"`)
 	const pid = results[0][0];
     return pid
+  }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new MariadbCompare(this,configuration)
   }
   
 }

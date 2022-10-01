@@ -20,9 +20,14 @@ import {
 /* Yadamu DBI */                                    
 
 import LoaderDBI     from '../loader/loaderDBI.js';
+
 import {
-  FileNotFound
-}                    from '../file/fileException.js';
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                    from '../file/fileException.js'
+
+import CloudCompare  from './cloudCompare.js';
 
 class CloudDBI extends LoaderDBI {
  
@@ -211,6 +216,11 @@ class CloudDBI extends LoaderDBI {
 	this.cloudService = this.manager.cloudService
   }
 
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new CloudCompare(this,configuration)
+  }
+	  
 }
 
 export {CloudDBI as default }

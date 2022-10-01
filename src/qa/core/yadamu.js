@@ -1,6 +1,4 @@
 
-"use strict"
-
 import fs                     from 'fs';
 
 import { 
@@ -30,7 +28,6 @@ import YadamuLogger           from './yadamuLogger.js';
 const  __filename             = fileURLToPath(import.meta.url);
 const __dirname               = dirname(__filename);
 const YadamuDefaults          = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/yadamuDefaults.json'),'utf-8'));
-const CompareRules            = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/compareRules.json'),'utf-8'));
 
 class Yadamu extends _Yadamu {
   
@@ -39,7 +36,6 @@ class Yadamu extends _Yadamu {
     
   static get QA_CONFIGURATION()   { return YadamuDefaults };    
   static get QA_DRIVER_MAPPINGS() { return this.QA_CONFIGURATION.drivers }
-  static get COMPARE_RULES()      { return CompareRules };    
   
   static get YADAMU_PARAMETERS() { 
     this.#_YADAMU_PARAMETERS = this.#_YADAMU_PARAMETERS || Object.freeze(Object.assign({},{MODE: DBIConstants.MODE},_Yadamu.YADAMU_PARAMETERS,this.QA_CONFIGURATION.yadamu))
@@ -120,25 +116,6 @@ class Yadamu extends _Yadamu {
     return metrics;
   }
 		
-  getCompareRules(rules) {
-	return {
-      emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 
-    , minBigIntIsNull      : rules.MIN_BIGINT_IS_NULL 
-    , doublePrecision      : rules.DOUBLE_PRECISION || 18
-    , numericScale     : rules.NUMERIC_SCALE || null
-	, spatialPrecision     : rules.SPATIAL_PRECISION || 18
-	, timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
-	, orderedJSON          : rules.hasOwnProperty("ORDERED_JSON") ? rules.ORDERED_JSON : false	
-	, xmlRule              : rules.XML_COMPARISON_RULE || null
-    , infinityIsNull       : rules.hasOwnProperty("INFINITY_IS_NULL") ? rules.INFINITY_IS_NULL : false 
-    }
-  }
-
-  makeXML(rules) {
-    return `<rules>${Object.keys(rules).map((tag) => { return `<${tag}>${rules[tag] === null ? '' : rules[tag]}</${tag}>` }).join()}</rules>`
-  }
-  
-  
   configureTermination(configuration) {
     // Kill Configuration is added by YADAMU-QA
     this.killConfiguration = configuration

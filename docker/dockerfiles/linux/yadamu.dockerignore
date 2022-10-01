@@ -2,5 +2,5 @@
 !bin/*.sh
 !src/install
 !src/node
-/src/node/gui
-/src/node/server
+src/node/gui
+src/node/server

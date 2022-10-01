@@ -138,6 +138,10 @@ class AzureDBI extends CloudDBI {
     return JSON.parse(fileContents.toString())
   }
   
+  getContentLength(props) {
+    return props.contentLength
+  }
+
   classFactory(yadamu) {
 	return new AzureDBI(yadamu,this,this.connectionParameters,this.parameters)
   }

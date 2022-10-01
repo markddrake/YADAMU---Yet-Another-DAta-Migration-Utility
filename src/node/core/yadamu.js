@@ -816,7 +816,7 @@ class Yadamu {
     })
 
   }
-
+  
   async getDBReader(dbi,isDatabase) {
 	const dbReader = isDatabase ? this.PARALLEL_ENABLED ? new DBReaderParallel(dbi, this.LOGGER) : new DBReader(dbi, this.LOGGER) : new DBReaderFile(dbi, this.LOGGER)
 	await dbReader.initialize();

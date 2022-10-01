@@ -12,9 +12,6 @@ import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 
-    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
-    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
-
     static #_DBI_PARAMETERS
     
     static get DBI_PARAMETERS()  { 
@@ -61,76 +58,6 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.YADAMU_DATABASE],e);
         throw e
       }
-    }
-
-    async useDatabase(databaseName) {     
-      const statement = `use ${databaseName}`
-      const results = await this.executeSQL(statement);
-    } 
-
-   async getRowCounts(connectInfo) {
-        
-     await this.useDatabase(connectInfo.database);
-     const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
-      
-     return results.recordset.map((row,idx) => {          
-       return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,parseInt(row.RowCount)]
-     })
-   }
-
-   async compareSchemas(source,target,rules) {
-       
-      const report = {
-        successful : []
-       ,failed     : []
-      }
-
-      await this.useDatabase(source.database);
-      
-      let compareRules = this.yadamu.getCompareRules(rules)   
-      compareRules = this.DATABASE_VERSION  > 12 ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
-
-      
-      let args = 
-`--
--- declare @FORMAT_RESULTS         bit           = 0;
--- declare @SOURCE_DATABASE        varchar(128)  = '${source.database}';
--- declare @SOURCE_SCHEMA          varchar(128)  = '${source.owner}';
--- declare @TARGET_DATABASE        varchar(128)  = '${target.database}';
--- declare @TARGET_SCHEMA          varchar(128)  = '${target.owner}';
--- declare @COMMENT                varchar(128)  = '';
--- declare @RULES                  narchar(4000) = '${compareRules}';
---`;
-            
-      this.SQL_TRACE.trace(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
-
-      const request = this.getRequest();
-      
-      let results = await request
-                          .input('FORMAT_RESULTS',this.sql.Bit,false)
-                          .input('SOURCE_DATABASE',this.sql.VarChar,source.database)
-                          .input('SOURCE_SCHEMA',this.sql.VarChar,source.owner)
-                          .input('TARGET_DATABASE',this.sql.VarChar,target.database)
-                          .input('TARGET_SCHEMA',this.sql.VarChar,target.owner)
-                          .input('COMMENT',this.sql.VarChar,'')
-                          .input('RULES',this.sql.VarChar,compareRules)
-                          .execute(MsSQLQA.SQL_COMPARE_SCHEMAS,{},{resultSet: true});
-
-      // Use length-2 and length-1 to allow Debugging info to be included in the output
-      
-      // console.log(results.recordsets[0])
-      
-      const successful = results.recordsets[results.recordsets.length-2]      
-      report.successful = successful.map((row,idx) => {          
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT,]
-      })
-        
-      const failed = results.recordsets[results.recordsets.length-1]
-      report.failed = failed.map((row,idx) => {
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLERRM !== null ? row.SQLERRM : '')]
-      })
-
-      return report
     }
 
     classFactory(yadamu) {
@@ -234,15 +161,3 @@ class MsSQLDBMgr extends MsSQLQA {
 }  
 
 export { MsSQLQA as default }
-
-const _SQL_SCHEMA_TABLE_ROWS = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
-   FROM sys.objects AS sOBJ 
-  INNER JOIN sys.partitions AS sPTN ON sOBJ.object_id = sPTN.object_id 
-  WHERE sOBJ.type = 'U' 
-    AND sOBJ.schema_id = SCHEMA_ID(@SCHEMA) 
-    AND sOBJ.is_ms_shipped = 0x0
-    AND index_id < 2
- GROUP BY sOBJ.schema_id, sOBJ.name`;
-
-const _SQL_COMPARE_SCHEMAS = `sp_COMPARE_SCHEMA`
-

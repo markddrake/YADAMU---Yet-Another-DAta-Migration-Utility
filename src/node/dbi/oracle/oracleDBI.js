@@ -12,6 +12,7 @@ import {
   Transform, 
   PassThrough
 }                                     from 'stream'
+
 import { 
   pipeline 
 }                                     from 'stream/promises';
@@ -55,6 +56,7 @@ import OracleOutputManager            from './oracleOutputManager.js'
 import OracleWriter                   from './oracleWriter.js'
 import OracleStatementLibrary         from './oracleStatementLibrary.js'
 import OracleStatementGenerator       from './oracleStatementGenerator.js'
+import OracleCompare                  from './oracleCompare.js'
 
 import {
   OracleError, 
@@ -233,6 +235,7 @@ class OracleDBI extends YadamuDBI {
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
   
   constructor(yadamu,manager,connectionSettings,parameters) {
+
     super(yadamu,manager,connectionSettings,parameters)
 	this.DATA_TYPES = OracleDataTypes
 
@@ -1628,7 +1631,11 @@ class OracleDBI extends YadamuDBI {
 	 await this.executeSQL(`drop directory ${this.SQL_DIRECTORY_NAME}`)
 	 await this.finalizeData()
   }
-
+  
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new OracleCompare(this,configuration)
+  }
 }
 
 export {OracleDBI as default }

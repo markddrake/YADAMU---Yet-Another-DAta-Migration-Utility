@@ -17,8 +17,10 @@ import {
 				
 /* Database Vendors API */                                    
 
-import ibmdb                          from 'ibm_db'
-const {Pool} = ibmdb;
+// Load ibmdb dynamically to mmanage issue with needing different version under electron
+
+// import ibmdb                          from 'ibm_db'
+// const {Pool} = ibmdb;
 
 /* Yadamu Core */                                    
 							          
@@ -44,7 +46,8 @@ import DB2Parser                      from './db2Parser.js'
 import DB2Writer                      from './db2Writer.js'
 import DB2OutputManager               from './db2OutputManager.js'
 import DB2StatementLibrary            from './db2StatementLibrary.js'
-import DB2StatementGenerator     from './db2StatementGenerator.js'
+import DB2StatementGenerator          from './db2StatementGenerator.js'
+import DB2Compare                     from './db2Compare.js'
 
 class DB2DBI extends YadamuDBI {
     
@@ -89,14 +92,21 @@ class DB2DBI extends YadamuDBI {
   **
   */
   
-  async testConnection(connectionProperties) {   
-    // Validate the supplied connection properties
-    throw new UnimplementedMethod('testConnection()',`YadamuDBI`,this.constructor.name)
+  async testConnection() {   
+    const ibmdb = await ( import(process.versions.hasOwnProperty('electron') ? "ibm_db_electron" : "ibm_db"))
+	const stack = new Error().stack
+	const connection = await new Promise((resolve,reject) => {
+      ibmdb.open(this.createConnectionString(),(err,conn) => {
+	    if (err) reject(new DB2Error(this.DRIVER_ID,err,stack,'DB2.open()'))
+	    resolve(conn)
+	  })
+	})
+	return connection
   }
   
   async createConnectionPool() {	
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
-	this.connectionPool = new Pool()
+	this.connectionPool = new this.ibmdb.Pool()
   }
   
   createConnectionString() {
@@ -180,8 +190,11 @@ class DB2DBI extends YadamuDBI {
 	  // Do not return failed connections to the pool.
       await this.connection.realClose()
     }
+	else {
+	  await this.connection.close()
+	}
 	
-    await this.connection.close()
+	this.connection = undefined
   }
 	
   async closePool(options) {
@@ -274,11 +287,13 @@ class DB2DBI extends YadamuDBI {
   **  Open the Database connection 
   **
   
+  */   
+
   async initialize() {
+	this.ibmdb = await ( import(process.versions.hasOwnProperty('electron') ? "ibm_db_electron" : "ibm_db"))
     await super.initialize(true)   
   }
    
-  */   
   
   /*
   **
@@ -603,6 +618,11 @@ class DB2DBI extends YadamuDBI {
   async getConnectionID() {
 	// Get a uniqueID for the current connection
     throw new Error('Unimplemented Method')
+  }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new DB2Compare(this,configuration)
   }
 	  
 }

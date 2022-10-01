@@ -1,4 +1,4 @@
-VBoxManage extpack install Oracle_VM_VirtualBox_Extension_Pack-6.1.32.vbox-extpack <<EOF
+VBoxManage extpack install Oracle_VM_VirtualBox_Extension_Pack-6.1.34.vbox-extpack <<EOF
 Y
 EOF
 #VBoxManage natnetwork stop --netname cfgnet

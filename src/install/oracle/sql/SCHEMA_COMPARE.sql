@@ -1,0 +1,41 @@
+--
+set pages 100
+set lines 256
+column SOURCE_SCHEMA format a32
+column TARGET_SCHEMA FORMAT A32
+column TABLE_NAME format A48
+column SQLERRM format A64
+column NOTES format A64
+column RESULTS format A10
+--
+set feedback off
+set heading off
+--
+select to_char(SYS_EXTRACT_UTC(SYSTIMESTAMP),'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ': "&SCHEMA&ID1", "&SCHEMA&ID2", "&METHOD", "&MODE"' || CHR(13) "Timestamp"
+  from DUAL
+/
+begin
+  YADAMU_TEST.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2',$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED  $THEN '{objectsRule:"SKIP"}' $ELSE '<rules><objectsRule>SKIP</objectsRule></rules>' $END );
+end;
+/
+--
+set heading on
+set feedback on
+--
+select 'SUCCESSFUL' "RESULTS", SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
+  from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
+   and MISSING_ROWS = 0
+   and EXTRA_ROWS = 0
+   and SQLERRM is NULL
+order by TABLE_NAME
+/
+select  'FAILED' "RESULTS", SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME,SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM "NOTES"
+  from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
+    or MISSING_ROWS <> 0
+    or EXTRA_ROWS <> 0
+    or SQLERRM is NOT NULL
+ order by TABLE_NAME
+/ 
+--

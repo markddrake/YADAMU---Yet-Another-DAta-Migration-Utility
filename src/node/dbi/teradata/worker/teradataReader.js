@@ -10,39 +10,36 @@ import {
 
 class TeradataReader extends Readable {
     
-    constructor(worker,connectionProperties,sqlStatement) {
+    constructor(worker,connectionProperties,sqlStatement,tableName,fetchSize) {
       super({objectMode:true}) 
       this.worker = worker
       this.vendorProperties = connectionProperties
       this.sqlStatement = sqlStatement
-      
-      this.stagingArea = []
-      this.highWaterMark = 10240
-      this.lowWaterMark = 7680
-      
+      this.tableName = tableName
       this.readPending = false;
-      this.streamPaused = false;
-      this.streamFailed = false;
-      this.streamComplete = false;
-      this.fetchInProgress = false;         
       this.recordsRead = 0
 	  this.idleTime = 0;
+	  this.fetchSize = fetchSize;
+	  this.totalIdleTime = 0
+	  
+	  this.stagingArea = []
         
     }
-    
+       
     async enqueueTask(task) {
       
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`deligateTask(${task.action})`)
+    // console.log(`deligateTask(${task.action})`)
     
     // Use the Worker to perform the task
       
     const taskComplete = new Promise((resolve,reject) => {
+      const stack = new Error().stack
       this.worker.once('message',(response) => {
-        if (response.success) {
+		if (response.success) {
           resolve(response)
         }
         else {
-          reject(response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : new TeradataError(this.DRIVER_ID,response.cause,task.sql))
+          reject(response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : new TeradataError(this.DRIVER_ID,response.cause,stack,`${response.action}(${this.sqlStatement})`))
         }
       })
     })
@@ -50,45 +47,54 @@ class TeradataReader extends Readable {
     return taskComplete
     
   } 
-  
-  async initialize() {
+ 
+  async doConstruct() {
       
-    const result = await this.enqueueTask({action : "connect", connectionProperties : this.vendorProperties})
-    const response = await this.enqueueTask({action : "query", sql: this.sqlStatement, batchSize: this.highWaterMark})
+    // const result = await this.enqueueTask({action : "connect", connectionProperties : this.vendorProperties})
+    const response = await this.enqueueTask({action : "query", sql: this.sqlStatement, batchSize: this.fetchSize})
     this.stagingArea.push(...response.rows)
 	this.recordsRead+=response.rows.length
+	if (response.streamComplete) {
+      this.stagingArea.push(null)
+	}
+	else {
+      const stack = new Error().stack
+  	  this.worker.on('message', (data) => {
+		if (data.success) {
+		  const recordsRead = data.rows.length 
+		  this.stagingArea.push(...data.rows)
+  		  data.rows.length = 0;
+	      this.recordsRead+= recordsRead
+          if (data.streamComplete) {
+		    this.worker.removeAllListeners('message')
+            this.stagingArea.push(null)
+		  }
+          if (this.readPending) {
+			const idleTime = performance.now() - this.startIdleTime
+			this.totalIdleTime+= idleTime
+    	    // console.log(this.tableName,recordsRead,data.elapsedTime,idleTime,(recordsRead/data.elapsedTime)*1000)
+			this.push(this.stagingArea.shift())
+		  } 
+        }
+        else {
+          throw data.name === 'TeradataError' ? TeradataError.recreateTeradataError(data.cause) : new TeradataError(this.DRIVER_ID,data.cause,stack,`${data.action}(${this.sqlStatement})`)
+        }
+	  })
+	}
   }
     
   async doRead() {
     if (this.stagingArea.length > 0) {
       this.push(this.stagingArea.shift())
-	  if ((this.stagingArea.length < this.lowWaterMark) && (!this.streamComplete) && (!this.fetchInProgress)){
-		this.fetchInProgress = true
-        const response = await this.enqueueTask({action : "fetchMore", batchSize: this.lowWaterMark})
-		this.fetchInProgress = false;          
-        if (response.rows.length > 0) {
-          this.stagingArea.push(...response.rows)
-	      this.recordsRead+=response.rows.length
-        }
-        else {
-          this.streamComplete = true
-        }
-        if (this.readPending) {
-          this.push(this.stagingArea.length > 0 ? this.stagingArea.shift() : null)
-	      const readIdleTime = performance.now() - this.startIdleTime
-  		  this.idleTime += readIdleTime;
-        }
-      }
+	}
+	else {
+      this.readPending = true;
+	  this.startIdleTime = performance.now();
     }
-    else {
-      if (!this.fetchInProgress) { 
-        this.push(null)
-      }
-      else {
-		this.startIdleTime = performance.now()
-        this.readPending = true;
-      }
-    }
+  }
+
+  _construct(callback) {
+    this.doConstruct().then(() => {callback()}).catch((e) => {callback(e)})
   }
     
   _read() {
@@ -97,7 +103,7 @@ class TeradataReader extends Readable {
   
   async doDestroy(e) {
     /// console.log('Read','Destroy',this.recordsRead,this.idleTime);
-	const result = await this.enqueueTask({action : "disconnect"})
+    this.worker.removeAllListeners('message');
   }
 
   _destroy(e,callback) {

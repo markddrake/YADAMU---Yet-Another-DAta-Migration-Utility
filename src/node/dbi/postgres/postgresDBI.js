@@ -62,6 +62,7 @@ import PostgresOutputManager         from './postgresOutputManager.js'
 import PostgresWriter                from './postgresWriter.js'
 import PostgresStatementGenerator    from './postgresStatementGenerator.js'
 import PostgresStatementLibrary      from './postgresStatementLibrary.js'
+import PostgresCompare               from './postgresCompare.js'
 
 class PostgresDBI extends YadamuDBI {
     
@@ -832,6 +833,11 @@ class PostgresDBI extends YadamuDBI {
   async finalizeCopy() {
 	 await super.finalizeCopy()
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `)
+  }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new PostgresCompare(this,configuration)
   }
 
 }

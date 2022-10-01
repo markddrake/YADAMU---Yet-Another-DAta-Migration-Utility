@@ -38,11 +38,6 @@ class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
     super.setConnectionProperties(connectionProperties)
   }
   
-  getContentLength(props) {
-    return props.contentLength
-  }
-
-  
   classFactory(yadamu) {
     return new AzureQA(yadamu,this,this.connectionParameters,this.parameters)
   }

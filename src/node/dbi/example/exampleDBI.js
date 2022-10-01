@@ -33,6 +33,7 @@ import ExampleReader                  from './exampleReader.js'
 import ExampleOutputManager           from './exampleOutputManager.js'
 import ExampleStatementLibrary        from './exampleStatementLibrary.js'
 import ExammpleStatementGenerator     from './exampleStatementGenerator.js'
+import ExammpleCompare                from './exampleCompare.js'
 
 class ExampleDBI extends YadamuDBI {
        
@@ -468,6 +469,11 @@ class ExampleDBI extends YadamuDBI {
   async getConnectionID() {
 	// Get a uniqueID for the current connection
     throw new Error('Unimplemented Method')
+  }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new ExampleCompare(this,configuration)
   }
 	  
 }

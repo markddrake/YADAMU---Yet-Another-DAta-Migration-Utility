@@ -5,7 +5,6 @@
 	"stagingArea": "loader-staging",
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
-	"emptyStringIsNull" : true,
 	"parameters": {
 		"REMOTE_STAGING_AREA"     : "/mnt/stagingArea/loader/csv",
 		"DIRECTORY"               : "loader/csv",

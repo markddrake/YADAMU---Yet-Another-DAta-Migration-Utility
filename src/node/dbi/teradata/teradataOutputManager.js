@@ -56,9 +56,25 @@ class TeradataOutputManager extends YadamuOutputManager {
 			 return col
 		   }	       
 		case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
-		   return (col,idx) => {
-			 return ((typeof col === 'string') && (col[10] === 'T')) ? col.replace('T',' ') : col
-		   }	       
+		  const tz_length = ((dataTypeDefinition.length === 0) || !dataTypeDefinition.hasOwnProperty('length')) ? 19 : (20 + dataTypeDefinition.length)
+		  return (col,idx) => {
+            if (typeof col === 'string') {
+              col = col.slice(0,tz_length) + 'Z'
+            }
+            else {
+              if (col.endsWith('+00:00')) {
+			    if (col.length > tz_length+6) {
+			      col = col.slice(0,tz_length) + '+00:00'
+				}
+			  }
+		      else {
+                // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
+                col = col.toISOString();
+              }
+			}
+            col = (col[10] === 'T') ? col.replace('T',' ') : col 
+            return col
+	      }
 		case this.dbi.DATA_TYPES.DATE_TYPE:
 		   return (col,idx) => {
 			 return typeof col === 'string' ? col.substring(0,10) : col

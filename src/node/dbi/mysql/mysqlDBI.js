@@ -45,6 +45,7 @@ import MySQLWriter                    from './mysqlWriter.js'
 import MySQLOutputManager             from './mysqlOutputManager.js'
 import MySQLStatementGenerator        from './mysqlStatementGenerator.js'
 import MySQLStatementLibrary          from './mysqlStatementLibrary.js'
+import MySQLCompare                   from './mysqlCompare.js'
 
 class MySQLDBI extends YadamuDBI {
    
@@ -758,6 +759,11 @@ class MySQLDBI extends YadamuDBI {
     const results = await this.executeSQL(`select connection_id() "pid"`)
     const pid = results[0].pid;
     return pid
+  }
+  
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new MySQLCompare(this,configuration)
   }
   
 }

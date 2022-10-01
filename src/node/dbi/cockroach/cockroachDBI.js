@@ -62,9 +62,10 @@ import CockroachParser                from '../postgres/postgresParser.js'
 import CockroachError                 from './cockroachException.js'
 import CockroachConstants             from './cockroachConstants.js'
 import CockroachDataTypes             from './cockroachDataTypes.js'
+import CockroachWriter                from './cockroachWriter.js'
 import CockroachStatementLibrary      from './cockroachStatementLibrary.js'
 import CockroachStatementGenerator    from './cockroachStatementGenerator.js'
-import CockroachWriter                from './cockroachWriter.js'
+import CockroachCompare               from './cockroachCompare.js'
 
 class CockroachDBI extends YadamuDBI {
     
@@ -920,6 +921,12 @@ class CockroachDBI extends YadamuDBI {
 	 await super.finalizeCopy()
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `)
   }
+  
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new CockroachCompare(this,configuration)
+  }
+	  
 
 }
 

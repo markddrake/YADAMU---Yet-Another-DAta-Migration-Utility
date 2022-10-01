@@ -12,6 +12,8 @@ import Yadamu             from '../core/yadamu.js';
 import YadamuLogger       from '../core/yadamuLogger.js';
 import YadamuConstants    from '../lib/yadamuConstants.js';
 import YadamuLibrary      from '../lib/yadamuLibrary.js';
+import YadamuCompare      from '../dbi/base/yadamuCompare.js'
+
 
 import {
   CommandLineError, 
@@ -21,8 +23,6 @@ import {
 import {
   FileNotFound
 }                         from '../dbi/file/fileException.js';
-
-// import YadamuCompare      from '../../qa/core/yadamuQA.js'
 
 
 /*
@@ -104,6 +104,7 @@ class YadamuCLI {
     , "COPY"         : Object.freeze(['COPY'])
     , "TEST"         : Object.freeze(['TEST'])
     , "SERVICE"      : Object.freeze([])
+    , "COMPRARE"      : Object.freeze([])
     })
     return this._SUPPORTED_ARGUMENTS
   }
@@ -122,6 +123,7 @@ class YadamuCLI {
     , "COPY"           : Object.freeze(['CONFIG'])
     , "TEST"           : Object.freeze(['CONFIG'])
     , "SERVICE"        : Object.freeze([])
+    , "COMPARE"        : Object.freeze([])
     , "CONNECTIONTEST" : Object.freeze(['CONFIG','RDBMS'])
     , "ENCRYPT"        : Object.freeze([])
     , "DECRYPT"        : Object.freeze([])
@@ -141,6 +143,7 @@ class YadamuCLI {
     , "COPY"      : Object.freeze(['FILE',"FROM_USER","TO_USER"])
     , "TEST"      : Object.freeze(['FILE',"FROM_USER","TO_USER"])
     , "SERVICE"   : Object.freeze([])
+    , "COMPARE"   : Object.freeze([])
     })
     return this._ILLEGAL_ARGUMENTS
   }
@@ -172,6 +175,7 @@ class YadamuCLI {
 	  case 'COPY':
 	  case 'TEST':
 	  case 'SERVICE':
+	  case 'COMPARE':
 	    this.command = this.getOperation(className);
 	    break;
       default:
@@ -569,11 +573,17 @@ class YadamuCLI {
 	else {
 	  const sourceDBI = await this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,sourceParameters)
       const targetDBI = await this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection,targetParameters)    
-      await this.yadamu.doCopy(sourceDBI,targetDBI);      
+      await this.yadamu.doCopy(sourceDBI,targetDBI);       
     }
     this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
   }
-
+  
+  async doCompare() {
+     const compareDBI = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+	 const comparator = await compareDBI.getComparator({});
+	 await comparator.doCompare()
+  }
+	  
   async doCopy() {
   
     const configuration = this.loadConfigurationFile()
@@ -581,7 +591,7 @@ class YadamuCLI {
 	await this.yadamu.initialize(configuration.parameters || {})
     const startTime = performance.now();
     for (const job of configuration.jobs) {
-	  await executeJob(configuration,job)
+	  await this.executeJob(configuration,job)
     }
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete: Configuration:"${this.yadamu.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);

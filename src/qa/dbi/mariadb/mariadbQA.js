@@ -12,11 +12,6 @@ import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 
 class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
 
-    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
-    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
-    static get SQL_SUCCESS()               { return _SQL_SUCCESS }
-    static get SQL_FAILED()                { return _SQL_FAILED }
-
 	static #_DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
@@ -48,33 +43,6 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
       await this.executeSQL(createUser,{});      
     }   
 	
-    async compareSchemas(source,target,rules) {
-
-      const report = {
-        successful : []
-       ,failed     : []
-      }
-
-      const compareRules =  JSON.stringify(this.yadamu.getCompareRules(rules))
-
-      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])
-
-      const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})
-      report.successful = successful
-     
-      const failed = await this.executeSQL(MariadbQA.SQL_FAILED,{})
-      report.failed = failed
-
-      return report
-    }
-
-    async getRowCounts(target) {
-
-      const results = await this.executeSQL(MariadbQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
-      return results
-      
-    }
-    
 	classFactory(yadamu) {
       return new MariadbQA(yadamu,this,this.connectionParameters,this.parameters)
     }
@@ -103,25 +71,3 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
 }
 
 export { MariadbQA as default }
-
-const _SQL_SUCCESS =
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
-  from SCHEMA_COMPARE_RESULTS 
- where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
-   and MISSING_ROWS = 0
-   and EXTRA_ROWS = 0
-   and NOTES is NULL
-order by TABLE_NAME`;
-
-const _SQL_FAILED = 
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, NOTES
-  from SCHEMA_COMPARE_RESULTS 
- where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-    or MISSING_ROWS <> 0
-    or EXTRA_ROWS <> 0
-    or NOTES is NOT NULL
- order by TABLE_NAME`;
-
-const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
-
-const _SQL_COMPARE_SCHEMAS =  `CALL COMPARE_SCHEMAS(?,?,?);`;

@@ -11,7 +11,8 @@ import {
   Worker,                              
   isMainThread,                        
   parentPort,                          
-  workerData                           
+  workerData,
+  MessageChannel  
 }                                     from 'worker_threads';
 
 /* 
@@ -66,12 +67,11 @@ class TeradataDBI extends _TeradataDBI {
     super(yadamu,manager,connectionSettings,parameters)
   }
   
-  async enqueueTask(task,psuedoSQL) {
+  async enqueueTask(task) {
 	  
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`deligateTask(${task.action})`)
 	
-	// Use the Worker to perform the task
-      
+	// Deligate the task to the worker
+	
 	const taskComplete = new Promise((resolve,reject) => {
 	  this.worker.once('message',(response) => {
 	    if (response.success) {
@@ -82,23 +82,35 @@ class TeradataDBI extends _TeradataDBI {
 	    }
       })
 	})
-	// console.log(`enqueueTask(${task.action})`,task.sql)
-    this.worker.postMessage(task)
-    return taskComplete
-	
+	this.worker.postMessage(task)
+	return taskComplete
   }	
 
-  getTeradataWorker() {
-	return new Worker(path.resolve(path.join(__dirname, 'teradataWorker.js')),{workerData: {}})
+  async getTeradataWorker() {
+	const worker = new Worker(path.resolve(path.join(__dirname, 'teradataWorker.js')),{workerData: {}})
+	
+	/*
+	**
+	** Set up a back channel for console logging
+	** 
+	
+	this.consoleChannel = new MessageChannel();
+	this.consoleChannel.port2.on('message',(message) => { console.log("WORKER",message)})
+	worker.postMessage({action: 'console', payload: this.consoleChannel.port1},[this.consoleChannel.port1])
+	
+	**
+	*/
+	
+    return worker
   }
- 
+
   async getConnectionFromPool() {
 
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     //  Do not Configure Connection here. 
 
-	this.worker = this.getTeradataWorker()
+	this.worker = await this.getTeradataWorker()
     this.SQL_TRACE.comment(`Enqueue: connect()`)
 
 	const result = await this.enqueueTask({action : "connect", connectionProperties : this.vendorProperties})
@@ -109,24 +121,29 @@ class TeradataDBI extends _TeradataDBI {
 	  
     this.SQL_TRACE.comment( `enqueueTask :disconnect()`)
 	
-    const result =  (this.worker) ? await this.enqueueTask({action : "disconnect" }) : undefined
-	
 	if (this.worker) {
+	  // this.yadamuLogger.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminating Worker')
+	  
 	  /*
 	  **
-	  ** Causes Node Crash
-	  ** kpedbg_dmp_stack()+396<-kpeDbgCrash()+129<-kpeDbgSignalHandler()+125<-skgesig_Win_UnhandledExceptionFilter()+158<-0x00007FFAD63D2991<-0x00007FFAD8B6A76C<-0x00007FFAD8B537D6<-0x00007FFAD8B686EF<-0x00007FFAD8AF5AEA<-0x00007FFAD8B676FE<-0x00007FFA977C2520
-	
-	  this.yadamuLogger.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminating Worker')
-      await this.worker.terminate()
-      this.yadamuLogger.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminated')
-
+	  ** Tear down the back channel for console messages
 	  **
-  	  */
+
+      this.consoleChannel.port2.removeAllListeners('message')
+      this.consoleChannel.port1.close()
+      this.consoleChannel.port1.unref()
+      this.consoleChannel.port2.unref()
 	  
+	  this.worker.removeAllListeners('message')
+ 	  
+	  **
+	  */
+	  await this.enqueueTask({action : "disconnect" })
+      this.worker.unref()
       this.worker = undefined
+
+      // this.yadamuLogger.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminated')	  
 	}
-	return result
   }
     
   async closePool(options) { /* Teradata-SDK does not support connection pooling */ }
@@ -152,14 +169,11 @@ class TeradataDBI extends _TeradataDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
 	try {
-	  const worker = this.getTeradataWorker()
-      const is = new TeradataReader(worker,this.vendorProperties,tableInfo.SQL_STATEMENT)
-	  await is.initialize()
+	  const is = new TeradataReader(this.worker,this.vendorProperties,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)
 	  return is
 	} catch (e) {
 	  throw this.trackExceptions(new TeradataError(this.DRIVER_ID,e,tableInfo.SQL_STATEMENT))
 	}
-    
   }  
   
   async setWorkerConnection() {    
@@ -170,10 +184,6 @@ class TeradataDBI extends _TeradataDBI {
   classFactory(yadamu) {
 	return new TeradataDBI(yadamu,this,this.connectionParameters,this.parameters)
   } 
-  
-  async destroy() {
-	await super.destroy()
-  }
   
 }
  

@@ -13,11 +13,6 @@ import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 
 class VerticaQA extends YadamuQALibrary.qaMixin(VerticaDBI) {
     
-    // static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
-    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
-    static get SQL_SUCCESS()               { return _SQL_SUCCESS }
-    static get SQL_FAILED()                { return _SQL_FAILED }
-
     static #_DBI_PARAMETERS
     
     static get DBI_PARAMETERS()  { 
@@ -28,35 +23,6 @@ class VerticaQA extends YadamuQALibrary.qaMixin(VerticaDBI) {
     get DBI_PARAMETERS() {
       return VerticaQA.DBI_PARAMETERS
     }   
-    
-    SQL_SCHEMA_TABLE_ROWS(schema) { return `with num_rows as (
-    select schema_name,    
-           anchor_table_name as table_name,
-           sum(total_row_count) as rows
-      from v_monitor.storage_containers sc
-      join v_catalog.projections p
-           on sc.projection_id = p.projection_id
-           and p.is_super_projection = true
-    where schema_name = '${schema}'
-     group by schema_name,
-              table_name,
-              sc.projection_id
-),
-tables_with_rows as (
-  select schema_name, table_name, max(rows) as rows
-    from num_rows
-   group by schema_name,
-         table_name
-)
-select t.table_schema, t.table_name, case when rows is null then 0 else rows end
-  from tables_with_rows twr
-       right outer join v_catalog.tables t
-                on t.table_schema = twr.schema_name
-               and t.table_name = twr.table_name 
-  where t.table_schema = '${schema}'
-
-`
-    }
     
     constructor(yadamu,manager,connectionSettings,parameters) {
        super(yadamu,manager,connectionSettings,parameters);
@@ -75,12 +41,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       }
       await this.createSchema(this.parameters.TO_USER);    
     }      
-
-    async getRowCounts(target) {
-      const results = await this.executeSQL(this.SQL_SCHEMA_TABLE_ROWS(target.schema));
-      return results.rows
-    }    
-
+	
     buildColumnLists(schemaMetadata,rules) {
 		
 	  const compareInfo = {}
@@ -112,44 +73,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       })
 	  return compareInfo
     }
-
-    async compareSchemas(source,target,rules) {
-		
-      const report = {
-        successful : []
-       ,failed     : []
-      }
-	  
-	  const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION(source.schema))
-	  let compareInfo = this.buildSchemaInfo(results.rows)
-	 	  
-      const compareOperations = this.buildColumnLists(compareInfo,rules) 
-	  
-      const compareResults = await Promise.all(Object.keys(compareOperations).map(async (TABLE_NAME) => {
-        const sqlStatement =
-`select 
-  '${TABLE_NAME}' "TABLE_NAME",
-  (select count(*) from "${source.schema}"."${TABLE_NAME}") SOURCE_ROWS,
-  (select count(*) from "${target.schema}"."${TABLE_NAME}") TARGET_ROWS,
-  (select count(*) from (select ${compareOperations[TABLE_NAME]} from "${source.schema}"."${TABLE_NAME}" except select ${compareOperations[TABLE_NAME]} from "${target.schema}"."${TABLE_NAME}") T1) EXTRA_ROWS,
-  (select count(*) from (select ${compareOperations[TABLE_NAME]} from "${target.schema}"."${TABLE_NAME}" except select ${compareOperations[TABLE_NAME]} from "${source.schema}"."${TABLE_NAME}") T2) MISSING_ROWS`;
-        return this.executeSQL(sqlStatement);
-     }))
-	 
-	 
-     compareResults.forEach((results,idx) => {
-        const compareResult =  results.rows[0]
-        if ((parseInt(compareResult[1]) === parseInt(compareResult[2])) && (parseInt(compareResult[3]) === 0) && (parseInt(compareResult[4])  === 0)) {
-          report.successful.push(new Array(source.schema,target.schema,compareResult[0],compareResult[2]))
-        }
-        else {
-          report.failed.push(new Array(source.schema,target.schema,...compareResult,''))
-        }
-      })
-     
-      return report
-    }
-        
+ 
     classFactory(yadamu) {
       return new VerticaQA(yadamu,this,this.connectionParameters,this.parameters)
     }
@@ -178,44 +102,3 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 }
 
 export { VerticaQA as default }
-
-const _SQL_SUCCESS =
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
-   from SCHEMA_COMPARE_RESULTS 
-  where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
-    and MISSING_ROWS = 0
-    and EXTRA_ROWS = 0
-    and SQLERRM is NULL
- order by TABLE_NAME`;
-
-const _SQL_FAILED = 
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS,  SQLERRM
-   from SCHEMA_COMPARE_RESULTS 
-  where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-     or MISSING_ROWS <> 0
-      or EXTRA_ROWS <> 0
-    or SQLERRM is NOT NULL
-  order by TABLE_NAME`;
-
-const _SQL_SCHEMA_TABLE_ROWS = 
-`with num_rows as (
-    select schema_name,
-           anchor_table_name as table_name,
-           sum(total_row_count) as rows
-    from v_monitor.storage_containers sc
-    join v_catalog.projections p
-         on sc.projection_id = p.projection_id
-         and p.is_super_projection = true
-    where schema_name = ?
-    group by schema_name,
-             table_name,
-             sc.projection_id
-)
-select schema_name,
-       table_name,
-       max(rows) as rows
-from num_rows
-group by schema_name,
-         table_name;`
-
-const _SQL_COMPARE_SCHEMAS = `call COMPARE_SCHEMA($1,$2,$3)`

@@ -34,6 +34,7 @@ import SnowflakeWriter                from './snowflakeWriter.js'
 import SnowflakeOutputManager         from './snowflakeOutputManager.js'
 import SnowflakeStatementGenerator    from './snowflakeStatementGenerator.js'
 import SnowflakeStatementLibrary      from './snowflakeStatementLibrary.js'
+import SnowflakeCompare               from './snowflakeCompare.js'
 
 class SnowflakeDBI extends YadamuDBI {
 
@@ -611,6 +612,15 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     await super.finalizeCopy()
 	const sqlStatement = this.statementLibrary.SQL_DROP_STAGE
     const  results = await this.executeSQL(sqlStatement)
+  }
+
+  getSchema(schemaInfo) {
+	return schemaInfo
+  }
+  
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new SnowflakeCompare(this,configuration)
   }
     
 }

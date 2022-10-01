@@ -1988,6 +1988,15 @@ class YadamuDBI extends EventEmitter {
           
   async finalizeCopy() {
   }
+
+  getSchema(schemaInfo) {
+	return schemaInfo.schema || (schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
+  }
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new YadamuCompare(this,configuration)
+  }
   
 }
 

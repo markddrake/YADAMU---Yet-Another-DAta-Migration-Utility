@@ -38,10 +38,6 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
     super.setConnectionProperties(connectionProperties)
   }
   
-  getContentLength(props) {
-    return props.ContentLength
-  }
-
   classFactory(yadamu) {
     return new AWSS3QA(yadamu,this,this.connectionParameters,this.parameters)
   }}

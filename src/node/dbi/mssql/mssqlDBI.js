@@ -69,8 +69,11 @@ import MsSQLStatementGenerator        from './mssqlStatementGenerator.js'
 import MsSQLReader                    from './mssqlReader.js'
 import MsSQLFileLoader                from './mssqlFileLoader.js'
 import MsSQLStatementLibrary          from './mssqlStatementLibrary.js'
+import MsSQLCompare                   from './mssqlCompare.js'
 
-import {ConnectionError} from '../../core/yadamuException.js'
+import {
+  ConnectionError
+}                                     from '../../core/yadamuException.js'
 
 
 class MsSQLDBI extends YadamuDBI {
@@ -1519,6 +1522,15 @@ class MsSQLDBI extends YadamuDBI {
     const pid = results.recordset[0].SPID
     return pid
   }  
+
+  getSchema(schemaInfo) {
+	return schemaInfo
+  }
+  
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new MsSQLCompare(this,configuration)
+  }
   
 }
 

@@ -34,6 +34,7 @@ import MongoOutputManager            from './mongoOutputManager.js'
 import MongoWriter                   from './mongoWriter.js'
 import MongoParser                   from './mongoParser.js'
 import MongoStatementGenerator       from './mongoStatementGenerator.js'
+import MongoCompare                  from './mongoCompare.js'
 
 /*
 **
@@ -172,7 +173,6 @@ class MongoDBI extends YadamuDBI {
   async connect(options) {
 
     // Wrapper for client.db()
-    
 	let stack
     options.useUnifiedTopology = true
     const operation = `new MongoClient.connect(${this.getMongoURL()}))\n`
@@ -236,7 +236,6 @@ class MongoDBI extends YadamuDBI {
   async dropDatabase(options) {
 
     // Wrapper for db.dropDatabase()
-
     
 	let stack
     const operation = `dropDatabase()`
@@ -445,7 +444,7 @@ class MongoDBI extends YadamuDBI {
   async testConnection() {   
     // ### Test Database connection
 	try {
-      await this.connect(this.vendorProperties)
+      await this.connect()
       await this.closePool()
 	} catch (e) {
       throw e;
@@ -456,7 +455,6 @@ class MongoDBI extends YadamuDBI {
   async createConnectionPool() {
 
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`createConnectionPool()`)
-      
     this.logConnectionProperties()
     const poolSize = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 5
     this.vendorProperties.options = typeof this.vendorProperties.options === 'object' ? this.vendorProperties.options : {}
@@ -483,7 +481,6 @@ class MongoDBI extends YadamuDBI {
   }
   
   async closePool(options) {
-
    	let stack
 	let operation = 'MongoClient.close()'
     try {
@@ -906,6 +903,11 @@ class MongoDBI extends YadamuDBI {
     })
     return dbMappings;    
   } 
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new MongoCompare(this,configuration)
+  }
   
 }
 

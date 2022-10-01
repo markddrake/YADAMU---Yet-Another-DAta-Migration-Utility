@@ -131,9 +131,17 @@ class DB2OutputManager extends YadamuOutputManager {
 		case this.dbi.DATA_TYPES.CLOB_TYPE:
 		case this.dbi.DATA_TYPES.NCLOB_TYPE:
 	      return (col,idx) => {
-			// https://github.com/ibmdb/node-ibm_db/issues/875
+			/*
+     		**
+		    ** Starting with ibm_db release 3.x empty strings are handled correctly
+		    **
+		   
+			// https://github.com/ibmdb/node-ibm_db/issues/875 
 			// Disable Batch Mode if data contains empty strings 
-			this.tableInfo.insertMode = ((col.length > 0) || (this.tableInfo.insertMode !== 'Batch')) ?  this.tableInfo.insertMode : 'Iterative'
+			this.tableInfo.insertMode = ((col.length > 0) || (this.tableInfo.instMode !== 'Batch')) ?  this.tableInfo.insertMode : 'Iterative'
+			
+			**
+			*/
 			return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
 	    case this.dbi.DATA_TYPES.SPATIAL_TYPE:
@@ -152,7 +160,7 @@ class DB2OutputManager extends YadamuOutputManager {
               case "GeoJSON":
                 paramDefinition.SQLType = this.dbi.DATA_TYPES.CLOB_TYPE
 		        return (col,idx) => {
-			      return typeof col === 'object' ? val = JSON.stringify(col) : col
+			      return typeof col === 'object' ? JSON.stringify(col) : col
 		        }
               default :
                 return null

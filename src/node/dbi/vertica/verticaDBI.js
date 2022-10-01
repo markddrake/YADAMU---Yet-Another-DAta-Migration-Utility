@@ -53,6 +53,7 @@ import VerticaWriter                 from './verticaWriter.js'
 import VerticaOutputManager          from './verticaOutputManager.js'
 import VerticaStatementGenerator     from './verticaStatementGenerator.js'
 import VerticaStatementLibrary       from './verticaStatementLibrary.js'
+import VerticaCompare                from './verticaCompare.js'
 
 import { 
   VerticaError,
@@ -692,6 +693,11 @@ class VerticaDBI extends YadamuDBI {
 	}
 	return metrics
   }    
+
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new VerticaCompare(this,configuration)
+  }
 
 }
 

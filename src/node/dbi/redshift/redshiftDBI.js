@@ -57,6 +57,7 @@ import RedshiftWriter                from './redshiftWriter.js'
 import RedshiftOutputManager         from './redshiftOutputManager.js'
 import RedshiftStatementGenerator    from './redshiftStatementGenerator.js'
 import RedshiftStatementLibrary      from './redshiftStatementLibrary.js'
+import RedshiftCompare               from './redshiftCompare.js'
 
 class RedshiftDBI extends YadamuDBI {
     
@@ -704,6 +705,11 @@ class RedshiftDBI extends YadamuDBI {
 	return metrics
   }
   
+  async getComparator(configuration) {
+	 await this.initialize()
+	 return new RedshiftCompare(this,configuration)
+  }
+
 }
 
 export { RedshiftDBI as default }

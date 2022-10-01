@@ -26,7 +26,8 @@
 		"mariadb": "../dbi/mariadb/mariadbDBI.js",
 		"mongodb": "../dbi/mongodb/mongoDBI.js",
 		"snowflake": "../dbi/snowflake/snowflakeDBI.js",
-		"teradata": "../dbi/teradata/worker/teradataDBI.js"
+		"teradata": "../dbi/teradata/worker/teradataDBI.js",
+		"yugabyte": "../dbi/yugabyte/yugabyteDBI.js"
 	},
 	"ddlEnabled": [
 		"oracle"

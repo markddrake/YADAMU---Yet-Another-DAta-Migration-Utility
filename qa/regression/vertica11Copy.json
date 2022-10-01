@@ -5,7 +5,6 @@
 	"stagingArea": "loader-staging",
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
-	"emptyStringIsNull" : true,
 	"parameters": {
 		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
 		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
