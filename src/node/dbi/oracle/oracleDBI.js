@@ -112,7 +112,6 @@ class OracleDBI extends YadamuDBI {
   get CACHELOB_BATCH_LIMIT()       { return this.parameters.CACHELOB_BATCH_LIMIT        || OracleConstants.CACHELOB_BATCH_LIMIT}
   get LOB_MAX_SIZE()               { return this.parameters.LOB_MAX_SIZE                || OracleConstants.LOB_MAX_SIZE}
 
-
   /*
   **
   ** Use this.DATA_TYPES.storageOptions.XML_TYPE to determine how XML content is stored in the database.

@@ -313,6 +313,7 @@ class YadamuOutputManager extends Transform {
           await this.processRow(obj.data)
 	    } catch (e) {
           switch (this.dbi.ON_ERROR) {
+			case 'RETRY':
             case 'SKIP':
             case 'FLUSH':
         	  // Ignore the error 

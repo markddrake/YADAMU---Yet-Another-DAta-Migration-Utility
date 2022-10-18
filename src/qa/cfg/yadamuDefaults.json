@@ -4,7 +4,7 @@
 	,   "ENCRYPTION" : false
 	},
 	"yadamuDBI": {
-		"ON_ERROR": "FLUSH",
+		"ON_ERROR": "RETRY",
 		"FEEDBACK": "COMMIT",
 		"COMMIT_RATIO": 5,
 		"BATCH_LIMIT" : 3

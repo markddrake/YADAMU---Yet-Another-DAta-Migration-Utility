@@ -1,0 +1,28 @@
+.set WIDTH 256
+--
+DELETE DATABASE YADAMU ALL;
+--
+DROP DATABASE YADAMU;
+--
+CREATE DATABASE YADAMU AS PERM = 1 * 1024 * 1024;
+--
+GRANT CREATE PROCEDURE ON YADAMU TO DBC;
+--
+set session database YADAMU;
+--
+.compile file = src/install/teradata/sql/SP_MAP_DATATYPE.sql;
+--
+.compile file = src/install/teradata/sql/SP_GENERATE_STATEMENTS.sql
+--
+.compile file = src/install/teradata/sql/SP_RECREATE_DATABASE.sql;
+--
+DELETE DATABASE YADAMU_QA ALL;
+--
+DROP DATABASE YADAMU_QA;
+--
+CREATE DATABASE YADAMU_QA AS PERM = 100 * 1024 * 1024 * 2014;
+--
+GRANT CREATE PROCEDURE ON YADAMU TO DBC;
+--
+GRANT ALL ON YADAMU_QA TO DBC WITH GRANT OPTION;
+--

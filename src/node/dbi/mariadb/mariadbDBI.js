@@ -357,7 +357,7 @@ class MariadbDBI extends YadamuDBI {
 		super.beginTransaction()
 		break
       } catch (e) {
-		const cause = MariadbError(e,stack,'mariadb.Connection.beginTransaction()')
+		const cause = new MariadbError(e,stack,'mariadb.Connection.beginTransaction()')
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

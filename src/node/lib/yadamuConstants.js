@@ -53,7 +53,7 @@ class YadamuConstants {
   }
   
   static get ABORT_CURRENT_TABLE() {
-	this._ABORT_CURRENT_TABLE  = this._ABORT_CURRENT_TABLE || Object.freeze(['ABORT','SKIP'])
+	this._ABORT_CURRENT_TABLE  = this._ABORT_CURRENT_TABLE || Object.freeze(['ABORT','SKIP','RETRY'])
 	return this._ABORT_CURRENT_TABLE
   }
   

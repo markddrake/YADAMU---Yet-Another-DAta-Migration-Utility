@@ -821,7 +821,7 @@ values(
   'fat & (rat | cat)'::tsquery
 );
 select YADAMU.AS_JSON(tsvector_col) from t_postgres.ts_search_types;
-select YADAMU.AS_TSVECTOR(YADAMU.AS_JSON(tsvector_col)) from t_postgres.ts_search_types;
+select YADAMU.AS_TS_VECTOR(YADAMU.AS_JSON(tsvector_col)) from t_postgres.ts_search_types;
 --
 -- 8.17. Range Types
 --

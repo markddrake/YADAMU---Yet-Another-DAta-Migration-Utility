@@ -159,6 +159,8 @@ class YadamuDBI extends EventEmitter {
   get SQL_TRACE()                    { return this._SQL_TRACE }
   set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
   get SQL_CUMLATIVE_TIME()           { return this.SQL_TRACE.SQL_CUMLATIVE_TIME }
+  
+  get SQL_TRUNCATE_TABLE_OPERATION() { return 'TRUNCATE TABLE' }
         
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
@@ -717,6 +719,10 @@ class YadamuDBI extends EventEmitter {
     this.latestError = undefined
   }
    
+  raisedError(error) {
+	return error === this.latestError
+  }
+  
   setSystemInformation(systemInformation) {
     this.systemInformation = systemInformation
   }
@@ -972,7 +978,7 @@ class YadamuDBI extends EventEmitter {
     }
     return results;
   }
-  
+    
   async skipDDLOperations() {
      this.emit(YadamuConstants.DDL_UNNECESSARY,performance.now,[])
   }
@@ -999,7 +1005,21 @@ class YadamuDBI extends EventEmitter {
   prepareDDLStatements(ddlStatements) {
     return ddlStatements
   }
-    
+  
+  async truncateTable(schema,tableName) {
+	 
+	if (this.TRANSACTION_IN_PROGRESS) {
+	  await this.rollbackTransaction()
+	}
+	
+	const sqlStatement = `${this.SQL_TRUNCATE_TABLE_OPERATION} "${schema}"."${tableName}"`
+	
+	await this.beginTransaction()
+	await this.executeSQL(sqlStatement)
+	await this.commitTransaction()
+	// await this.beginTransaction()
+  }
+	    
   analyzeStatementCache(statementCache,startTime) {
   
     let dmlStatementCount = 0
