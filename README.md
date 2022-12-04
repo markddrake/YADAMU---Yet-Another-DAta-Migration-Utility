@@ -15,13 +15,11 @@ Supported Databases :
 * Oracle 18c
 * Oracle 12cR2
 * Oracle 11gR2
-* Microsoft SQL Server 2014
-* Microsoft SQL Server 2017
-* Microsoft SQL Server 2019
+* Microsoft SQL Server 2014 - Microsoft SQL Server 2022
 * Postgres 11 through Postgres 14
 * MySQL 8.0.12 and later
 * MariaDB 5.5 and later
-* MongoDB 4.0 and later
+* MongoDB 4.0 and later1
 * Snowflake Data Warehouse
 * Vertica 9 through Vertica 11
 * DB2 11 LUW
