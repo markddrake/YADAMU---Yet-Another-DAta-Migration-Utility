@@ -153,6 +153,10 @@ class MongoDBI extends YadamuDBI {
     }
     return results;
   }    
+  
+   async truncateTable(schema,collectionName) {	 
+	await this.deleteMany(collectionName)
+  }
    
    traceMongo(apiCall) {
     return `MongoClient.db(${this.connection?.databaseName || this.vendorProperties.database }).${apiCall}\n`
@@ -441,6 +445,26 @@ class MongoDBI extends YadamuDBI {
     }
   }
     
+  async deleteMany(schema,collectionName) {
+	 
+    // Wrapper for db.collection().deleteMany({})
+
+	let stack
+    const operation = `${collectionName}.deletetMany({})`
+	const writeConcern = options?.writeConcern || {w:1} 
+    try {
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      options = options === undefined ? {writeConcern: writeConcern} : (options.writeConcern === undefined ? Object.assign (options, {writeConcern:writeConcern} ) : options)
+      let sqlStartTime = performance.now()
+	  stack =  new Error().stack
+      const results = await this.connection.collection(collectionName).deleteMany({},options)
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      return results;
+    } catch (e) {
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+    }
+  }
+	
   async testConnection() {   
     // ### Test Database connection
 	try {

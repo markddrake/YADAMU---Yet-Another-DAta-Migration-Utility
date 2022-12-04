@@ -148,26 +148,6 @@ services:
       - ORA1120-01-DIAG:/opt/oracle/diag
     restart: always
 
-  MSSQL17-01: 
-    container_name: MSSQL17-01
-    image:  mcr.microsoft.com/mssql/server:2017-latest
-    mem_limit: '10gb'
-    shm_size: '4gb'
-    security_opt:
-      - seccomp:unconfined
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "1433:1433"
-    environment:
-      ACCEPT_EULA: Y
-      MSSQL_MEMORY_LIMIT_MB: 16384
-      SA_PASSWORD: oracle#1
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - MSSQL17-01-VOLUME:/var/opt/mssql 
-    restart: always
-
   MSSQL19-01: 
     container_name: MSSQL19-01
     image:  mcr.microsoft.com/mssql/server:2019-latest
@@ -186,6 +166,26 @@ services:
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
       - MSSQL19-01-VOLUME:/var/opt/mssql
+    restart: always
+
+  MSSQL22-01: 
+    container_name: MSSQL22-01
+    image:  mcr.microsoft.com/mssql/server:2022-latest
+    mem_limit: '10gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "1435:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL22-01-VOLUME:/var/opt/mssql
     restart: always
 
   PGSQL14-01: 
@@ -366,8 +366,8 @@ volumes:
   ORA1220-01-DIAG:
   ORA1120-01-DATA:
   ORA1120-01-DIAG:
-  MSSQL17-01-VOLUME:
   MSSQL19-01-VOLUME:
+  MSSQL22-01-VOLUME:
   PGSQL14-01-VOLUME:
   MYSQL80-01-VOLUME:
   MARIA10-01-CONF:

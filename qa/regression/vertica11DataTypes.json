@@ -48,7 +48,7 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "mssql17"
+    "source"          : "mssql22"
   , "target"          : "vertica11"
   , "tasks": [ 
       "postgresDataTypes"

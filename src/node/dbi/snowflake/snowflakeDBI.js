@@ -223,9 +223,8 @@ class SnowflakeDBI extends YadamuDBI {
 
 	  const stack = new Error().stack;
       const sqlStartTime = performance.now()
-	  this.connection.execute({
+	  const statement = {
         sqlText        : sqlStatement
-      , binds          : args
 	  , fetchAsString  : ['Number','Date','JSON']
       , complete       : async (err,statement,rows) => {
 		                   const sqlEndTime = performance.now()
@@ -250,7 +249,10 @@ class SnowflakeDBI extends YadamuDBI {
                              resolve(rows)
 						   }
 				         }    
-      })
+      }
+	  // console.log(JSON.stringify(statement))
+      statement.binds = args
+	  this.connection.execute(statement)
     })
   }  
 

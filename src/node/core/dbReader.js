@@ -141,7 +141,7 @@ class DBReader extends Readable {
 	  yadamuPipeline.push(...outputStreams)
       activeStreams.push(...yadamuPipeline.map((s) => { return finished(s) }))
     } catch (e) {
-      this.yadamuLogger.handleException(['PIPELINE','STREAM INITIALIZATION',task.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],e)
+      this.yadamuLogger.handleException(['PIPELINE','STREAM INITIALIZATION',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],e)
       throw (e)
     }
  	
@@ -155,16 +155,16 @@ class DBReader extends Readable {
 	  this.activeReaders.add(activeReader)
 	  // Pass the Reader to the YadamuWriter instance so it can calculate lost rows correctly in the event of an error
 	  this.setReader(yadamuPipeline)
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
       pipelineMetrics.pipeStartTime = performance.now();
 	  await pipeline(...yadamuPipeline)
 	  pipelineMetrics.pipeEndTime = performance.now();
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
 	  
 	  
 	} catch (err) {
 	  
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME,readerDBI.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
 	  
 	  // Wait for any outstanding DDL operations to complete. Throw DDL errors. If the DDL phase was successful this becomes a no-op.
 	  
@@ -183,7 +183,7 @@ class DBReader extends Readable {
       // this.yadamuLogger.trace([this.constructor.name,'PIPELINE','FAILED','STREAMS_COMPLETE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,readerDBI.getWorkerNumber(),task.TABLE_NAME,`${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}`],'COMPLETED')
       
       // console.log(pipelineMetrics)
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:[${s.readableLength},${s.writableLength}]` }).join(',')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:[${s.readableLength},${s.writableLength}]` }).join(',')}`)
 	  
 	  // Determine the underlying cause of the error.
 	  const cause = pipelineMetrics.readerError || pipelineMetrics.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error})?.underlyingError || err
@@ -191,7 +191,7 @@ class DBReader extends Readable {
 	  
  
 	  // Verify all components of the pipeline have been destroyed. 
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
       // yadamuPipeline.map((s) => { if (!s.destroyed){ s.destroy(cause)})	    
 
       if (readerDBI.ON_ERROR === 'ABORT') {
@@ -205,7 +205,7 @@ class DBReader extends Readable {
 
       }
 	  else {
-        this.yadamuLogger.handleException(['PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
+        this.yadamuLogger.handleException(['PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],cause)
 	  }
 	  
 	  if (retryOnError) {

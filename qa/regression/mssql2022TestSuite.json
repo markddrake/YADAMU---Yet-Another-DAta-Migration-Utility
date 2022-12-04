@@ -3,24 +3,20 @@
 	"connections": "connections.json",
 	"tasks": "tasks.json",
 	"recreateSchema": true,
-	"parameters": {},
-	"tests": [
-		{
+	"tests": [{
 			"operation": "import",
 			"source": "file-staging",
-			"target": "tera#1",
+			"target": "mssql22",
 			"verifyOperation": true,
 			"parameters": {
-				"DIRECTORY": "export/json/%location%",
-				"XML_STORAGE_MODEL": "VARIANT"
+				"DIRECTORY": "export/json/%location%"
 			},
 			"tasks": [
 				"oracle",
 				"mysql",
 				"mssql"
 			]
-		},
-		{
+		},{
 			"operation": "export",
 			"recreateSchema": true,
 			"createDirectory": true,
@@ -28,11 +24,8 @@
 			"parameters": {
 				"DIRECTORY": "%operation%/%mode%/%connection%"
 			},
-			"source": "tera#1",
+			"source": "mssql22",
 			"target": "file-staging",
-			"parameters": {
-				"DIRECTORY": "%operation%/json/%vendor%"
-			},
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -40,7 +33,7 @@
 			]
 		},{
 			"source": "oracle19c",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -48,7 +41,7 @@
 			]
 		},{
 			"source": "oracle18c",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -56,7 +49,7 @@
 			]
 		},{
 			"source": "oracle12c",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -64,7 +57,7 @@
 			]
 		},{
 			"source": "oracle11g",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -72,7 +65,7 @@
 			]
 		},{
 			"source": "mssql19",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -80,7 +73,7 @@
 			]
 		},{
 			"source": "mssql22",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -88,7 +81,7 @@
 			]
 		},{
 			"source": "postgres#1",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -96,7 +89,7 @@
 			]
 		},{
 			"source": "mysql#1",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -104,7 +97,7 @@
 			]
 		},{
 			"source": "mariadb#1",
-			"target": "tera#1",
+			"target": "mssql22",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -112,7 +105,7 @@
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "tera#1",
+			"target": "mssql22",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
@@ -122,10 +115,10 @@
 				"mssql"
 			]
 		},{
-			"source": "tera#1",
+			"source": "mssql22",
 			"targets": [
-				"tera#1",
-				"oracle19c",
+                "mssql22",
+                "oracle19c",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",
@@ -136,26 +129,13 @@
 				"mariadb#1",
 				"mongodb#1"
 			],
+			"parameters" : {
+               "IDENTIFIER_MAPPING_FILE" : ""
+			},
 			"tasks": [
 				"oracle",
 				"mysql",
 				"mssql"
-			]
-		},
-		{
-			"source": "tera#1",
-			"target": "tera#1",
-			"stagingArea": "loader-staging",
-			"reloadStagingArea": false,
-			"parameters": {
-				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-				"DIRECTORY": "loader/%targetConnection%/%sourceConnection%/csv",
-				"COMMIT_RATIO": 0
-			},
-			"tasks": [
-				"oracle",
-				"mssql",
-				"mysql"
 			]
 		}
 	]

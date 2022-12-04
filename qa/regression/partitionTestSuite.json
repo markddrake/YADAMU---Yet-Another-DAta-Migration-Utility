@@ -80,8 +80,8 @@
 			]
 		},
 		{
-			"source": "mssql17",
-			"target": "mssql17",
+			"source": "mssql22",
+			"target": "mssql22",
 			"tasks": [
 				"SH"
 			]

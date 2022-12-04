@@ -10,8 +10,9 @@ goto :eof
   call %~dp0\linux\configureOracle.bat   ORA1120-01
   call %~dp0\linux\configureMySQL.bat    MYSQL80-01
   call %~dp0\linux\configureMariaDB.bat  MARIA10-01
-  call %~dp0\linux\configureMsSQL.bat    MSSQL17-01
+  REM call %~dp0\linux\configureMsSQL.bat    MSSQL17-01
   call %~dp0\linux\configureMsSQL.bat    MSSQL19-01
+  call %~dp0\linux\configureMsSQL.bat    MSSQL22-01
   REM call %~dp0\linux\configurePostgres.bat PGSQL12-01
   REM call %~dp0\linux\configurePostgres.bat PGSQL13-01
   call %~dp0\linux\configurePostgres.bat PGSQL14-01
@@ -30,8 +31,9 @@ goto :eof
   call %~dp0\windows\configureOracle.bat   ORA1120-01
   call %~dp0\windows\configureMySQL.bat    MYSQL80-01
   call %~dp0\windows\configureMariaDB.bat  MARIA10-01
-  call %~dp0\windows\configureMsSQL.bat    MSSQL17-01
+  REM call %~dp0\windows\configureMsSQL.bat    MSSQL17-01
   call %~dp0\windows\configureMsSQL.bat    MSSQL19-01
+  call %~dp0\windows\configureMsSQL.bat    MSSQL22-01
   REM call %~dp0\windows\configurePostgres.bat PGSQL12-01
   REM call %~dp0\windows\configurePostgres.bat PGSQL13-01
   call %~dp0\windows\configurePostgres.bat PGSQL14-01

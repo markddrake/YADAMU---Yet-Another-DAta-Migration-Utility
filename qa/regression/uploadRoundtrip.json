@@ -13,7 +13,7 @@
       "oracle19c"
     , "oracle18c"
     , "oracle12c"
-    , "mssql17"
+    , "mssql22"
     , "mssql19"
     , "postgres#1"
     , "mysql#1"

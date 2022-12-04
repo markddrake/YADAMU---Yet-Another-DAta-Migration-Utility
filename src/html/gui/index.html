@@ -63,7 +63,7 @@
                   <form id="form-source-file">
                     <div class="input-group mb-3">
                       <input type="text" id="source-filename" name="source-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
-                      <button onclick="selectSourceFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
+                      <button type="button" onclick="selectSourceFile(this)"<i class="bi bi-file-earmark-arrow-up"></i></button>
                     </div>
 				  </form>
                 </div>
@@ -91,11 +91,11 @@
                         <label class="form-check-label" for="source-oracle-caseSensitive">Case Sensitive</label>
                     </div>
                     <div class="float-right">
-                    <button type="button" id="source-oracle-testConnection"onclick="validateOracleSource(this)" class="btn btn-primary">Test Connection
+                    <button id="source-oracle-testConnection"onclick="validateOracleSource(this)" class="btn btn-primary">Test Connection
                       <i id="source-oracle-status"class="bi bi-question-circle"></i>
                     </button>
                     </div>
-                    </form>
+                  </form>
                 </div>
               </div>
             </div>
@@ -467,7 +467,7 @@
                   <form id="form-target-file">
                     <div class="input-group mb-3">
                       <input type="text" id="target-filename" name="target-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
-                      <button onclick="selectTargetFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
+                      <button type="button" onclick="selectTargetFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
                     </div>
 				  </form>
                 </div>

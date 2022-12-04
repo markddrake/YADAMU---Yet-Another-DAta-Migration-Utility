@@ -10,13 +10,13 @@
   }
 , "tests" : [{
     "source"      : "file-staging"
-  , "targets"     : ["mssql17","mssql19","postgres#1","mysql#1","mariadb#1"]
+  , "targets"     : ["mssql22","mssql19","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "oracle"
     ]
   },{
     "source"      : "file-staging"
-  , "targets"     : ["oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1"]
+  , "targets"     : ["oracle19c","oracle18c","oracle12c","oracle11g","mssql22","mssql19","postgres#1"]
   , "tasks": [
       "mysql"
     ]

@@ -105,7 +105,7 @@ function setCopyState() {
   
 }
 
-async function selectSourceFile(control) {
+function selectSourceFile(control) {
 	
   const options = {
     title : "Select File to upload", 
@@ -116,11 +116,15 @@ async function selectSourceFile(control) {
 	],
 	properties: ['openFile']
   }	
-  const browseResults = await dialog.showOpenDialog(null,options)
-  if (browseResults.cancelled !== true) {
-    document.getElementById('source-filename').value = browseResults.filePaths[0]
+  
+  // const browseResults = await dialog.showOpenDialog(null,options)
+  
+  const filePath = dialog.showOpenDialogSync(null,options)
+  
+  if (filePath) {
+    document.getElementById('source-filename').value = filePath[0]
     const parameters = {
-	  FILE : document.getElementById('source-filename').value
+	  FILE : filePath[0]
     }
 	ipcRenderer.send('source-filename',parameters);
 	window.validSource = true;
@@ -128,7 +132,7 @@ async function selectSourceFile(control) {
   }
 }
 
-async function selectTargetFile(control) {
+function selectTargetFile(control) {
 	
   const options = {
     title : "Select File to save", 
@@ -137,16 +141,18 @@ async function selectTargetFile(control) {
 		{name: 'Exports', extensions: ['json', 'exp', 'dmp', 'dump']},
 		{name: 'All Files', extensions: ['*']}
 	],
-	properties: ['openFile']
+	properties: []
   }	
-  const browseResults = await dialog.showSaveDialog(null,options)
-  if (browseResults.cancelled !== true) {
-    document.getElementById('target-filename').value = browseResults.filePath
+  
+  const filePath = dialog.showSaveDialogSync(null,options)
+  
+  if (filePath) {
+    document.getElementById('source-filename').value = filePath[0]
     const parameters = {
-	  FILE : document.getElementById('target-filename').value
+	  FILE : filePath[0]
     }
-	ipcRenderer.send('target-filename',parameters);
-	window.validTarget = true;
+	ipcRenderer.send('source-filename',parameters);
+	window.validSource = true;
 	setCopyState();
   }
 }
@@ -235,7 +241,6 @@ function validateOracleSource(button) {
 	FROM_USER : document.getElementById('source-oracle-schema').value
   }
  
-
   if (document.getElementById('source-oracle-caseSensitive').checked === false) {
 	connectionProperties.user = connectionProperties.user.toUpperCase();
     parameters.FROM_USER = parameters.FROM_USER.toUpperCase();

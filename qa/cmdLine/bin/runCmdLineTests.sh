@@ -29,14 +29,18 @@ export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
 echo "$CURRRENT_TIMESTAMP: Exporting Oracle11g"
 export SHELL_LOG_FILE=$YADAMU_LOG_PATH/export_oracle11g.log
 source qa/cmdLine/oracle11g/bin/export_sample_datasets.sh     1> $SHELL_LOG_FILE 2>&1
-export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
-echo "$CURRRENT_TIMESTAMP: Exporting MsSQL Server 2017"
-export SHELL_LOG_FILE=$YADAMU_LOG_PATH/export_mssql17.log
-source qa/cmdLine/mssql17/bin/export_sample_datasets.sh       1> $SHELL_LOG_FILE 2>&1
+#export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
+#echo "$CURRRENT_TIMESTAMP: Exporting MsSQL Server 2017"
+#$export SHELL_LOG_FILE=$YADAMU_LOG_PATH/export_mssql17.log
+#source qa/cmdLine/mssql17/bin/export_sample_datasets.sh       1> $SHELL_LOG_FILE 2>&1
 export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
 echo "$CURRRENT_TIMESTAMP: Exporting MsSQL Server 2019"
 export SHELL_LOG_FILE=$YADAMU_LOG_PATH/export_mssql19.log
 source qa/cmdLine/mssql19/bin/export_sample_datasets.sh       1> $SHELL_LOG_FILE 2>&1
+export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
+echo "$CURRRENT_TIMESTAMP: Exporting MsSQL Server 2022"
+export SHELL_LOG_FILE=$YADAMU_LOG_PATH/export_mssql22.log
+source qa/cmdLine/mssql22/bin/export_sample_datasets.sh       1> $SHELL_LOG_FILE 2>&1
 export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
 echo "$CURRRENT_TIMESTAMP: Exporting MySQL"
 export SHELL_LOG_FILE=$YADAMU_LOG_PATH/export_mysql.log
@@ -58,14 +62,18 @@ export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
 echo "$CURRRENT_TIMESTAMP: Testing Oracle11g"
 export SHELL_LOG_FILE=$YADAMU_LOG_PATH/oracle11g.log
 source qa/cmdLine/oracle11g/bin/cmdLineTests.sh               1> $SHELL_LOG_FILE 2>&1
-export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
-echo "$CURRRENT_TIMESTAMP: Testing MsSQL Server 2017"
-export SHELL_LOG_FILE=$YADAMU_LOG_PATH/mssql17.log
-source qa/cmdLine/mssql17/bin/cmdLineTests.sh                 1> $SHELL_LOG_FILE 2>&1
+#export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
+#echo "$CURRRENT_TIMESTAMP: Testing MsSQL Server 2017"
+#export SHELL_LOG_FILE=$YADAMU_LOG_PATH/mssql17.log
+#source qa/cmdLine/mssql17/bin/cmdLineTests.sh                 1> $SHELL_LOG_FILE 2>&1
 export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
 echo "$CURRRENT_TIMESTAMP: Testing MsSQL Server 2019"
 export SHELL_LOG_FILE=$YADAMU_LOG_PATH/mssql19.log
 source qa/cmdLine/mssql19/bin/cmdLineTests.sh                 1> $SHELL_LOG_FILE 2>&1
+export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
+echo "$CURRRENT_TIMESTAMP: Testing MsSQL Server 2022"
+export SHELL_LOG_FILE=$YADAMU_LOG_PATH/mssql22.log
+source qa/cmdLine/mssql22/bin/cmdLineTests.sh                 1> $SHELL_LOG_FILE 2>&1
 export CURRRENT_TIMESTAMP=$(date --utc +%FT%H:%M:%S.%3N)
 echo "$CURRRENT_TIMESTAMP: Testing Postgres"
 export SHELL_LOG_FILE=$YADAMU_LOG_PATH/postgres.log

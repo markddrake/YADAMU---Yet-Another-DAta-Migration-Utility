@@ -1,0 +1,33 @@
+version: "2.4"
+services:
+
+  MSSQL17-01: 
+    container_name: MSSQL17-01
+    image:  mcr.microsoft.com/mssql/server:2017-latest
+    mem_limit: '10gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL17-01-VOLUME:/var/opt/mssql 
+    restart: always
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MSSQL17-01-VOLUME:
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+    

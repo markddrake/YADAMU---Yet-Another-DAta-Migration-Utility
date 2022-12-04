@@ -89,9 +89,14 @@ class Yadamu extends _Yadamu {
   }
   
   initializeSQLTrace() {
+	/*
+	**
 	if ((this.STATUS.sqlLogger instanceof NullWriter) && this.parameters.SQL_TRACE) {
        this.STATUS.sqlLogger = undefined
 	}
+	**
+	*/
+	
 	super.initializeSQLTrace()
   } 
   

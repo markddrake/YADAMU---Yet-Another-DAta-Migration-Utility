@@ -43,6 +43,7 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11DataTypes
@@ -50,6 +51,7 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
@@ -112,6 +114,24 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
+  ;;
+
+  mssql14)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
+  ;;
+
+  mssql17)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2017ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2017DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2017TestSuite
+  ;;
+
+  mssql22)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022TestSuite
   ;;
 
   db2)

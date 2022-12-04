@@ -1,11 +1,20 @@
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                              from 'perf_hooks'
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
-import YadamuWriter from '../base/yadamuWriter.js';
-import {BatchInsertError} from '../../core/yadamuException.js'
+import Yadamu                  from '../../core/yadamu.js'
+
+import {
+  YadamuError             
+, BatchInsertError
+}                              from '../../core/yadamuException.js'
+
+import YadamuLibrary           from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary    from '../../lib/yadamuSpatialLibrary.js'
+
+import YadamuWriter            from '../base/yadamuWriter.js'
+import SnowflakeError          from './snowflakeException.js'
 
 class SnowflakeWriter extends YadamuWriter {
 
@@ -88,12 +97,12 @@ class SnowflakeWriter extends YadamuWriter {
 	      this.adjustRowCounts(batchRowCount)
 	    } catch (cause) {
 		  this.dbi.SQL_TRACE.disable()
-	      if ((batchRowCount > 1 ) && (!cause.lostConnection())){
+	      if ((batchRowCount > 1 ) && (!YadamuError.lostConnection(cause))){
             batches.push(nextBatch.splice(0,(Math.ceil(batchRowCount/2)*columnCount)),nextBatch)			  
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
 		  else {
-			if (cause.spatialInsertFailed()) {
+			if ((cause instanceof SnowflakeError) && cause.spatialInsertFailed()) {
 		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
 			else {
@@ -122,12 +131,12 @@ class SnowflakeWriter extends YadamuWriter {
 	      this.adjustRowCounts(nextBatch.length)
         } catch (cause) {
           this.dbi.SQL_TRACE.disable()
-	      if ((nextBatch.length > 1) && (!cause.lostConnection())){
+	      if ((nextBatch.length > 1) && (!YadamuError.lostConnection(cause))) {
             batches.push(nextBatch.splice(0,Math.ceil(nextBatch.length/2)),nextBatch)
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
 		  else {
-			if (cause.spatialInsertFailed()) {
+			if ((cause instanceof SnowflakeError) && cause.spatialInsertFailed()) {
 		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
 			else {

@@ -43,7 +43,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "mssql17"
+    "source"             : "mssql22"
   , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -97,7 +97,7 @@
   },{
     "source"             : "azurite#1"
   , "targets": [
-	   "mssql17","mssql19"
+	   "mssql22","mssql19"
 	  
     ]
   , "parameters": {

@@ -411,7 +411,11 @@ class YadamuCompare {
 	  
     } catch (e) {
      this.yadamuLogger.handleException([`COMPARE`],e)
-      return {}
+      return {
+	    success: []
+	  , failed: []
+      , error : e	  
+	  }
       // throw e
     } 
   }  

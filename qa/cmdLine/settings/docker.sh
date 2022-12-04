@@ -24,6 +24,12 @@ unset MSSQL19_PWD
 export MSSQL19_HOST=MSSQL19-01
 unset MSSQL19_PORT
 unset MSSQL19_DBNAME
+# SQL Server 2022 Connection Information
+unset MSSQL22_USER
+unset MSSQL22_PWD
+export MSSQL22_HOST=MSSQL22-01
+unset MSSQL22_PORT
+unset MSSQL22_DBNAME
 # MySQL Connection Information
 unset MYSQL_USER
 unset MYSQL_PWD

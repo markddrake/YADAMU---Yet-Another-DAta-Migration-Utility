@@ -53,7 +53,7 @@
     "mssql17"                           : {
       "mssql"                           : {  
         "user"                          : "sa"
-      , "server"                        : "MSSQL17-01"
+      , "server"                        : "mssql17-01"
       , "database"                      : "master"
       , "password"                      : "oracle#1"
       , "requestTimeout"                : 360000000
@@ -67,6 +67,19 @@
       "mssql"                           : {  
         "user"                          : "sa"
       , "server"                        : "MSSQL19-01"
+      , "database"                      : "master"
+      , "password"                      : "oracle#1"
+      , "requestTimeout"                : 360000000
+      , "options"                       : {
+          "encrypt"                     : false 
+        , "abortTransactionOnError"     : false
+        }
+      }
+    },
+    "mssql22"                           : {
+      "mssql"                           : {  
+        "user"                          : "sa"
+      , "server"                        : "MSSQL22-01"
       , "database"                      : "master"
       , "password"                      : "oracle#1"
       , "requestTimeout"                : 360000000

@@ -1,0 +1,35 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "connections.json"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "parameters"                      : {
+    "DIRECTORY"                     : "export/json/%location%"
+  }
+, "tests" : [{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "mssql22"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "mssql22"
+  , "target": "file-staging"
+  , "parameters"                      : {
+       "DIRECTORY"                     : "export/json/%vendor%"
+    }
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "mssql22"
+  , "target": "mssql22"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

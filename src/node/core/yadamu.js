@@ -142,6 +142,7 @@ class Yadamu {
      ,warningRaised    : false
      ,statusMsg        : 'successfully'
      ,startTime        : performance.now()
+	 ,sqlLogger        : NullWriter.NULL_WRITER
     }
     return this._STATUS
   }
@@ -294,6 +295,7 @@ class Yadamu {
  	  
   initializeParameters(configParameters) {
 
+
     // Start with Yadamu Defaults
     this.parameters = Object.assign({}, this.YADAMU_PARAMETERS);
 
@@ -306,11 +308,31 @@ class Yadamu {
   }
   
   initializeSQLTrace() {
-	  
-	const options = {
-	  flags : (this.STATUS.sqlLogger && this.STATUS.sqlLogger.writableEnded) ? "a" : "w"
+	 
+    /*
+	**
+	** Initialize SQL Tracing. By default SQL Tracing is discarded by writting to the NULL_WRITER
+	**
+	*/
+	
+	if (this.STATUS.sqlLogger instanceof NullWriter) {
+      if (this.parameters.SQL_TRACE) {
+	    this.STATUS.sqlLogger = fs.createWriteStream(this.parameters.SQL_TRACE)
+	  }
 	}
-	this.STATUS.sqlLogger = this.STATUS.sqlLogger || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : NullWriter.NULL_WRITER )
+	else {
+	  if (this.parameters.SQL_TRACE) {
+	    if (this.parameters.SQL_TRACE !== this.STATUS.sqlLogger.path) {
+		  this.STATUS.sqlLogger.close();
+	      this.STATUS.sqlLogger = fs.createWriteStream(this.parameters.SQL_TRACE)
+		}
+	  }
+	  else {
+        this.STATUS.sqLogger.close();
+		this.STATUS.sqlLogger = NullWriter.NULL_WRITER
+	  }
+	}
+		  
   }
   
   initializeLogging() {

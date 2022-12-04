@@ -57,7 +57,7 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql17",
+			"source": "mssql22",
 			"target": "oracle11g",
 			"tasks": [
 				"oracle",
@@ -107,7 +107,7 @@
 				"oracle18c",
 				"oracle12c",
 				"oracle21c",
-				"mssql17",
+				"mssql22",
 				"mssql19",
 				"postgres#1",
 				"mysql#1",

@@ -39,12 +39,13 @@
     "pg-copy-streams": "^2.2.2",
     "pg-query-stream": "^4.2.1",
     "readable-stream": "^3.6.0",
-    "snowflake-sdk": "^1.6.13",
+    "snowflake-sdk": "1.6.13",
     "teradata-nodejs-driver": "^1.0.0-rc.7",
     "uuid": "^8.0.0",
     "wkx": "^0.5.0"
   },
   "devDependencies": {
-    "electron": "^20.1.0"
+    "electron": "^21.3.0",
+    "electron-packager": "^17.1.1"
   }
 }

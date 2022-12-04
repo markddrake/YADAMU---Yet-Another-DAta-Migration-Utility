@@ -1,54 +1,54 @@
 {
 	"Oracle": {
 	  "class" : "../oracle/oracleDataTypes.js"
-	, "file"  : "src/node/dbi/oracle/oracleTypeMappings.json"
+	, "file"  : "../oracle/oracleTypeMappings.json"
 	},
 	"MSSQLSERVER": {
 	  "class" : "../mssql/mssqlDataTypes.js"
-	, "file": "src/node/dbi/mssql/mssqlTypeMappings.json"
+	, "file": "../mssql/mssqlTypeMappings.json"
 	},
 	"Vertica": {
 	  "class" : "../vertica/verticaDataTypes.js"
-	, "file": "src/node/dbi/vertica/verticaTypeMappings.json"
+	, "file": "../vertica/verticaTypeMappings.json"
 	},
 	"Postgres": {
    	  "class" : "../postgres/postgresDataTypes.js"
-	, "file": "src/node/dbi/postgres/postgresTypeMappings.json"
+	, "file": "../postgres/postgresTypeMappings.json"
 	},
 	"MySQL": {
 	  "class" : "../mysql/mysqlDataTypes.js"
-	, "file": "src/node/dbi/mysql/mysqlTypeMappings.json"
+	, "file": "../mysql/mysqlTypeMappings.json"
 	},
 	"MariaDB": {
 	  "class" : "../mariadb/mariadbDataTypes.js"
-	, "file": "src/node/dbi/mariadb/mariadbTypeMappings.json"
+	, "file": "../mariadb/mariadbTypeMappings.json"
 	},
 	"MongoDB": {
 	  "class" : "../mongodb/mongoDataTypes.js"
-	, "file": "src/node/dbi/mongodb/mongoTypeMappings.json"
+	, "file": "../mongodb/mongoTypeMappings.json"
 	},
 	"SNOWFLAKE": {
 	  "class" : "../snowflake/snowflakeDataTypes.js"
-	, "file": "src/node/dbi/snowflake/snowflakeTypeMappings.json"
+	, "file": "../snowflake/snowflakeTypeMappings.json"
 	},
 	"Teradata": {
 	  "class" : "../teradata/teradataDataTypes.js"
-	, "file": "src/node/dbi/teradata/teradataTypeMappings.json"
+	, "file": "../teradata/teradataTypeMappings.json"
 	},
 	"Redshift": {
 	  "class" : "../redshift/redshiftDataTypes.js"
-	, "file": "src/node/dbi/redshift/redshiftTypeMappings.json"
+	, "file": "../redshift/redshiftTypeMappings.json"
 	},
 	"DB2": {
 	  "class" : "../db2/db2DataTypes.js"
-	, "file": "src/node/dbi/db2/db2TypeMappings.json"
+	, "file": "../db2/db2TypeMappings.json"
 	},
 	"Yugabyte": {
 	  "class" : "../postgres/postgresDataTypes.js"
-	, "file": "src/node/dbi/yugabyte/yugabyteTypeMappings.json"
+	, "file": "../yugabyte/yugabyteTypeMappings.json"
 	},
 	"Cockroach": {
 	  "class" : "../cockroach/cockroachDataTypes.js"
-	, "file": "src/node/dbi/cockroach/cockroachTypeMappings.json"
+	, "file": "../cockroach/cockroachTypeMappings.json"
 	}
 }
