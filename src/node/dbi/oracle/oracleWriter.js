@@ -247,7 +247,7 @@ end;`
 	    await this.dbi.restoreSavePoint(cause);
 		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
-          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
+          this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
           this.dml = this.avoidMutatingTable(this.dml);
           try {
             rows = batch.rows
@@ -268,12 +268,12 @@ end;`
           } catch (cause) {
   		    await this.reportBatchError(batch,`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
-            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+            this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
             this.tableInfo.insertMode = 'Iterative';
           }
         } 
         else {  
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+          this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
           this.tableInfo.insertMode = 'Iterative';
         }
 	  }
@@ -316,12 +316,12 @@ end;`
 
   async doDestroy(err) {
 	  
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost],'doDestroy()')
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost],'doDestroy()')
 
     if (this.triggersDisabled && (!this.PARTITIONED_TABLE  || (this.tableInfo.partitionsRemaining === 0))) {
-	  // this.yadamuLogger.trace([this.constructor.name,'doDestory()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
+	  // this.LOGGER.trace([this.constructor.name,'doDestory()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
 	  await this.batchCompleted
-      // this.yadamuLogger.trace([this.constructor.name,'doDestory()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
+      // this.LOGGER.trace([this.constructor.name,'doDestory()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
 	  await this.endTransaction()
 	  await this.dbi.enableTriggers(this.dbi.CURRENT_SCHEMA,this.tableInfo.tableName);
 	  this.triggersDisabled = false;

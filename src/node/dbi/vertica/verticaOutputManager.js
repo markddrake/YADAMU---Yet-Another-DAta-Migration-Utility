@@ -21,8 +21,18 @@ class VerticaOutputManager extends YadamuOutputManager {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
-  toSQLInterval(interval) {
+  toSQLIntervalYM(interval) {
     const jsInterval = YadamuLibrary.parse8601Interval(interval)
+	return `${jsInterval.years || 0} years ${jsInterval.months || 0} months`
+  }	
+  
+  toSQLIntervalDMS(interval) {
+    const jsInterval = YadamuLibrary.parse8601Interval(interval)
+	return `${jsInterval.days || 0} day ${jsInterval.hours || 0} hour ${jsInterval.minutes || 0} mins ${jsInterval.seconds || 0} sec`
+  }	
+
+  toSQLInterval(interval) {
+	const jsInterval = YadamuLibrary.parse8601Interval(interval)
 	switch (jsInterval.type) {
 	  case 'YM':
   	    return `${jsInterval.years || 0} years ${jsInterval.months || 0} months`
@@ -48,16 +58,6 @@ class VerticaOutputManager extends YadamuOutputManager {
 	})
   }
   
-  toSQLIntervalYM(interval) {
-    const jsInterval = YadamuLibrary.parse8601Interval(interval)
-    return `${jsInterval.years || 0} years ${jsInterval.months || 0} months`
-  }	
-  
-  toSQLIntervalDMS(interval) {
-    const jsInterval = YadamuLibrary.parse8601Interval(interval)
-    return `${jsInterval.days || 0} day ${jsInterval.hours || 0} hour ${jsInterval.minutes || 0} mins ${jsInterval.seconds || 0} sec`
-  }	
-
   generateTransformations(dataTypes,stringColumns) {
 
     // Set up Transformation functions to be applied to the incoming rows
@@ -65,7 +65,7 @@ class VerticaOutputManager extends YadamuOutputManager {
    return dataTypes.map((dataType,idx) => {      
 
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
-	  
+	    
 	  switch (dataTypeDefinition.type.toLowerCase()) {
 		case this.dbi.DATA_TYPES.JSON_TYPE:
 		  return (col,idx) =>  {
@@ -192,7 +192,7 @@ class VerticaOutputManager extends YadamuOutputManager {
 			return this.toSQLInterval(col)
 		  }
         case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
-  		case "interval day to second":
+  		// case "interval day to second":
 		  return (col,idx) => {
 		    return this.toSQLIntervalDMS(col)
 		  }

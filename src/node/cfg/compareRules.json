@@ -230,18 +230,21 @@
 	"ORDERED_JSON": {
 		"default": false,
 		"oracle": {
+			"oracle#23": true,
 			"oracle#21": true,
 			"mysql": true,
 			"snowflake": true,
 			"cockroach": true
 		},
 		"mariadb": {
+			"oracle#23": true,
 			"oracle#21": true,
 			"mysql": true,
 			"snowflake": true,
 			"cockroach": true
 		},
 		"mongodb": {
+			"oracle#23": true,
 			"oracle#21": true,
 			"postgres": true,
 			"yugabyte": true,
