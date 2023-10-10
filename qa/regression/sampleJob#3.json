@@ -13,7 +13,7 @@
   }
  ,"jobs"                            : [{
      "source"                       : {
-        "connection"                : "oracle19c"
+        "connection"                : "oracle#1"
       , "schema"                    : "sourceSchema"
       }
      ,"target"                      : {

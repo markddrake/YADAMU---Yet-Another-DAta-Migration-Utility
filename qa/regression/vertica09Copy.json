@@ -19,7 +19,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"targets": [
 			   "vertica09"
 		    ],
@@ -72,7 +72,7 @@
 		},{
 			"source": "vertica09",
 			"targets": [
-			   "vertica11"
+			   "vertica23"
 		    ],
 			"parameters": {
   	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
@@ -92,7 +92,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "vertica11",
+			"source": "vertica23",
 			"targets": [
 			   "vertica09"
 		    ],

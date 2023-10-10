@@ -19,7 +19,7 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "oracle19c"
+    "source"          : "oracle#1"
   , "targets"         : [
        "snow#1"
 	]
@@ -72,7 +72,7 @@
   },{
     "source"          : "snow#1"
   , "targets"         : [
-       "snow#1","oracle19c","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+       "snow#1","oracle#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
 	]
   , "tasks": [ 
       "postgresDataTypes"

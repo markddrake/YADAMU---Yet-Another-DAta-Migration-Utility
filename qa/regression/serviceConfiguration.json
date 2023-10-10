@@ -1,6 +1,6 @@
 {
   "connections": {
-    "oracle19c": {
+    "oracle#1": {
       "oracle": {
         "user": "SYSTEM",
         "connectString": "ORA1903",
@@ -10,7 +10,7 @@
     "postgres#1": {
       "postgres": {
         "user": "postgres",
-        "host": "PGSQL14-01",
+        "host": "PGSQL15-01",
         "database": "yadamu",
         "password": "oracle",
         "port": "5432"
@@ -33,7 +33,7 @@
   "jobs": [
     {
       "source": {
-        "connection": "oracle19c",
+        "connection": "oracle#1",
         "schema": "HR"
       },
       "target": {

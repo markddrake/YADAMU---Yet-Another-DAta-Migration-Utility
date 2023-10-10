@@ -20,7 +20,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -44,7 +44,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "mssql22"
+    "source"             : "mssql#1"
   , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -85,7 +85,7 @@
   },{
     "source"             : "loader-YADAMU_HOME"
   , "targets": [
-	  "oracle19c","oracle18c","oracle12c","oracle11g"
+	  "oracle#1","oracle18c","oracle12c","oracle11g"
 	  
     ]
   , "parameters": {
@@ -98,7 +98,7 @@
   },{
     "source"             : "loader-YADAMU_HOME"
   , "targets": [
-	   "mssql22","mssql19"
+	   "mssql#1","mssql19"
 	  
     ]
   , "parameters": {
@@ -122,7 +122,7 @@
       "mysql"
 	]
   },{
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-lRegress"
   , "parameters"         : {
       "DIRECTORY"        : "%operation%/gzip-json/%sourceConnection%"
@@ -132,7 +132,7 @@
       "HR","BI"
 	]
   },{
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-lRegress"
   , "parameters"         : {
       "DIRECTORY"        : "%operation%/x-gzip-json/%sourceConnection%"
@@ -144,7 +144,7 @@
       "HR","BI"
 	]
   },{
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-lRegress"
   , "parameters"         : {
       "DIRECTORY"        : "%operation%/x-json/%sourceConnection%"

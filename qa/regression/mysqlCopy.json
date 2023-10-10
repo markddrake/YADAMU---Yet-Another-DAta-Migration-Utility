@@ -11,7 +11,7 @@
 		"COMMIT_RATIO"            : 0
 	},
 	"tests": [{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mysql#1",
 			"parameters" : {
 				"SPATIAL_FORMAT": "WKT"

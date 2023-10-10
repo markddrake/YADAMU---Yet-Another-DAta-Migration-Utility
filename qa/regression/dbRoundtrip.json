@@ -6,13 +6,13 @@
 , "parameters": {
   }
 , "tests"                  : [{
-    "source": "oracle19c"
+    "source": "oracle#1"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -24,11 +24,11 @@
   },{
     "source": "oracle18c"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -40,11 +40,11 @@
   },{
     "source": "oracle12c"
   ,   "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -56,11 +56,11 @@
   },{
     "source": "oracle11g"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -70,13 +70,13 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source": "mssql22"
+    "source": "mssql#1"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -88,11 +88,11 @@
   },{
     "source": "mssql19"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -104,11 +104,11 @@
   },{
     "source": "postgres#1"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -120,11 +120,11 @@
   },{
     "source": "mysql#1"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",
@@ -136,11 +136,11 @@
   },{
     "source": "mariadb#1"
   , "targets": [
-	  "oracle19c",
+	  "oracle#1",
       "oracle18c",
       "oracle12c",
       "oracle11g",
-      "mssql22",
+      "mssql#1",
       "mssql19",
       "postgres#1",
       "mysql#1",

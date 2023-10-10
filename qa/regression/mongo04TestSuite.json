@@ -17,7 +17,7 @@
       "oracle","mysql","mssql"
     ]
   },{
-    "source"            : "oracle19c"
+    "source"            : "oracle#1"
   , "target"            : "mongodb#40"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -41,7 +41,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "mssql22"
+    "source"            : "mssql#1"
   , "target"            : "mongodb#40"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -73,7 +73,7 @@
   },{
     "source"            : "mongodb#40"
   , "targets": [
-	  "mongodb#40","oracle19c","oracle18c","oracle12c","oracle11g","mssql22","mssql19","postgres#1","mysql#1","mariadb#1"
+	  "mongodb#40","oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1"
     ]
   , "parameters" : {
       "MONGO_STRIP_ID": false

@@ -11,32 +11,32 @@
 		"COMMIT_RATIO"            : 0
 	},
 	"tests": [{
-			"source": "oracle19c",
-			"target": "oracle19c",
+			"source": "oracle#1",
+			"target": "oracle#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mssql19",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "postgres#1",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mysql#1",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

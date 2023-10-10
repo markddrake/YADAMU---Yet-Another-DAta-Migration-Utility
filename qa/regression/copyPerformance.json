@@ -12,7 +12,7 @@
 	},
 	"tests": [{
 			"source": "loader-staging",
-			"target": "oracle19c",
+			"target": "oracle#1",
 	        "parameters": {
 			   "DATA_STAGING_ENABLED" : true
 			},
@@ -21,7 +21,7 @@
 			]
 		},{
 			"source": "loader-staging",
-			"target": "oracle19c",
+			"target": "oracle#1",
 	        "parameters": {
 			   "DATA_STAGING_ENABLED" : false
 			},
@@ -30,7 +30,7 @@
 			]
 		},{
 			"source": "loader-staging",
-			"target": "oracle19c",
+			"target": "oracle#1",
 	        "parameters": {
 			   "DATA_STAGING_ENABLED" : true
 			},
@@ -39,7 +39,7 @@
 			]
 		},{
 			"source": "loader-staging",
-			"target": "oracle19c",
+			"target": "oracle#1",
 	        "parameters": {
 			   "DATA_STAGING_ENABLED" : false
 			},
@@ -48,7 +48,7 @@
 			]
 		},{
 			"source": "loader-staging",
-			"target": "oracle19c",
+			"target": "oracle#1",
 	        "parameters": {
 			   "DATA_STAGING_ENABLED" : true
 			},
@@ -57,7 +57,7 @@
 			]
 		},{
 			"source": "loader-staging",
-			"target": "oracle19c",
+			"target": "oracle#1",
 	        "parameters": {
 			   "DATA_STAGING_ENABLED" : false
 			},

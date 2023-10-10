@@ -12,7 +12,7 @@
 	},
 	
 	"tests": [{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "yugabyte#1",
 			"tasks": [
 				"oracle","mssql","mysql"

@@ -10,7 +10,7 @@
 , "tests"                  : [{
     "source": "oracle18c"
   , "targets": [
-	  "oracle19c"
+	  "oracle23c", "oracle19c"
     ]
   , "recreateSchema"    : false
   , "parameters" : {
@@ -21,9 +21,9 @@
       "PM"
 	]
   },{
-    "source": "oracle19c"
+    "source": "oracle#1"
   , "targets": [
-	  "mssql22","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  "mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
     ]
   , "tasks": [ 
       "HR","BI"

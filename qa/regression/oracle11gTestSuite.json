@@ -1,7 +1,7 @@
 {
 	"operation": "dbRoundTrip",
-	"connections": "qa/regression/connections.json",
-	"tasks": "qa/regression/tasks.json",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
 	"recreateSchema": true,
 	"parameters": {},
 	"tests": [{
@@ -17,7 +17,7 @@
 				"mssql"
 			]
 		},{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "oracle11g",
 			"tasks": [
 				"oracle",
@@ -41,7 +41,7 @@
 				"mssql"
 			]
 		},{
-			"source": "oracle21c",
+			"source": "oracle23c",
 			"target": "oracle11g",
 			"tasks": [
 				"oracle",
@@ -57,7 +57,7 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql22",
+			"source": "mssql#1",
 			"target": "oracle11g",
 			"tasks": [
 				"oracle",
@@ -103,11 +103,11 @@
 			"source": "oracle11g",
 			"targets": [
 				"oracle11g",
-				"oracle19c",
+				"oracle#1",
 				"oracle18c",
 				"oracle12c",
-				"oracle21c",
-				"mssql22",
+				"oracle23c",
+				"mssql#1",
 				"mssql19",
 				"postgres#1",
 				"mysql#1",

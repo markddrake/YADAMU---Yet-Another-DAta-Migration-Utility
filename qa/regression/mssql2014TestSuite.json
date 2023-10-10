@@ -26,16 +26,13 @@
 			},
 			"source": "mssql14",
 			"target": "file-staging",
-			"parameters": {
-				"DIRECTORY": "%operation%/json/%vendor%"
-			},
 			"tasks": [
 				"oracle",
 				"mysql",
 				"mssql"
 			]
 		},{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mssql14",
 			"tasks": [
 				"oracle",
@@ -121,7 +118,7 @@
 			"source": "mssql14",
 			"targets": [
                 "mssql14",
-                "oracle19c",
+                "oracle#1",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",

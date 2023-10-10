@@ -11,7 +11,7 @@
 		"COMMIT_RATIO"            : 0
 	},
 	"tests": [{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mariadb#1",
 			"tasks": [
 				"oracle","mssql","mysql"

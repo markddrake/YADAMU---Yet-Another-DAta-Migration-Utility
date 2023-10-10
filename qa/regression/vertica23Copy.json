@@ -5,16 +5,23 @@
 	"stagingArea": "loader-staging",
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
-	"emptyStringIsNull" : true,
 	"parameters": {
 		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
 		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv"
 	},
 	"tests": [{
-			"source": "oracle19c",
+			"source": "vertica23",
 			"targets": [
-			   "vertica10","vertica11"
+			   "vertica23"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle#1",
+			"targets": [
+			   "vertica23"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -22,7 +29,7 @@
 		},{
 			"source": "mssql19",
 			"targets": [
-			   "vertica10","vertica11"
+			   "vertica23"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -30,7 +37,7 @@
 		},{
 			"source": "postgres#1",
 			"targets": [
-			   "vertica10","vertica11"
+			   "vertica23"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -38,7 +45,7 @@
 		},{
 			"source": "mysql#1",
 			"targets": [
-			   "vertica10","vertica11"
+			   "vertica23"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -46,8 +53,19 @@
 		},{
 			"source": "mongodb#1",
 			"targets": [
-			   "vertica10","vertica11"
+			   "vertica23"
 		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "vertica10",
+			"targets": [
+			   "vertica23"
+		    ],
+			"parameters": {
+  	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
+            },
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

@@ -9,7 +9,7 @@
   }
 , "tasks"                             : "tasks.json"
 , "tests" : [{
-    "source": "oracle19c"
+    "source": "oracle#1"
   , "target": "file-staging"
   , "parameters"                      : {
 	  "DIRECTORY"                     : "%operation%/json/%vendor%"

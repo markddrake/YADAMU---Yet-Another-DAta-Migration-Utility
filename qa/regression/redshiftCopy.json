@@ -12,7 +12,7 @@
 		"TIMESTAMP_PRECISION"     : 6
 	},
 	"tests": [{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "redshift#1",
 			"tasks": [
 				"oracle","mssql","mysql"

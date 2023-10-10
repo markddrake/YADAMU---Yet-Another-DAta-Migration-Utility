@@ -6,7 +6,7 @@
  ,"schemas"                           : "schemas.json"
  ,"jobs"                            : [{
      "source"                       : {
-        "connection"                : "oracle19c"
+        "connection"                : "oracle#1"
       , "schema"                    : "HR"
       }
      ,"target"                      : {

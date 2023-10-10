@@ -10,42 +10,42 @@
 	},
 	"tests": [
 		{
-			"source": "oracle19c",
-			"target": "oracle19c",
+			"source": "oracle#1",
+			"target": "oracle#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mssql19",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "postgres#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mysql#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mariadb#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mongodb#1",
 			"tasks": [
 				"SH"
@@ -80,8 +80,8 @@
 			]
 		},
 		{
-			"source": "mssql22",
-			"target": "mssql22",
+			"source": "mssql#1",
+			"target": "mssql#1",
 			"tasks": [
 				"SH"
 			]
@@ -119,7 +119,7 @@
 		},
 		{
 			"operation": "export",
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "file-sRegress",
 			"parameters": {
 				"DIRECTORY": "%operation%/json/%vendor%/%mode%"
@@ -130,7 +130,7 @@
 		},
 		{
 			"operation": "export",
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "file-sRegress",
 			"parameters": {
 				"MODE": "DDL_ONLY",
@@ -142,7 +142,7 @@
 		},
 		{
 			"operation": "export",
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "file-sRegress",
 			"parameters": {
 				"MODE": "DDL_AND_DATA",
@@ -154,7 +154,7 @@
 		},
 		{
 			"operation": "export",
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "file-sRegress",
 			"parameters": {
 				"DIRECTORY": "%operation%/gzip/%vendor%/%mode%",
@@ -166,7 +166,7 @@
 		},
 		{
 			"operation": "export",
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "file-sRegress",
 			"parameters": {
 				"DIRECTORY": "%operation%/x-gzip/%vendor%/%mode%",
@@ -180,7 +180,7 @@
 		},
 		{
 			"operation": "export",
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "file-sRegress",
 			"parameters": {
 				"DIRECTORY": "%operation%/x-json/%vendor%/%mode%",
@@ -194,7 +194,7 @@
 		{
 			"operation": "fileRoundtrip",
 			"source": "file-sRegress",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"parameters": {
 				"MODE": "DDL_AND_DATA",
 				"SOURCE_DIRECTORY": "export/json/%location%/%mode%",
@@ -217,7 +217,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "loader-sRegress",
 			"parameters": {
 				"DIRECTORY": "%sourceConnection%/json"
@@ -228,7 +228,7 @@
 		},
 		{
 			"source": "loader-sRegress",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"parameters": {
 				"DIRECTORY": "json"
 			},
@@ -237,7 +237,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "loader-sRegress",
 			"parameters": {
 				"DIRECTORY": "gzip",
@@ -248,7 +248,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "loader-sRegress",
 			"parameters": {
 				"DIRECTORY": "x-gzip",
@@ -273,7 +273,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "minio#1",
 			"parameters": {
 				"DIRECTORY": "%sourceConnection%/json"
@@ -284,7 +284,7 @@
 		},
 		{
 			"source": "minio#1",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"parameters": {
 				"DIRECTORY": "json"
 			},
@@ -293,7 +293,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "minio#1",
 			"parameters": {
 				"DIRECTORY": "gzip",
@@ -316,7 +316,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "azurite#1",
 			"parameters": {
 				"DIRECTORY": "%sourceConnection%/json"
@@ -327,7 +327,7 @@
 		},
 		{
 			"source": "azurite#1",
-			"target": "oracle19c",
+			"target": "oracle#1",
 			"parameters": {
 				"DIRECTORY": "json"
 			},
@@ -336,7 +336,7 @@
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "azurite#1",
 			"parameters": {
 				"DIRECTORY": "gzip",
@@ -347,42 +347,42 @@
 			]
 		},
 		{
-			"source": "oracle19c",
-			"target": "oracle19c",
+			"source": "oracle#1",
+			"target": "oracle#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "postgres#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mysql#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mariadb#1",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mssql19",
 			"tasks": [
 				"SH"
 			]
 		},
 		{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "mongodb#1",
 			"tasks": [
 				"SH"

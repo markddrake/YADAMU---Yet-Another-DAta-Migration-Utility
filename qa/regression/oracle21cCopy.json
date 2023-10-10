@@ -1,7 +1,7 @@
 {
     "operation": "dbRoundTrip",
-    "connections": "qa/regression/connections.json",
-    "tasks": "qa/regression/tasks.json",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
     "recreateSchema": true,
     "parameters": {},
     "tests": [{

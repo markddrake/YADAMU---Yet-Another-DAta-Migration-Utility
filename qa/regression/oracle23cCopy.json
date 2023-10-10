@@ -5,8 +5,8 @@
     "recreateSchema": true,
     "parameters": {},
     "tests": [{
-            "source": "oracle#1",
-            "target": "oracle#1",
+            "source": "oracle23c",
+            "target": "oracle23c",
             "stagingArea": "loader-staging",
             "reloadStagingArea" : false,
             "parameters": {

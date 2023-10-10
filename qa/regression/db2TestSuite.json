@@ -38,7 +38,7 @@
 				"mssql"
 			]
 		},{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"target": "db2#1",
 			"tasks": [
 				"oracle",
@@ -78,7 +78,7 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql22",
+			"source": "mssql#1",
 			"target": "db2#1",
 			"tasks": [
 				"oracle",
@@ -124,11 +124,11 @@
 			"source": "db2#1",
 			"targets": [
 			    "db2#1",
-				"oracle19c",
+				"oracle#1",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",
-				"mssql22",
+				"mssql#1",
 				"mssql19",
 				"postgres#1",
 				"mysql#1",

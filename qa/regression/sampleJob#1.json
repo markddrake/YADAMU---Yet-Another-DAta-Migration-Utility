@@ -1,6 +1,6 @@
 {
   "connections"                         : {
-    "oracle19c"                         : {
+    "oracle#1"                         : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
@@ -21,11 +21,11 @@
   }
  ,"jobs"                            : [{
      "source"                       : {
-        "connection"                : "oracle19c"
+        "connection"                : "oracle#1"
       , "schema"                    : "HR"
       }
      ,"target"                      : {
-        "connection"                : "oracle19c"
+        "connection"                : "oracle#1"
       , "schema"                    : "HR1"
       }
      ,"parameters"                  : {

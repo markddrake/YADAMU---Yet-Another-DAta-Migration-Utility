@@ -6,7 +6,7 @@
 	"tests": [{
 			"operation": "import",
 			"source": "file-staging",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"verifyOperation": true,
 			"parameters": {
 				"DIRECTORY": "export/json/%location%"
@@ -24,7 +24,7 @@
 			"parameters": {
 				"DIRECTORY": "%operation%/%mode%/%connection%"
 			},
-			"source": "mssql22",
+			"source": "mssql#1",
 			"target": "file-staging",
 			"tasks": [
 				"oracle",
@@ -32,8 +32,8 @@
 				"mssql"
 			]
 		},{
-			"source": "oracle19c",
-			"target": "mssql22",
+			"source": "oracle#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -41,7 +41,7 @@
 			]
 		},{
 			"source": "oracle18c",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -49,7 +49,7 @@
 			]
 		},{
 			"source": "oracle12c",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -57,7 +57,7 @@
 			]
 		},{
 			"source": "oracle11g",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -65,15 +65,15 @@
 			]
 		},{
 			"source": "mssql19",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
 				"mssql"
 			]
 		},{
-			"source": "mssql22",
-			"target": "mssql22",
+			"source": "mssql#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -81,7 +81,7 @@
 			]
 		},{
 			"source": "postgres#1",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -89,7 +89,7 @@
 			]
 		},{
 			"source": "mysql#1",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -97,7 +97,7 @@
 			]
 		},{
 			"source": "mariadb#1",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -105,7 +105,7 @@
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "mssql22",
+			"target": "mssql#1",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
@@ -115,14 +115,14 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql22",
+			"source": "mssql#1",
 			"targets": [
-                "mssql22",
-                "oracle19c",
+                "mssql#1",
+                "oracle#1",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",
-				"mssql22",
+				"mssql#1",
 				"mssql19",
 				"postgres#1",
 				"mysql#1",

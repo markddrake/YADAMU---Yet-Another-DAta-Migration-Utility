@@ -19,7 +19,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle19c",
+			"source": "oracle#1",
 			"targets": [
 			   "vertica11"
 		    ],

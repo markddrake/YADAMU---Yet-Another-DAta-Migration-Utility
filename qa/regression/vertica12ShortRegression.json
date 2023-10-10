@@ -5,19 +5,21 @@
 , "recreateSchema"                    : true
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
-, "parameters"                      : {
-    "DIRECTORY"                     : "export/json/%location%"
+, "parameters"                        : {
+    "DIRECTORY"                       : "export/json/%location%"
+  , "REMOTE_STAGING_AREA"             : "/mnt/shared/stagingArea/db/vertica"
+  , "LOCAL_STAGING_AREA"              : "/usr/src/YADAMU/stagingArea/db/vertica"
   }
 , "tests" : [{
 	"operation" : "import"
   , "source": "file-staging"
-  , "target": "mssql#1"
+  , "target": "vertica12"
   , "tasks": [
        "HR","BI"
     ]
   },{
 	"operation" : "export"
-  , "source": "mssql#1"
+  , "source": "vertica12"
   , "target": "file-staging"
   , "parameters"                      : {
        "DIRECTORY"                     : "export/json/%vendor%"
@@ -26,8 +28,8 @@
       "HR", "BI"
     ]
   },{
-    "source": "mssql#1"
-  , "target": "mssql#1"
+    "source": "vertica12"
+  , "target": "vertica12"
   , "tasks": [
        "HR","BI"
     ]

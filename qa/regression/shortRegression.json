@@ -6,8 +6,8 @@
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
 , "tests" : [{
-    "source": "oracle19c"
-  , "target": "oracle19c"
+    "source": "oracle#1"
+  , "target": "oracle#1"
   , "tasks": [
        "HR","BI"
     ]
@@ -36,8 +36,8 @@
        "HR","BI"
     ]
   },{
-    "source": "mssql22"
-  , "target": "mssql22"
+    "source": "mssql#1"
+  , "target": "mssql#1"
   , "tasks": [
        "HR","BI"
     ]
@@ -70,7 +70,7 @@
     ]
   },{                    
     "operation"          : "export"
-  , "source"             : "oracle19c"
+  , "source"             : "oracle#1"
   , "target"             : "file-sRegress"
   , "parameters"         : {
 	  "DIRECTORY"        : "%operation%/json/%vendor%/%mode%"
@@ -80,7 +80,7 @@
     ]                    
   },{
     "operation"          : "export"
-  , "source"             : "oracle19c"
+  , "source"             : "oracle#1"
   , "target"             : "file-sRegress"
   , "parameters"         : {
       "MODE"             : "DDL_ONLY"
@@ -91,7 +91,7 @@
     ]                    
   },{                    
     "operation"          : "export"
-  , "source"             : "oracle19c"
+  , "source"             : "oracle#1"
   , "target"             : "file-sRegress"
   , "parameters"         : {
       "MODE"             : "DDL_AND_DATA"
@@ -102,7 +102,7 @@
     ]
   },{                  
     "operation"           : "export"
-  , "source"              : "oracle19c"
+  , "source"              : "oracle#1"
   , "target"              : "file-sRegress"
   , "parameters"          : {
 	  "DIRECTORY"        : "%operation%/gzip/%vendor%/%mode%"
@@ -113,7 +113,7 @@
     ]
   },{                  
     "operation"           : "export"
-  , "source"              : "oracle19c"
+  , "source"              : "oracle#1"
   , "target"              : "file-sRegress"
   , "parameters"          : {
 	  "DIRECTORY"        : "%operation%/x-gzip/%vendor%/%mode%"
@@ -126,7 +126,7 @@
     ]
   },{                  
     "operation"           : "export"
-  , "source"              : "oracle19c"
+  , "source"              : "oracle#1"
   , "target"              : "file-sRegress"
   , "parameters"          : {
 	  "DIRECTORY"        : "%operation%/x-json/%vendor%/%mode%"
@@ -139,7 +139,7 @@
   },{
     "operation"          : "fileRoundtrip"
   , "source"             : "file-sRegress"
-  , "target"             : "oracle19c"
+  , "target"             : "oracle#1"
   , "parameters"         : {
       "MODE"             : "DDL_AND_DATA"
     , "SOURCE_DIRECTORY" : "export/json/%location%/%mode%"
@@ -160,7 +160,7 @@
       "HR","BI"        
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-sRegress"
   , "parameters" : {   
       "DIRECTORY"        : "%sourceConnection%/json"
@@ -170,7 +170,7 @@
 	]                  
   },{                  
     "source"             : "loader-sRegress"
-  , "target"             : "oracle19c"	  
+  , "target"             : "oracle#1"	  
   , "parameters" : {   
       "DIRECTORY"        : "json"
     }
@@ -178,7 +178,7 @@
      "HR","BI"         
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-sRegress"
   , "parameters"         : {
       "DIRECTORY"        : "gzip"
@@ -188,7 +188,7 @@
       "HR","BI"        
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "loader-sRegress"
   , "parameters" : {   
       "DIRECTORY"        : "x-gzip"
@@ -211,7 +211,7 @@
       "HR","BI"        
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "minio#1"
   , "parameters"         : {
       "DIRECTORY"        : "%sourceConnection%/json"
@@ -221,7 +221,7 @@
 	]                  
   },{                  
     "source"             : "minio#1"
-  , "target"             : "oracle19c"
+  , "target"             : "oracle#1"
   , "parameters"         : {
 	  "DIRECTORY"        : "json"
   }                    
@@ -229,7 +229,7 @@
       "HR","BI"        
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "minio#1"
   , "parameters"         : {
       "DIRECTORY"        : "gzip"
@@ -250,7 +250,7 @@
       "HR","BI"        
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "azurite#1"
   , "parameters"         : {
       "DIRECTORY"        : "%sourceConnection%/json"
@@ -260,7 +260,7 @@
 	]                  
   },{                  
     "source"             : "azurite#1"
-  , "target"             : "oracle19c"	  
+  , "target"             : "oracle#1"	  
   , "parameters"         : {
 	  "DIRECTORY"        : "json"
   }                    
@@ -268,7 +268,7 @@
       "HR","BI"        
 	]                  
   },{                  
-    "source"             : "oracle19c"
+    "source"             : "oracle#1"
   , "target"             : "azurite#1"
   , "parameters"         : {
       "DIRECTORY"        : "gzip"

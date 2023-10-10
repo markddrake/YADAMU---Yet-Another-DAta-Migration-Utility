@@ -17,7 +17,7 @@
   }
 , "tests" : [{
 	"operation" : "export"
-  , "source": "oracle19c"
+  , "source": "oracle#1"
   , "target": "file-staging"
   , "tasks": [
       "HR", "BI"
@@ -27,7 +27,7 @@
   , "source": "file-staging"
   , "target": "vertica11"
   , "parameters"                      : {
-      "DIRECTORY"                     : "export/json/oracle19c"
+      "DIRECTORY"                     : "export/json/oracle#1"
     }
   , "tasks": [
        "HR","BI"
@@ -50,7 +50,7 @@
   , "source": "file-staging"
   , "target": "snow#1"
   , "parameters"                      : {
-      "DIRECTORY"                     : "export/json/oracle19c"
+      "DIRECTORY"                     : "export/json/oracle#1"
     }
   , "tasks": [
        "HR","BI"
@@ -73,7 +73,7 @@
   , "source": "file-staging"
   , "target": "tera#1"
   , "parameters"                      : {
-      "DIRECTORY"                     : "export/json/oracle19c"
+      "DIRECTORY"                     : "export/json/oracle#1"
     }
   , "tasks": [
        "HR","BI"
@@ -96,7 +96,7 @@
   , "source": "file-staging"
   , "target": "redshift#1"
   , "parameters"                      : {
-      "DIRECTORY"                     : "export/json/oracle19c"
+      "DIRECTORY"                     : "export/json/oracle#1"
     }
   , "tasks": [
        "HR","BI"

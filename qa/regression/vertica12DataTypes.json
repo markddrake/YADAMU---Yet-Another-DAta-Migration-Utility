@@ -14,7 +14,7 @@
     "operation"       : "import"
   , "source"          : "file-staging"
   , "targets"         : [
-       "vertica10","vertica23"
+       "vertica10","vertica12"
 	]
   , "verifyOperation" : true
   , "parameters"      : {
@@ -25,61 +25,61 @@
 	]
   },{
     "source"          : "oracle#1"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "oracle18c"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "oracle12c"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "oracle11g"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "mssql#1"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "mssql19"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "postgres#1"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "mysql#1"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "mariadb#1"
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
-    "source"          : "vertica23"
-  , "target"          : "vertica10"
+    "source"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
@@ -88,14 +88,14 @@
 	"parameters"      : {
 	   "MONGO_STRIP_ID" : false
 	}
-  , "target"          : "vertica10"
+  , "target"          : "vertica12"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
-    "source"          : "vertica10"
+    "source"          : "vertica12"
   , "targets"         : [
-       "vertica10","vertica23","oracle#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+       "vertica12","vertica10","oracle#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
 	]
   , "tasks": [ 
       "postgresDataTypes"
