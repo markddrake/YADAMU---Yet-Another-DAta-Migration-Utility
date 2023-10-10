@@ -1,0 +1,35 @@
+version: "2.4"
+services:
+
+  VRTCA11-01: 
+    container_name: VRTCA11-01
+    image:  vertica/vertica-ce:11.1.1-0 
+    mem_limit: '12gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+     - YADAMU-NET
+    ports: 
+      - "54333:5433"
+      - "54443:5444"
+    environment:
+      APP_DB_USER: "vertica"
+      APP_DB_PASSWORD: "oracle"
+      TZ: "Etc/UTC"
+    #deploy:
+    #  mode: global
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - VRTCA11-01-VOLUME:/data
+    restart: always    
+    
+volumes:
+  VRTCA11-01-VOLUME:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+

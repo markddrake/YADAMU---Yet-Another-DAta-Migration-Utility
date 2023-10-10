@@ -1,0 +1,33 @@
+version: "3.3"
+services:
+
+ TDATA17-01:
+   container_name: TDATA17-01
+   image:  teradata/17
+   security_opt:
+      - label:disable    
+   privileged: true
+   mem_limit: '12gb'
+   shm_size: '4gb'
+   networks:
+     - YADAMU-NET
+   ports:
+    - 1025:1025 
+   volumes:
+     - YADAMU_01-SHARED:/mnt/shared
+     - TDATA17-01-APPLIANCE:/root/VBox 
+     - /tmp/.X11-unix:/tmp/.X11-unix
+ 
+   devices:
+     - "/dev/vboxdrv:/dev/vboxdrv"
+
+   restart: always
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  TDATA17-01-APPLIANCE:
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET

@@ -2,6 +2,7 @@
 !docker/regression/tnsnames.ora
 !docker/regression/bin/*.sh
 !qa/bin/*sh
+!qa/connections/connections.json
 !qa/mappings
 !qa/regression
 !qa/sql

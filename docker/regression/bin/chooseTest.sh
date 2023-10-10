@@ -38,17 +38,17 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh initialize
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh stageDataSets
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11ShortRegression
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23ShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
@@ -63,7 +63,7 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11TestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23TestSuite
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10TestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
@@ -73,13 +73,13 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11Copy
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23Copy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cTestSuite
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle19cCopy
@@ -92,6 +92,14 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
     ;;	
   
+  oracle23c)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cCopy
+  ;;
+
   oracle21c)
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle21cDataTypes
@@ -116,10 +124,16 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle11gCopy
   ;;
 
-  mssql14)
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
+  mssql22)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022TestSuite
+  ;;
+
+  mssql19)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2019ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2019DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2019TestSuite
   ;;
 
   mssql17)
@@ -128,10 +142,10 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2017TestSuite
   ;;
 
-  mssql22)
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022ShortRegression
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2022TestSuite
+  mssql14)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
   ;;
 
   db2)
@@ -146,6 +160,22 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
+  ;;
+
+  vertica23)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23TestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica23Copy
+  ;;
+
+  vertica12)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica12ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica12DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica12TestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica12Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica12Copy
   ;;
 
   vertica11)
@@ -163,8 +193,6 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
   ;;
-
-  # source $YADAMU_SCRIPT_DIR/runRegressionTest.sh redshiftCopy
 
   vertica09)
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09ShortRegression
@@ -193,6 +221,7 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+  # source $YADAMU_SCRIPT_DIR/runRegressionTest.sh redshiftCopy
   ;;
 
   regression)
@@ -211,6 +240,7 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runServiceTests.sh $TESTNAME
   ;; 
   
+
   interactive)
     sleep 365d
   ;; 

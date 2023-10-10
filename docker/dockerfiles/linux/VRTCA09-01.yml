@@ -11,8 +11,8 @@ services:
    networks:
      - YADAMU-NET
    ports: 
-      - "5436:5433"
-      - "5447:5444"
+      - "54331:5433"
+      - "54441:5444"
    volumes:
      - YADAMU_01-SHARED:/mnt/shared
      - VRTCA09-01-DATA:/home/dbadmin/docker

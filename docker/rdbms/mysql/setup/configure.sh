@@ -1,13 +1,13 @@
 # Temp Install MySQLShell to configure database. Changes will be lost when container restarts but that's OK
-apt-get update
-apt-get install -y curl
-apt-get install -y lsb-release
-apt-get install -y wget
-curl https://repo.mysql.com//mysql-apt-config_0.8.22-1_all.deb >  mysql-apt-config_0.8.22-1_all.deb
-export DEBIAN_FRONTEND="noninteractive";
-dpkg -i mysql-apt-config*.deb
-apt-get update  --allow-unauthenticated  
-apt-get install -y mysql-shell
+# apt-get update
+# apt-get install -y curl
+# apt-get install -y lsb-release
+# apt-get install -y wget
+# curl https://repo.mysql.com//mysql-apt-config_0.8.22-1_all.deb >  mysql-apt-config_0.8.22-1_all.deb
+# export DEBIAN_FRONTEND="noninteractive";
+# dpkg -i mysql-apt-config*.deb
+# apt-get update  --allow-unauthenticated  
+# apt-get install -y mysql-shell
 export STAGE=/var/lib/mysql/stage
 cd $STAGE
 mkdir -p log

@@ -674,7 +674,7 @@ create table t_postgres.network_types (
 --
 insert into t_postgres.network_types
 values (
-  '2001:4f8:3:ba:​2e0:81ff:fe22:d1f1/128',
+  '2001:4f8:3:ba:​2e00:81ff:fe22:d1f1/128',
   '2001:4f8:3:ba::/64',
   '0800-2b01-0203',
   '08002b01:02030405'
@@ -747,7 +747,7 @@ values (
 );
 insert into  t_postgres.binary_types
 values (
-  decode('FFFFFFF','hex'),
+  decode('FFFFFFFF','hex'),
   true,
   1::bit,
   B'111',

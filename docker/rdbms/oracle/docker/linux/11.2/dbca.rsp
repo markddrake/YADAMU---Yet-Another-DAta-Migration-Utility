@@ -351,20 +351,20 @@ EMCONFIGURATION = "NONE"
 # Datatype      : String
 # Description   : Location of the data file's
 # Valid values  : Directory for all the database files
-# Default value : $ORACLE_BASE\oradata
+# Default value : $ORACLE_BASE/oradata
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-DATAFILEDESTINATION ="{ORACLE_BASE}\oradata\{DB_UNIQUE_NAME}" 
+DATAFILEDESTINATION ="{ORACLE_BASE}/oradata/{DB_UNIQUE_NAME}" 
 
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYAREADESTINATION
 # Datatype      : String
 # Description   : Location of the data file's
 # Valid values  : Recovery Area location
-# Default value : $ORACLE_BASE\flash_recovery_area
+# Default value : $ORACLE_BASE/flash_recovery_area
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-RECOVERYAREADESTINATION="{ORACLE_BASE}\fast_recovery_area\{DB_UNIQUE_NAME}\"
+RECOVERYAREADESTINATION="{ORACLE_BASE}/fast_recovery_area{DB_UNIQUE_NAME}/"
 
 #-----------------------------------------------------------------------------
 # Name          : STORAGETYPE
@@ -465,7 +465,7 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Datatype      : String
 # Description   : Specifies list of listeners to register the database with.
 #         By default the database is configured for all the listeners specified in the 
-#         $ORACLE_HOME\network\admin\listener.ora   
+#         $ORACLE_HOME/network/admin/listener.ora   
 # Valid values  : The list should be space separated names like "listener1 listener2".
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
@@ -489,7 +489,7 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=ORA11200,ORACLE_BASE=c:\oracle,DB_NAME=ORA11200,ORACLE_HOME=c:\oracle\rdbms\11.2\db_home1,SID=ORA11200
+variables=DB_UNIQUE_NAME=ORA11200,ORACLE_BASE=/opt/oracle,DB_NAME=ORA11200,ORACLE_HOME=/opt/oracle/rdbms/11.2/db_home1,SID=ORA11200
 
 #-----------------------------------------------------------------------------
 # Name          : INITPARAMS
@@ -498,16 +498,16 @@ variables=DB_UNIQUE_NAME=ORA11200,ORACLE_BASE=c:\oracle,DB_NAME=ORA11200,ORACLE_
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-initParams=compatible=11.2.0.4.0,java_jit_enabled=false,db_name=ORA11200,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=16384,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME},SGA_TARGET=4096,PGA_AGGREGATE_TARGET=2048
+initParams=compatible=11.2.0.4.0,java_jit_enabled=false,db_name=ORA11200,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,sga_target=8192,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/oradata/admin/{DB_UNIQUE_NAME}/adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=4096,db_recovery_file_dest={ORACLE_BASE}/oradata/fast_recovery_area/{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
-# Name          : MEMORYPERCENTAGE 
+# Name          : MEMORYPERCENTAGE
 # Datatype      : String
 # Description   : percentage of physical memory for Oracle
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-MEMORYPERCENTAGE = "0"
+MEMORYPERCENTAGE = "85"
 
 #-----------------------------------------------------------------------------
 # Name          : DATABASETYPE
@@ -523,7 +523,7 @@ DATABASETYPE = "MULTIPURPOSE"
 # Name          : AUTOMATICMEMORYMANAGEMENT
 # Datatype      : Boolean
 # Description   : flag to indicate Automatic Memory Management is used
-# Valid values  : TRUE\FALSE
+# Valid values  : TRUE/FALSE
 # Default value : TRUE
 # Mandatory     : NO
 #-----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 # escape=`
-FROM yadamu/svr-2019:vs13
+FROM yadamu/svr:vs13
 #
 # The 11.2 version of setup.exe will not run in servercore. (No GUI).
 # In order to get a working 12.2 in server core is necessary to perform a software only installation in a clean Windows 10 or 11 environment. 
@@ -44,9 +44,10 @@ COPY dbca.rsp .
 COPY tnsnames.ora $ORACLE_HOME/network/admin
 COPY netca.rsp $ORACLE_HOME/assistants/netca
 #
-# Defer execution of NETCA and DBCA to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
+# Execution of NETCA and DBCA deferred to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
 #
 WORKDIR c:/
 COPY Start.ps1 .
 ENTRYPOINT ["powershell","c:\\Start.ps1"]
 #ENTRYPOINT ["powershell","wait-event"]
+

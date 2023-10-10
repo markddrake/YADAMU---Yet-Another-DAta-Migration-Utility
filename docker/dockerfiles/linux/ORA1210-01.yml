@@ -1,0 +1,40 @@
+version: "2.4"
+services:
+
+
+  ORA1210-01: 
+    container_name: ORA1210-01
+    # image:  oracle/database:12.1.0.2-ee 
+    image:  yadamu/oracle:12.1
+    mem_limit: '12gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15212:1521"
+    environment:
+      ORACLE_SID: CDB12100
+      ORACLE_PDB: PDB12100
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1210-01-DIAG:/opt/oracle/admin
+      - ORA1210-01-DATA:/opt/oracle/oradata
+      - ORA1210-01-DIAG:/opt/oracle/diag
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  ORA1210-01-ADMIN:
+  ORA1210-01-DATA:
+  ORA1210-01-DIAG:
+    

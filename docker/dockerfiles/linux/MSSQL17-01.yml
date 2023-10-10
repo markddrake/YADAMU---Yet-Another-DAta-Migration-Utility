@@ -11,7 +11,7 @@ services:
     networks:
       - YADAMU-NET
     ports: 
-      - "1433:1433"
+      - "14332:1433"
     environment:
       ACCEPT_EULA: Y
       MSSQL_MEMORY_LIMIT_MB: 16384

@@ -1,0 +1,37 @@
+version: "2.4"
+services:
+
+  ORA2103-01: 
+    container_name: ORA2103-01
+    # image:  oracle/database:21.3.0-ee
+    image:  yadamu/oracle:21.3.0
+    mem_limit: '10gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15216:1521"
+    environment:
+      ORACLE_SID: CDB21300 
+      ORACLE_PDB: PDB21300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA2103-01-DATA:/opt/oracle/admin
+      - ORA2103-01-DATA:/opt/oracle/oradata
+      - ORA2103-01-DIAG:/opt/oracle/diag
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  ORA2103-01-DATA:
+  ORA2103-01-DIAG:

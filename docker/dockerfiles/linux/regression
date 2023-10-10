@@ -8,7 +8,8 @@ COPY qa/regression qa/regression
 COPY qa/service qa/service
 COPY qa/sql qa/sql
 COPY src src
-copy utilities utilities
+COPY utilities utilities
+COPY qa/connections/connections.json qa/regression
 ENV TNS_ADMIN=/usr/src/YADAMU
 ENV YADAMU_PASSPHRASE=yabasc
 RUN mkdir -p mnt/log \

@@ -1,12 +1,18 @@
-# start the service
-if ((-not (Test-Path -Path "c:\oracle\oradata"  -PathType Container)) -or (@( Get-ChildItem "c:\oracle\oradata" ).Count -eq 0)){
-  Set-Location -Path $ENV:ORACLE_HOME
-  Write-Output "Oracle: Creating Network"
-  .\bin\netca -silent -responseFile $ENV:ORACLE_HOME\assistants\netca\netca.rsp
-  Write-Output "Oracle: Creating Database"
-  .\bin\dbca -silent -createDatabase -responseFile $ENV:ORACLE_HOME\dbca.rsp 
-  Write-Output "Oracle: Database created"
+Set-Location -Path $ENV:ORACLE_HOME
+$service = Get-Service -Name OracleOraDB11Home1TNSListener -ErrorAction SilentlyContinue
+if($service -eq $null) {
+  Start-Sleep -Seconds $ENV:DELAY
+  $NOW = Get-Date -Format "o"
+  Write-Output "$NOW Oracle: Creating Network Service ""OracleOraDB11Home1TNSListener""."
+  netca -silent -responseFile $ENV:ORACLE_HOME\assistants\netca\netca.rsp
+  $NOW = Get-Date -Format "o"
+  Write-Output "$NOW Oracle: Creating Database"
+  dbca -silent -createDatabase -responseFile $ENV:ORACLE_HOME\dbca.rsp 
+  $NOW = Get-Date -Format "o"
+  Write-Output "$NOW Oracle: Database created"
 }
-Write-Output "Oracle: Container Ready. Monitoring Logs."
+$NOW = Get-Date -Format "o"
+Write-Output "$NOW Oracle: Container Ready. Monitoring Logs."
 GET-Content -Path  C:\oracle\diag\rdbms\$ENV:ORACLE_SID\$ENV:ORACLE_SID\trace\alert_$ENV:ORACLE_SID.log  -Wait -ErrorAction 'silentlycontinue'
 Wait-Event
+
