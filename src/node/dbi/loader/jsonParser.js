@@ -12,7 +12,7 @@ class JSONParser extends _JSONParser {
   registerEvents(parser) {
     
     parser.once('error',(err) => {
-      this.yadamuLogger.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${this.exportFilePath}"`],err)
+      this.LOGGER.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${this.exportFilePath}"`],err)
 	  // How to stop the parser..
 	  // this.parser.destroy(err)  
 	  this.destroy(err);
@@ -22,14 +22,14 @@ class JSONParser extends _JSONParser {
     }).on('key',(key) => {
       // Push the current object onto the stack and the current object to the key
 
-      // this.yadamuLogger.trace([`${this.constructor.name}.onKey()`,`${this.jDepth}`,`"${key}"`],``);
+      // this.LOGGER.trace([`${this.constructor.name}.onKey()`,`${this.jDepth}`,`"${key}"`],``);
       
       this.objectStack.push(this.currentObject);
       this.currentObject = key;
     }).on('openobject',(key) => {
       // If the object has a key put the object on the stack and set the current object to the key. 
 
-      // this.yadamuLogger.trace([`${this.constructor.name}.onOpenObject()`,`${this.jDepth}`,`"${key}"`],`ObjectStack:${this.objectStack}\n`);      
+      // this.LOGGER.trace([`${this.constructor.name}.onOpenObject()`,`${this.jDepth}`,`"${key}"`],`ObjectStack:${this.objectStack}\n`);      
       
       if (this.jDepth > 0) {
         this.objectStack.push(this.currentObject);
@@ -42,7 +42,7 @@ class JSONParser extends _JSONParser {
         this.currentObject = key;
       }
     }).on('openarray',() => {
-      // this.yadamuLogger.trace([`${this.constructor.name}.onOpenArray()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}`);
+      // this.LOGGER.trace([`${this.constructor.name}.onOpenArray()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}`);
       if (this.jDepth > 0) {
         this.objectStack.push(this.currentObject);
       }
@@ -51,7 +51,7 @@ class JSONParser extends _JSONParser {
     }).on('valuechunk',(v) => {
       this.chunks.push(v);  
     }).on('value',(v) => {
-      // this.yadamuLogger.trace([`${this.constructor.name}.onvalue()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}\n`);        
+      // this.LOGGER.trace([`${this.constructor.name}.onvalue()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}\n`);        
       if (this.chunks.length > 0) {
         this.chunks.push(v);
         v = this.chunks.join('');
@@ -69,7 +69,7 @@ class JSONParser extends _JSONParser {
           this.currentObject = parentObject;
       }
     }).on('closeobject',() => {
-      // this.yadamuLogger.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${JSON.stringify(this.currentObject)}`);           
+      // this.LOGGER.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${JSON.stringify(this.currentObject)}`);           
       this.jDepth--;
 
       if (this.objectStack.length > 0) {
@@ -88,7 +88,7 @@ class JSONParser extends _JSONParser {
         this.currentObject = parentObject;
       }
     }).on('closearray',() => {
-	  // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
+	  // this.LOGGER.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
       this.jDepth--;
 
       let skipObject = false;

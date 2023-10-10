@@ -5,10 +5,17 @@ import DBIConstants        from './dbiConstants.js';
 
 class YadamuCopyManager {
  
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   constructor(dbi,credentials,yadamuLogger) {
     this.dbi = dbi
 	this.credentials = credentials
-	this.yadamuLogger = yadamuLogger
+
+	this.LOGGER   = yadamuLogger || this.dbi.LOGGER
+	this.DEBUGGER = this.dbi.DEBUGGER
   } 
   
   async reportCopyResults(tableName,metrics) {
@@ -21,11 +28,11 @@ class YadamuCopyManager {
     switch (metrics.skipped) {
 	  case 0:
 	    rowCountSummary = `Rows ${metrics.read}.`
-        this.yadamuLogger.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
+        this.LOGGER.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
         break
       default:
 	    rowCountSummary = `Read ${metrics.read}. Written ${metrics.read - metrics.skipped}.`
-        this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
+        this.LOGGER.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
         await this.dbi.reportCopyErrors(tableName,metrics)
 	}
 	
@@ -57,15 +64,15 @@ class YadamuCopyManager {
       }
 	} catch (cause) {
 	  result = cause
-	  // this.yadamuLogger.trace(['PIPELINE','COPY',sourceVendor,worker.DATABASE_VENDOR,this.dbi.getWorkerNumber()],cause)
-	  this.yadamuLogger.handleException(['PIPELINE','COPY',sourceVendor,worker.DATABASE_VENDOR,this.dbi.getWorkerNumber()],cause)
+	  // this.LOGGER.trace(['PIPELINE','COPY',sourceVendor,worker.DATABASE_VENDOR,this.dbi.getWorkerNumber()],cause)
+	  this.LOGGER.handleException(['PIPELINE','COPY',sourceVendor,worker.DATABASE_VENDOR,this.dbi.getWorkerNumber()],cause)
 	  if ((this.dbi.ON_ERROR === 'ABORT') && !operationAborted) {
         operationAborted = true
 		if (taskList.length > 0) {
-	      this.yadamuLogger.error(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed: Skipping ${taskList.length} Tables`);
+	      this.LOGGER.error(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed: Skipping ${taskList.length} Tables`);
 		}
 		else {
-	      this.yadamuLogger.warning(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed.`);
+	      this.LOGGER.warning(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed.`);
 		}		
         taskList.length = 0;
       }
@@ -91,11 +98,11 @@ class YadamuCopyManager {
 	  return this.copyOperation(taskList,worker)
     })
 	  
-    this.yadamuLogger.info(['PIPELINE','COPY',concurrency,sourceVendor,this.dbi.DATABASE_VENDOR],`Processing ${taskCount} Tables`);
+    this.LOGGER.info(['PIPELINE','COPY',concurrency,sourceVendor,this.dbi.DATABASE_VENDOR],`Processing ${taskCount} Tables`);
 
-    // this.yadamuLogger.trace([this.constructor.name,'COPY',concurrency,sourceVendor,this.dbi.DATABASE_VENDOR,'COPY_OPERATIONS',copyOperations.length],'WAITING')
+    // this.LOGGER.trace([this.constructor.name,'COPY',concurrency,sourceVendor,this.dbi.DATABASE_VENDOR,'COPY_OPERATIONS',copyOperations.length],'WAITING')
 	const results = await Promise.allSettled(copyOperations)
-	// this.yadamuLogger.trace([this.constructor.name,,concurrency,sourceVendor,this.dbi.DATABASE_VENDOR,workerCount,'COPY_OPERATIONS',copyOperations.length],'PROCESSING')
+	// this.LOGGER.trace([this.constructor.name,,concurrency,sourceVendor,this.dbi.DATABASE_VENDOR,workerCount,'COPY_OPERATIONS',copyOperations.length],'PROCESSING')
 	const fatalError = results.find((result) => { return result.value instanceof Error })?.value
 	if (fatalError) throw fatalError
 	return results
@@ -103,7 +110,7 @@ class YadamuCopyManager {
   
   async copyStagedData(vendor,controlFile,metadata) {
 
-    // this.yadamuLogger.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'copyStagedData()')
+    // this.LOGGER.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'copyStagedData()')
 
     this.dbi.verifyStagingSource(vendor)
 	

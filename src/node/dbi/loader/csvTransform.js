@@ -52,7 +52,7 @@ class CSVTransform extends YadamuParser {
   } 
   
   _final(callback) {
-	// this.yadamuLogger.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
+	// this.LOGGER.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
 	this.endTime = performance.now();
     this.push({
       eod: {

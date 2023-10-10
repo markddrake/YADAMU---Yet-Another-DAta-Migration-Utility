@@ -32,7 +32,7 @@ class LoaderCompare extends YadamuCompare {
 
 	const streams = await this.dbi.compareInputStreams(filename)
 		
-	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
+	const jsonParser = new JSONParser(this.LOGGER, this.MODE, filename)
 	streams.push(jsonParser);
 	
 	const arrayWriter = new ArrayWriter(this)
@@ -53,17 +53,17 @@ class LoaderCompare extends YadamuCompare {
           streams.push(...await this.dbi.compareInputStreams(exportFilePath))
         } catch (e) {
           if (e.FileNotFound && e.FileNotFound()) {
-            // this.yadamuLogger.error(['COMPARE','ROW COUNT'],`Cannot Locate File "${exportFilePath}".`)
-            this.yadamuLogger.handleException(['COMPARE','ROW COUNT'],e)
+            // this.LOGGER.error(['COMPARE','ROW COUNT'],`Cannot Locate File "${exportFilePath}".`)
+            this.LOGGER.handleException(['COMPARE','ROW COUNT'],e)
             return 0
           }
           throw e
         }
-        const rowCounter = new RowCounter(exportFilePath,this.yadamuLogger)
+        const rowCounter = new RowCounter(exportFilePath,this.LOGGER)
         streams.push(rowCounter)
         const nullStream = new NullWriter();
         streams.push(nullStream)  
-        // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,],`${streams.map((s) => { return s.constructor.name }).join(' => ')}`)
+        // this.LOGGER.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,],`${streams.map((s) => { return s.constructor.name }).join(' => ')}`)
         await pipeline(streams)
         return rowCounter.ROW_COUNT
       }))

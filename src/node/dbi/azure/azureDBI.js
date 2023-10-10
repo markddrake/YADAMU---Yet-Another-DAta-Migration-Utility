@@ -112,7 +112,7 @@ class AzureDBI extends CloudDBI {
 	  url = new URL(url ? url : 'http://0.0.0.0')
 	} catch (e) {
       this.logger.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${vendorProperties.endpoint}"`)
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
+	  this.LOGGER.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
 	  url = new URL('http://0.0.0.0')
 	}
 
@@ -129,7 +129,7 @@ class AzureDBI extends CloudDBI {
   }
 
   async createConnectionPool() {
-	// this.yadamuLogger.trace([this.constructor.name],`BlobServiceClient.fromConnectionString()`)
+	// this.LOGGER.trace([this.constructor.name],`BlobServiceClient.fromConnectionString()`)
     this.cloudConnection = BlobServiceClient.fromConnectionString(this.vendorProperties);
 	this.cloudService = new AzureStorageService(this,{})
   }

@@ -31,6 +31,12 @@ class StreamSwitcher extends Transform {
   get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation.driverSettings.spatialFormat }
   get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation.driverSettings.circleFormat }
 
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   /*
   **
   ** This class ensures that the correct components are attached up to the pipeline before pushing messages down the pipeline 
@@ -45,21 +51,21 @@ class StreamSwitcher extends Transform {
     super({objectMode: true });  
 	this.yadamu = yadamu
     this.READER_METRICS = metrics
-	this.yadamuLogger = this.yadamu.LOGGER
+	this.LOGGER = this.yadamu.LOGGER
 	this.rowsRead = 0	
   }
 
 
   pipe(outputStream,options) {
 	// Cache the down stream participant
-  	// this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],'Attaching pipe')
+  	// this.LOGGER.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],'Attaching pipe')
 	this.dbWriter = this.dbWriter || outputStream
 	return super.pipe(outputStream,options);
   } 
     
   generateTransformations(tableName) {
 
-    // this.yadamuLogger.trace([this.constructor.name,tableName],'generateTransformations()')
+    // this.LOGGER.trace([this.constructor.name,tableName],'generateTransformations()')
 	
 	const tableMetadata = this.metadata[tableName]
 	return tableMetadata.dataTypes.map((dataType,idx) => {	  
@@ -164,7 +170,7 @@ class StreamSwitcher extends Transform {
         throw new CommandLineError(`Could not resolve the following table names : "${invalidTableNames}".`)
       }
 	
-      this.yadamuLogger.info(['FILE'],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
+      this.LOGGER.info(['FILE'],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
 	  	 
       const metadata = {}
 	  this.TABLE_FILTER.forEach((table) => {
@@ -200,9 +206,9 @@ class StreamSwitcher extends Transform {
 	
 	const tableWriter = compose(...streams)
     this.dbWriter.listeners('error').forEach((f) => {tableWriter.on('error',f)});	
-    // this.yadamuLogger.trace([this.constructor.name,'createTableWriter()'],`Waiting on Cache Loaded. [${this.dbWriter.dbi.cacheLoaded}]`);
+    // this.LOGGER.trace([this.constructor.name,'createTableWriter()'],`Waiting on Cache Loaded. [${this.dbWriter.dbi.cacheLoaded}]`);
 	await this.dbWriter.dbi.cacheLoaded
-	// this.yadamuLogger.trace([this.constructor.name,'createTableWriter()'],`Cache Loaded. [${this.dbWriter.dbi.cacheLoaded}]`);
+	// this.LOGGER.trace([this.constructor.name,'createTableWriter()'],`Cache Loaded. [${this.dbWriter.dbi.cacheLoaded}]`);
 	this.setTransformations(tableName)
 	return tableWriter
   }
@@ -217,7 +223,7 @@ class StreamSwitcher extends Transform {
   }
       
   async doTransform(messageType,obj) {
-	  // this.yadamuLogger.trace([this.constructor.name,'doTransform()'],`${messageType}`)
+	  // this.LOGGER.trace([this.constructor.name,'doTransform()'],`${messageType}`)
 	  switch (messageType) {
 	    case 'data':
 		  this.processRow(obj)
@@ -236,13 +242,13 @@ class StreamSwitcher extends Transform {
 	  	  this.yadamu.WARNING_MANAGER.setMetadata(this.metadata)
 		  if ((this.yadamu.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
   	  	    // DDL_ONLY operation or empty schema: Wait for DDL Complete.
-			// this.yadamuLogger.trace([this.constructor.name,'doTransform()',messageType],`Waiting on DLL Complete. [${this.dbWriter.dbi.ddlComplete}]`);
+			// this.LOGGER.trace([this.constructor.name,'doTransform()',messageType],`Waiting on DLL Complete. [${this.dbWriter.dbi.ddlComplete}]`);
     		await this.dbWriter.dbi.ddlComplete
-			// this.yadamuLogger.trace([this.constructor.name,'doTransform()',messageType],`DDL Complete. [${this.dbWriter.dbi.ddlComplete}]`);
+			// this.LOGGER.trace([this.constructor.name,'doTransform()',messageType],`DDL Complete. [${this.dbWriter.dbi.ddlComplete}]`);
 		  }
 		  else {
 			// There are one or more tables to process. 
-			// this.yadamuLogger.trace([this.constructor.name,'doTransform()',messageType],`unpipe(${this.dbWriter.constructor.name})`);
+			// this.LOGGER.trace([this.constructor.name,'doTransform()',messageType],`unpipe(${this.dbWriter.constructor.name})`);
 	  	    this.unpipe(this.dbWriter);
 	      }
 	      break;
@@ -253,12 +259,12 @@ class StreamSwitcher extends Transform {
 			this.skipTable = false;
   		    this.processRow = this.writeDataToPipe
 		    this.tableWriter = await this.createTableWriter(obj.table)
-            // this.yadamuLogger.trace([this.constructor.name,'doTransform()'],`pipe(${this.tableWriter.constructor.name})`);
+            // this.LOGGER.trace([this.constructor.name,'doTransform()'],`pipe(${this.tableWriter.constructor.name})`);
 	  	    this.pipe(this.tableWriter) 
 	  	    this.push(obj)
 	      }
 		  else {
-			// this.yadamuLogger.trace([this.constructor.name,'doTransform()',messageType],`Skipping obj`);
+			// this.LOGGER.trace([this.constructor.name,'doTransform()',messageType],`Skipping obj`);
      		this.skipTable = true;
 			this.processRow = this.skipData
 		  }
@@ -275,7 +281,7 @@ class StreamSwitcher extends Transform {
             this.push(obj);
 			// Wait for the target stream to get all the data If we unpipe to early data is lost.
 			await this.tableDataWritten
-			// this.yadamuLogger.trace([this.constructor.name,'doTransform()',messageType],`unpipe(${this.tableWriter.constructor.name})`);
+			// this.LOGGER.trace([this.constructor.name,'doTransform()',messageType],`unpipe(${this.tableWriter.constructor.name})`);
 			this.unpipe(this.tableWriter)
 			// Pipe a null object to terminate the tableWriter and flush all pending data.
 			const is = new Readable.from([])
@@ -283,7 +289,7 @@ class StreamSwitcher extends Transform {
 		  }
 		  break;
 	    case 'eof':
-          // this.yadamuLogger.trace([this.constructor.name,'doTransform()'messageType],`pipe(${this.dbWriter.constructor.name})`);
+          // this.LOGGER.trace([this.constructor.name,'doTransform()'messageType],`pipe(${this.dbWriter.constructor.name})`);
 		  this.pipe(this.dbWriter); 
 	      this.push(obj);
       	  break;
@@ -298,7 +304,7 @@ class StreamSwitcher extends Transform {
 	this.doTransform(messageType,obj).then(() => { 
 	  callback()
 	}).catch((e) => { 
-	  this.yadamuLogger.handleException(['FILE','EVENT STREAM',`_TRANSFORM(${messageType})`,this?.dbWriter.dbi.ON_ERROR],e);
+	  this.LOGGER.handleException(['FILE','EVENT STREAM',`_TRANSFORM(${messageType})`,this?.dbWriter.dbi.ON_ERROR],e);
       callback(e)
 	})
   };

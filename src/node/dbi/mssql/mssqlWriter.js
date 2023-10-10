@@ -48,7 +48,7 @@ class MsSQLWriter extends YadamuWriter {
 		this.reportBatchError(batch,`INSERT MANY`,cause)
 	    await this.dbi.restoreSavePoint(cause);
 		await this.dbi.verifyTransactionState()
-	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
+	  	this.LOGGER.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative';
       }
     }
@@ -61,7 +61,7 @@ class MsSQLWriter extends YadamuWriter {
       if (this.rowsLost()) {
 		throw cause
       }
-      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`INSERT ONE`,`"${this.tableName}"`],cause);
+      this.LOGGER.handleException([`${this.dbi.DATABASE_VENDOR}`,`INSERT ONE`,`"${this.tableName}"`],cause);
       this.endTime = performance.now();
       this.releaseBatch(batch)
       return this.skipTable          
@@ -100,7 +100,7 @@ class MsSQLWriter extends YadamuWriter {
   }
 
   async doFinal() {
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost],'doFinal()')
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost],'doFinal()')
     await this.dbi.clearCachedStatement()
 	await super.doFinal()
   }

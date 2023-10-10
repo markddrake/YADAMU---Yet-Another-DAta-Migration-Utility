@@ -17,14 +17,20 @@ class exportFileHeader extends Transform {
   get DDL()                  { return this._DDL; }
   set DDL(v)                 { this._DDL = v  }
 
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   constructor(source, importFilePath, yadamuLogger) {
     super({objectMode: true })
-	this.yadamuLogger = yadamuLogger
+	this.LOGGER = yadamuLogger
 	this.SYSTEM_INFORMATION = undefined
 	this.METADATA = undefined
     this.DDL = []
 	this.source = source;
-	this.jsonParser = new JSONParser(this.yadamuLogger,'DDL_ONLY',importFilePath)
+	this.jsonParser = new JSONParser(this.LOGGER,'DDL_ONLY',importFilePath)
     source.pipe(this.jsonParser).pipe(this)
   }
 

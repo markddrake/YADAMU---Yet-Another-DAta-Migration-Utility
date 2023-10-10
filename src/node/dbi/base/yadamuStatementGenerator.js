@@ -69,13 +69,20 @@ class YadamuStatementGenerator {
     return this._TYPE_MAPPINGS
   }
   
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
 
     this.dbi = dbi;
     this.SOURCE_VENDOR = vendor
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;   
+
+	this.LOGGER   = yadamuLogger || this.dbi.LOGGER
+	this.DEBUGGER = this.dbi.DEBUGGER
   }
   
   async init() {
@@ -105,10 +112,10 @@ class YadamuStatementGenerator {
 	  if (spatialFormats.length > 0) {
   	    // ToDo ### Multiple spatial formats 
 	    if ((spatialFormats.length > 1)  && (!spatialFormats.every((val) => { return val === spatialFormats[0] } )))  {
-		  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Multiple spatial formats detected : ${spatialFormats}`)
+		  this.LOGGER.warning([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Multiple spatial formats detected : ${spatialFormats}`)
 	    }
 	    if (this.dbi.INBOUND_SPATIAL_FORMAT !== spatialFormats[0]) {
-		  this.yadamuLogger.qa([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Default Spatial Format overridden. Expected: ${this.dbi.INBOUND_SPATIAL_FORMAT}. Found: ${spatialFormats[0]}`)
+		  this.LOGGER.qa([this.dbi.DATABASE_VENDOR,tableMetadata.tableName],`Default Spatial Format overridden. Expected: ${this.dbi.INBOUND_SPATIAL_FORMAT}. Found: ${spatialFormats[0]}`)
 	    }		  
 	    return spatialFormats[0]
 	  }
@@ -265,9 +272,9 @@ class YadamuStatementGenerator {
 		                 || this.TYPE_MAPPINGS.get(dataType.toLowerCase()) 
 			             || this.TYPE_MAPPINGS.get(dataType.toUpperCase()) 
 	                     || this.mapUserDefinedDataType(dataType,tableMetadata.sizeConstraints[idx])
-                         || this.yadamuLogger.logInternalError([this.dbi.DATABASE_VENDOR,`MAPPING NOT FOUND`],`Missing Mapping for "${dataType}" in mappings for "${this.SOURCE_VENDOR}".`)
+                         || this.LOGGER.logInternalError([this.dbi.DATABASE_VENDOR,`MAPPING NOT FOUND`],`Missing Mapping for "${dataType}" in mappings for "${this.SOURCE_VENDOR}".`)
 	   targetDataType = this.refactorBySizeConstraint(dataType,targetDataType,tableMetadata.sizeConstraints[idx])
-       // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.SOURCE_VENDOR,dataType,tableMetadata.sizeConstraints[idx]],`Mapped to "${targetDataType}".`)
+       // this.LOGGER.trace([this.dbi.DATABASE_VENDOR,this.SOURCE_VENDOR,dataType,tableMetadata.sizeConstraints[idx]],`Mapped to "${targetDataType}".`)
        return targetDataType
 	 })
   }

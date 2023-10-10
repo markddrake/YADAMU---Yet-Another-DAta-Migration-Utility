@@ -38,16 +38,23 @@ class YadamuParser extends Transform {
       }) 
     }
   }
+
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
   
   constructor(dbi,queryInfo,yadamuLogger, parseDelay) {
     super({objectMode: true });  
 	this.dbi = dbi
     this.queryInfo = queryInfo;
-    this.yadamuLogger = yadamuLogger
 	this.startTime = performance.now()
 	this.setTransformations(queryInfo)
 	this.parseDelay = parseDelay
 	this.timings = []
+
+	this.LOGGER   = yadamuLogger || this.dbi.LOGGER
+	this.DEBUGGER = this.dbi.DEBUGGER
   }
     
   sendTableMessage() {
@@ -114,7 +121,7 @@ class YadamuParser extends Transform {
   }
 
    _final(callback) {
-	// this.yadamuLogger.trace([this.constructor.name,this.queryInfo.TABLE_NAME],'_final()');
+	// this.LOGGER.trace([this.constructor.name,this.queryInfo.TABLE_NAME],'_final()');
 	this.endTime = performance.now();
 	callback()
   } 

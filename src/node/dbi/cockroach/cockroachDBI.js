@@ -197,7 +197,7 @@ class CockroachDBI extends YadamuDBI {
      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	 const setting = Object.values(result.rows[0])[0]
 	 if (setting !== this.MAX_READ_BUFFER_MESSAGE_SIZE) {
-	   this.yadamuLogger.warning([this.DATABASE_VENDOR],`Adjusting max_read_buffer_size from '${setting}' to '${this.MAX_READ_BUFFER_MESSAGE_SIZE}'`)
+	   this.LOGGER.warning([this.DATABASE_VENDOR],`Adjusting max_read_buffer_size from '${setting}' to '${this.MAX_READ_BUFFER_MESSAGE_SIZE}'`)
 	   const statement = `SET CLUSTER SETTING sql.conn.max_read_buffer_message_size = '${this.MAX_READ_BUFFER_MESSAGE_SIZE}'`
    	   this.SQL_TRACE.traceSQL(statement)
        const results = await this.pool.query(statement)
@@ -216,7 +216,7 @@ class CockroachDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new CockroachError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
       // throw pgErr
     })
 
@@ -232,7 +232,7 @@ class CockroachDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
 
 	let stack
     this.SQL_TRACE.comment(`Getting Connection From Pool.`)
@@ -250,7 +250,7 @@ class CockroachDBI extends YadamuDBI {
 
   async getConnection() {
 
-	this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnection(pgClient)`)
+	this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnection(pgClient)`)
 	
 	this.logConnectionProperties()
     const sqlStartTime = performance.now()
@@ -298,14 +298,14 @@ class CockroachDBI extends YadamuDBI {
         case '00000': // Table not found on Drop Table if exists
 	      break;
         default:
-          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
+          this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
       }
     })  
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new CockroachError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
       // throw pgErr
     })
    
@@ -317,13 +317,13 @@ class CockroachDBI extends YadamuDBI {
 	this.POSTGIS_VERSION = await this.getPostgisInfo()
 	
 	if (this.isManager()) {
-      this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
 	}
   }
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined) {
 	  let stack
@@ -334,7 +334,7 @@ class CockroachDBI extends YadamuDBI {
       } catch (e) {
         this.connection = undefined;
 		const err = this.trackExceptions(new CockroachError(this.DRIVER_ID,e,stack,'Client.release()'))
-		this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
+		this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
       }
 	}
@@ -342,7 +342,7 @@ class CockroachDBI extends YadamuDBI {
   
   async closePool(options) {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
 
     if (this.pool !== undefined && this.pool.end) {
       let stack
@@ -382,7 +382,7 @@ class CockroachDBI extends YadamuDBI {
     const components = message.split(' ')
 	if (parseInt(components[10]) < parseInt(components[2])) {
 	  const requiredSize = parseInt(components[2])
-	  this.yadamuLogger.warning([this.DATABASE_VENDOR],`Setting max_read_buffer_size to '${requiredSize} MiB'`)
+	  this.LOGGER.warning([this.DATABASE_VENDOR],`Setting max_read_buffer_size to '${requiredSize} MiB'`)
 	  const resizeStatement = `SET CLUSTER SETTING sql.conn.max_read_buffer_message_size = '${requiredSize}MiB'`
 	  await this.rollbackTransaction()
       this.SQL_TRACE.traceSQL(resizeStatement)
@@ -465,20 +465,20 @@ class CockroachDBI extends YadamuDBI {
           await this.rollbackTransaction(cause) 
 	    } catch(transactionError) {
 	 	  cause.cause = [cause.cause, transactionError];
-  		  this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','TRANSACTION ABORTED','ROLLBACK TRANSACTION'],cause)
+  		  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','TRANSACTION ABORTED','ROLLBACK TRANSACTION'],cause)
 	      throw cause
 		}
   	    try {
  		  await this.beginTransaction() 
 	    } catch(transactionError) {
 		  cause.cause = [cause.cause, transactionError];
-  		  this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','BEGIN TRANSACTION',operation],cause)
+  		  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','BEGIN TRANSACTION',operation],cause)
 		  throw cause
 		}
 		if (cause.transactionAborted() && (retryCount < this.RETRY_LIMIT)) {
  	      retryCount++
-		  this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,'INSERT BATCH','TRANSACTION ABORTED',retryCount],cause)
-		  this.yadamuLogger.info([this.DATABASE_VENDOR,'INSERT BATCH'],`Retrying operation.`)
+		  this.LOGGER.handleWarning([this.DATABASE_VENDOR,'INSERT BATCH','TRANSACTION ABORTED',retryCount],cause)
+		  this.LOGGER.info([this.DATABASE_VENDOR,'INSERT BATCH'],`Retrying operation.`)
 		  continue
 		}
 		throw cause
@@ -488,7 +488,7 @@ class CockroachDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true)
-	this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
+	this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
     
   }
   
@@ -500,7 +500,7 @@ class CockroachDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+     // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
      await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
 	 super.beginTransaction()
@@ -515,7 +515,7 @@ class CockroachDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
@@ -530,7 +530,7 @@ class CockroachDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
+   // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
 
     this.checkConnectionState(cause)
 
@@ -551,7 +551,7 @@ class CockroachDBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
@@ -559,7 +559,7 @@ class CockroachDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
     this.checkConnectionState(cause)
 	 
@@ -577,7 +577,7 @@ class CockroachDBI extends YadamuDBI {
 
   async releaseSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
     super.releaseSavePoint()
@@ -621,7 +621,7 @@ class CockroachDBI extends YadamuDBI {
       const rlis = Readable.from(rli)
 
       const multiplexor = new PassThrough()
-	  const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
+	  const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.LOGGER)
 
 	  stack = new Error().stack		
       const outputStream = await this.executeSQL(CopyFrom(copyStatement))    
@@ -651,7 +651,7 @@ class CockroachDBI extends YadamuDBI {
     }
     catch (e) {
 	  if ((e instanceof CockroachError) && e.bjsonTooLarge()) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
+        this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable()
         elapsedTime = await this.loadStagingTable(importFilePath)	
@@ -669,7 +669,7 @@ class CockroachDBI extends YadamuDBI {
   */
 
   processLog(log,operation) {
-    super.processLog(log, operation, this.status, this.yadamuLogger)
+    super.processLog(log, operation, this.status, this.LOGGER)
     return log
   }
 
@@ -693,7 +693,7 @@ class CockroachDBI extends YadamuDBI {
       }
     }
     else {
-      this.yadamuLogger.error([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`)
+      this.LOGGER.error([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`)
       // Return value will be parsed....
       return [];
     }
@@ -759,7 +759,7 @@ class CockroachDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new CockroachParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new CockroachParser(this,queryInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -768,7 +768,7 @@ class CockroachDBI extends YadamuDBI {
 
   async getInputStream(queryInfo) {        
   
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
     /*
     **
@@ -859,7 +859,7 @@ class CockroachDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement)
       }))
     } catch (e) {
-	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
+	 this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	 results = e;
     }
 	return results;
@@ -909,7 +909,7 @@ class CockroachDBI extends YadamuDBI {
   	} catch(e) {
 	  metrics.writerError = e
 	  try {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
+  	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

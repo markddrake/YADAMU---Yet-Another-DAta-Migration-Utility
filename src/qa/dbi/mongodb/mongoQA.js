@@ -82,13 +82,13 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
       let stack
       let operation
 	  const tags = this.getTerminationTags(workerId,pid)
-	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
+	  this.LOGGER.qa(tags,`Termination Scheduled.`);
 	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
         if (this.client !== undefined) {
 		  
 		  // this.listCurrentOps()
 		  
-		  this.yadamuLogger.log(tags,`Killing connection.`);
+		  this.LOGGER.log(tags,`Killing connection.`);
           const killClient = await new MongoClient(this.getMongoURL(),{ useUnifiedTopology: true});
           await killClient.connect();
           const dbAdmin = await killClient.db('admin',{returnNonCachedInstance:true});  
@@ -102,7 +102,7 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
 		  await killClient.close()
         }
         else {
-          this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+          this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
         }
       }).catch((e) => {
           this.yadamu.LOGGER.handleException(tags,new MongoError(this.DRIVER_ID,e,stack,operation));

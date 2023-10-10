@@ -188,13 +188,13 @@ class JSONOutputManager extends YadamuOutputManager {
 	this.rowSeperator = ','
     this.COPY_METRICS.committed++;
     if ((this.FEEDBACK_INTERVAL > 0) && ((this.COPY_METRICS.committed % this.FEEDBACK_INTERVAL) === 0)) {
-      this.yadamuLogger.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.COPY_METRICS.committed}.`);
+      this.LOGGER.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.COPY_METRICS.committed}.`);
     }
   }
   
   async doTransform(messageType,obj) {
 	 
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.COPY_METRICS.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.COPY_METRICS.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
 	
     switch (messageType) {
       case 'data':
@@ -210,7 +210,7 @@ class JSONOutputManager extends YadamuOutputManager {
 	    break;  
       case 'eod':
         // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
-        // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,this.rowCount],`${YadamuConstants.END_OF_DATA}`)  
+        // this.LOGGER.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,this.rowCount],`${YadamuConstants.END_OF_DATA}`)  
         this.emit(YadamuConstants.END_OF_DATA)
       default:
     }
@@ -226,7 +226,7 @@ class JSONOutputManager extends YadamuOutputManager {
 	// Called from _flush() when there are no more rows to process for the current table.
 	// Generate the required reporting based on this component having no further data, since the downstream pipeline components remain open.
 	  
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.hasPendingRows(),this.COPY_METRICS.received,this.COPY_METRICS.committed,this.COPY_METRICS.written,this.COPY_METRICS.cached],`JSONOutputManager.processPendingRows(${this.hasPendingRows()})`)
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.hasPendingRows(),this.COPY_METRICS.received,this.COPY_METRICS.committed,this.COPY_METRICS.written,this.COPY_METRICS.cached],`JSONOutputManager.processPendingRows(${this.hasPendingRows()})`)
 	this.COPY_METRICS.managerEndTime = performance.now()
 	this.finalizeTable()
   }
@@ -234,12 +234,12 @@ class JSONOutputManager extends YadamuOutputManager {
   async doDestroy(err) {
     // Workaround for unexpected "[ERR_STREAM_DESTROYED]: Cannot call pipe after a stream was destroyed" exceptions	 
     if (this.writableEnded && this.writableFinished && err?.code === 'ERR_STREAM_DESTROYED') {
-      // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished,err.code],`JSON_Writer_destroy(): Swallowed error "${err.message}".`)
+      // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished,err.code],`JSON_Writer_destroy(): Swallowed error "${err.message}".`)
       err = undefined
 	}
 	
 	// Defer performance reporting to here... Ensures parser 'finish' event has occurred.
-	this.reportGenerator = new PerformanceReporter(this.dbi,this.tableInfo,this.COPY_METRICS,{},this.yadamuLogger)
+	this.reportGenerator = new PerformanceReporter(this.dbi,this.tableInfo,this.COPY_METRICS,{},this.LOGGER)
 	this.reportGenerator.reportPerformance(err)
 	this.reportGenerator.end()
 	await super.doDestroy(err)

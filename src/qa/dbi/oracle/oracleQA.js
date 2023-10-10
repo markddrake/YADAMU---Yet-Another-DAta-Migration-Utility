@@ -60,10 +60,10 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 	
     async scheduleTermination(pid,workerId) {
 	  const tags = this.getTerminationTags(workerId,`${pid.sid},${pid.serial}`)
-	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
+	  this.LOGGER.qa(tags,`Termination Scheduled.`);
       setTimeout(this.yadamu.KILL_DELAY,pid,{ref: false}).then(async (pid) => {
         if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
-	      this.yadamuLogger.log(tags,`Killing connection.`);
+	      this.LOGGER.log(tags,`Killing connection.`);
 		  const conn = await this.getConnection();
 		  const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
 		  let stack
@@ -74,24 +74,24 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 		  } catch (e) {
 			if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
 			  // The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
-			  this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
+			  this.LOGGER.log(tags,`Worker finished prior to termination.`)
  		    }
 			else {
 			  const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement)
-			  this.yadamuLogger.handleException(tags,cause)
+			  this.LOGGER.handleException(tags,cause)
 			}
             if (!e.message.startsWith('DPI-1010')) {
               try {
      		    await conn.close()
 	          } catch (closeError) {
                 closeError.cause = e;
- 			    this.yadamuLogger.handleException(tags,cause)
+ 			    this.LOGGER.handleException(tags,cause)
               }
 		    }    
 	      }
 		}
 		else {
-		  this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		}
       })
     }

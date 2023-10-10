@@ -334,7 +334,7 @@ class OracleOutputManager extends YadamuOutputManager {
     ** If talbeInfo.lobColuns = false then there are no lobs so there is no need to re-order the row.
     */
 
-    // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.COPY_METRICS.cached],'cacheRow()')
+    // this.LOGGER.trace([this.constructor.name,this.tableInfo.lobColumns,this.COPY_METRICS.cached],'cacheRow()')
 	
     // if (this.COPY_METRICS.received === 1) {console.log('Cache Row (1)\n',row)}
 

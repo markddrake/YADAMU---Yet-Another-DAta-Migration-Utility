@@ -214,8 +214,8 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
         }  
         return tableInfo.ddl;
       } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}`],e)
-        this.yadamuLogger.writeDirect(`${tableInfo.ddl}`)
+        this.LOGGER.logException([`${this.constructor.name}`],e)
+        this.LOGGER.writeDirect(`${tableInfo.ddl}`)
       } 
     });
     return statementCache;

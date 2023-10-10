@@ -82,10 +82,10 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 	
     async scheduleTermination(pid,workerId) {
       const tags = this.getTerminationTags(workerId,pid)
-      this.yadamuLogger.qa(tags,`Termination Scheduled.`);
+      this.LOGGER.qa(tags,`Termination Scheduled.`);
       setTimeout(this.yadamu.KILL_DELAY,pid,{ref: false}).then(async (pid) => {
         if (this.pool !== undefined) {
-          this.yadamuLogger.log(tags,`Killing connection.`);
+          this.LOGGER.log(tags,`Killing connection.`);
           // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
           // const request = new this.sql.Request(this.pool);
           const request = await this.sql.connect(this.vendorProperties);
@@ -97,20 +97,20 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
           } catch (e) {
             if (e.number && (e.number === 6104)) {
               // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
-              this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
+              this.LOGGER.log(tags,`Worker finished prior to termination.`)
             }
             else if (e.number && (e.number === 6106)) {
               // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
-              this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
+              this.LOGGER.log(tags,`Worker finished prior to termination.`)
             }
             else {
               const cause = new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement)
-              this.yadamuLogger.handleException(tags,cause)
+              this.LOGGER.handleException(tags,cause)
             }
           } 
         }
         else {
-          this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+          this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
         }
 	  })
     }
@@ -152,7 +152,7 @@ class MsSQLDBMgr extends MsSQLQA {
 		await this.final()
 
       } catch (e) {
-        console.log([this.DATABASE_VENDOR,'recreateDatabase()'],e);
+        // console.log([this.DATABASE_VENDOR,'recreateDatabase()'],e);
 		await this.destroy(e)
         throw e
       }

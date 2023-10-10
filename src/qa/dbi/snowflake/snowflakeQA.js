@@ -78,9 +78,9 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
       let stack
 	  const operation = `select SYSTEM$ABORT_SESSION( ${pid} );`
 	  const tags = this.getTerminationTags(workerId,pid)
-	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
+	  this.LOGGER.qa(tags,`Termination Scheduled.`);
       setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
-        this.yadamuLogger.log(tags,`Killing connection.`);
+        this.LOGGER.log(tags,`Killing connection.`);
         stack = new Error().stack
         const conn = await this.getConnectionFromPool();
         const res = await this.execute(conn,operation)

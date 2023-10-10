@@ -54,7 +54,7 @@ class TeradataCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NAM
 		  results = Object.values(results[0])
           compareResults.push(results)
 		} catch (e) {
-		  // this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'QA','COMPARE_SCHEMA'],e)  
+		  // this.LOGGER.handleException([this.dbi.DATABASE_VENDOR,'QA','COMPARE_SCHEMA'],e)  
 		  compareResults.push([table.TABLE_NAME,-1,-1,-1,-1,e.message])
 		}
 	  }

@@ -102,18 +102,18 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
 	  let stack
 	  const operation = `kill ${pid}`
 	  const tags = this.getTerminationTags(workerId,pid)
-	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
+	  this.LOGGER.qa(tags,`Termination Scheduled.`);
 	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
    	    if (this.pool !== undefined && this.pool.end) {
 		  stack = new Error().stack
-    	  this.yadamuLogger.log(tags,`Killing connection.`);
+    	  this.LOGGER.log(tags,`Killing connection.`);
      	  const conn = await this.getConnectionFromPool();
 		  
 		  const res = await conn.query(operation);
 		  await conn.release()
 		}
 		else {
-		  this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		}
       }).catch((e) => {
         this.yadamu.LOGGER.handleException(tags,new MySQLError(this.DRIVER_ID,e,stack,operation));

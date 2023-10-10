@@ -9,12 +9,18 @@ class RowCounter extends Transform {
 
   get ROW_COUNT()   { return this._ROW_COUNT }
 
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   constructor(exportFilePath,yadamuLogger) {
 
     super();  
 
 	this.exportFilePath = exportFilePath
-    this.yadamuLogger = yadamuLogger;
+    this.LOGGER = yadamuLogger;
 	
 	this.parser = Parser.createStream()
   
@@ -30,7 +36,7 @@ class RowCounter extends Transform {
   registerEvents(parser) {
   
     parser.once('error',(err) => {
-      this.yadamuLogger.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${exportFilePath}"`],err)
+      this.LOGGER.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${exportFilePath}"`],err)
 	  // parser.destroy(err);
   	  // Swallow any further errors raised by the Parser
 	  // parser.on('error',(err) => {});
@@ -39,10 +45,10 @@ class RowCounter extends Transform {
     }).on('openarray',() => {
       this.jDepth++;
     }).on('closeobject',() => {
-      // this.yadamuLogger.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${JSON.stringify(this.currentObject)}`);           
+      // this.LOGGER.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${JSON.stringify(this.currentObject)}`);           
       this.jDepth--;
     }).on('closearray',() => {
-	  // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
+	  // this.LOGGER.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
       this.jDepth--;
       switch (this.jDepth){
         case 1:

@@ -298,7 +298,7 @@ class FileDBI extends YadamuDBI {
 	
 	this.DIRECTORY = this.SOURCE_DIRECTORY
 	
-	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	// this.LOGGER.trace([this.constructor.name],`initializeExport()`)
 	super.initializeExport()
 	this.setDescription(this.FILE)
 	
@@ -310,7 +310,7 @@ class FileDBI extends YadamuDBI {
   }
 
   finalizeExport() {
- 	// this.yadamuLogger.trace([this.constructor.name,],'finalizeExport()')
+ 	// this.LOGGER.trace([this.constructor.name,],'finalizeExport()')
 	this.closeInputStream()
   }
   
@@ -364,20 +364,20 @@ class FileDBI extends YadamuDBI {
   async initializeImport() {
 
     // For FileDBI Import is Writing data to the file system.
-	// this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+	// this.LOGGER.trace([this.constructor.name],`initializeImport()`)
 		
 	this.DIRECTORY = this.TARGET_DIRECTORY
 	super.initializeImport()
     this.setDescription(this.FILE)
 
 	this.outputStream = await this.createOutputStream()
-    this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE],`Writing data to "${this.FILE}".`)
+    this.LOGGER.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE],`Writing data to "${this.FILE}".`)
   }
   
   async initializeData() {
   
 	// Set up the pipeline and write the system information, ddl and metadata sections to the pipe...
-    // this.yadamuLogger.trace([this.constructor.name],`initializeData()`)
+    // this.LOGGER.trace([this.constructor.name],`initializeData()`)
 
     // Remove the source structure from each metadata object prior to serializing it. Put it back after the serialization has been completed.
 
@@ -430,7 +430,7 @@ class FileDBI extends YadamuDBI {
   
   async finalizeData() {
     
-	// this.yadamuLogger.trace([this.constructor.name],`finalizeData(${YadamuLibrary.isEmpty(this.metadata)})`)
+	// this.LOGGER.trace([this.constructor.name],`finalizeData(${YadamuLibrary.isEmpty(this.metadata)})`)
 	
 	if (!YadamuLibrary.isEmpty(this.metadata)) {
       const finalizeExport = new ExportWriter('}}')
@@ -462,7 +462,7 @@ class FileDBI extends YadamuDBI {
         this.closeInputStream()
 	  }
     } catch (err) {
-      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'ABORT','InputStream'],err)
+      this.LOGGER.handleException([this.DATABASE_VENDOR,'ABORT','InputStream'],err)
     }
 	 
     try {
@@ -470,7 +470,7 @@ class FileDBI extends YadamuDBI {
         this.closeOutputStream()
 	  }
     } catch (err) {
-      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'ABORT','OutputStream'],err)
+      this.LOGGER.handleException([this.DATABASE_VENDOR,'ABORT','OutputStream'],err)
     }
   }
 
@@ -502,11 +502,11 @@ class FileDBI extends YadamuDBI {
     }
 
     if (this.metadata === undefined) {
-      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Metadata undefined. Cannot obtain required information.`)
+      this.LOGGER.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Metadata undefined. Cannot obtain required information.`)
 	}
 
 	if (this.metadata[tableName] === undefined) {
-      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`No metadata entry for "${tableName}". Current entries: ${JSON.stringify(Object.keys(this.metadata))}`)
+      this.LOGGER.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`No metadata entry for "${tableName}". Current entries: ${JSON.stringify(Object.keys(this.metadata))}`)
 	}
 
 	// ### Need to simplify and standardize DataTypes - Data type mapping for Files.. 
@@ -527,7 +527,7 @@ class FileDBI extends YadamuDBI {
     // Return the inputStream and the transform streams required to process it.
     const stats = fs.statSync(this.FILE)
     const fileSizeInBytes = stats.size
-    this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.READER_ROLE],`Processing file "${this.FILE}". Size ${fileSizeInBytes} bytes.`)
+    this.LOGGER.info([this.DATABASE_VENDOR,YadamuConstants.READER_ROLE],`Processing file "${this.FILE}". Size ${fileSizeInBytes} bytes.`)
 	return this.inputStream
   }
   
@@ -577,7 +577,7 @@ class FileDBI extends YadamuDBI {
       streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
-	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.FILE)
+	const jsonParser = new JSONParser(this.LOGGER, this.MODE, this.FILE)
     jsonParser.COPY_METRICS = metrics
 	jsonParser.once('readable',() => {
 	  metrics.parserStartTime = performance.now()
@@ -604,8 +604,8 @@ class FileDBI extends YadamuDBI {
 
   getOutputStream(tableName,metrics) {
     // Override parent method to allow output stream to be passed to worker
-    // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
-	const jw =  new JSONOutputManager(this,tableName,metrics,this.firstTable,this.status,this.yadamuLogger)
+    // this.LOGGER.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
+	const jw =  new JSONOutputManager(this,tableName,metrics,this.firstTable,this.status,this.LOGGER)
 	return jw
   }
       
@@ -668,7 +668,7 @@ class FileDBI extends YadamuDBI {
     this.FILE = outputFilePath
 	await this.createOutputStream()
 	streams.push(this.outputStream)
-	this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE,options.encryptedInput ? 'DECRYPT' : 'ENCRYPT'],`File: "${inputFilePath}" ==> "${outputFilePath}"`)
+	this.LOGGER.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE,options.encryptedInput ? 'DECRYPT' : 'ENCRYPT'],`File: "${inputFilePath}" ==> "${outputFilePath}"`)
 	return streams;
   }
     

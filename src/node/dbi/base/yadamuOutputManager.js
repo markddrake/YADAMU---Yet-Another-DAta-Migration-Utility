@@ -22,6 +22,11 @@ class YadamuOutputManager extends Transform {
   set COPY_METRICS(v)      { this._COPY_METRICS =  v }
 
   get PARTITIONED_TABLE()  { return this.tableInfo?.hasOwnProperty('partitionCount')}    
+
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
   
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
     const options = {
@@ -35,7 +40,9 @@ class YadamuOutputManager extends Transform {
 	this.displayName = tableName
 	this.COPY_METRICS = metrics
 	this.status = status;
-    this.yadamuLogger = yadamuLogger;    
+  
+  	this.LOGGER   = yadamuLogger || this.dbi.LOGGER
+	this.DEBUGGER = this.dbi.DEBUGGER
 
     this.startTime = performance.now();
 	this.endTime = undefined
@@ -62,13 +69,13 @@ class YadamuOutputManager extends Transform {
   async nextBatch() {
     this.COPY_METRICS.batchNumber++;
 	if (this.batchCache.length === 0) {  
-      // this.yadamuLogger.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'WAITING')       
+      // this.LOGGER.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'WAITING')       
 	  await new Promise((resolve,reject) => {
 		this.once(DBIConstants.BATCH_RELEASED,() => {
 	      resolve()
 		})
 	  })
-      // this.yadamuLogger.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'PROCESSING')
+      // this.LOGGER.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'PROCESSING')
 	}
 	this.COPY_METRICS.cached = 0;
 	const nextBatch = this.batchCache.shift()
@@ -84,9 +91,9 @@ class YadamuOutputManager extends Transform {
   }
 
   async setTableInfo(tableName) {
-    // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'WAITING')
+    // this.LOGGER.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'WAITING')
     await this.dbi.cacheLoaded
-    // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'PROCESSING')
+    // this.LOGGER.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'PROCESSING')
     this.tableInfo = this.dbi.getTableInfo(tableName)
 	this.skipTable = this.dbi.MODE === 'DDL_ONLY';	
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
@@ -119,7 +126,7 @@ class YadamuOutputManager extends Transform {
   }
    
   abortTable() {
-	// this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'abortTable()')
+	// this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'abortTable()')
 	
     this.skipTable = true;
 	
@@ -162,13 +169,13 @@ class YadamuOutputManager extends Transform {
       this.rejectRow(this.tableName,record);
       const iterativeError = this.createIterativeException(cause,this.COPY_METRICS.cached,rowNumber,record,info)
 	  this.dbi.trackExceptions(iterativeError);
-      this.yadamuLogger.logRejected([...(typeof cause.getTags === 'function' ? cause.getTags() : []),this.dbi.DATABASE_VENDOR,this.displayName,operation,this.COPY_METRICS.cached,rowNumber],iterativeError);
+      this.LOGGER.logRejected([...(typeof cause.getTags === 'function' ? cause.getTags() : []),this.dbi.DATABASE_VENDOR,this.displayName,operation,this.COPY_METRICS.cached,rowNumber],iterativeError);
     } catch (e) {
-	  this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.displayName,this.tableInfo.insertMode],e)
+	  this.LOGGER.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.displayName,this.tableInfo.insertMode],e)
     }
     
     if (this.COPY_METRICS.skipped === this.dbi.TABLE_MAX_ERRORS) {
-      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.LOGGER.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
       this.abortTable()
     }
   }
@@ -197,7 +204,7 @@ class YadamuOutputManager extends Transform {
       }
     } catch (cause) {
 	  if (row === undefined) {
-        this.yadamuLogger.logInternalError([this.constructor.name,`checkColumnCount()`,this.tableName,],`${this.constructor.name}.checkColumnCount(). Received "undefined" row.`)
+        this.LOGGER.logInternalError([this.constructor.name,`checkColumnCount()`,this.tableName,],`${this.constructor.name}.checkColumnCount(). Received "undefined" row.`)
 		this.abortTable()
 		row = []
 	  }
@@ -213,7 +220,7 @@ class YadamuOutputManager extends Transform {
     // Use forEach not Map as transformations are not required for most columns. 
     // Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
-    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
+    // this.LOGGER.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
 
 	// if (this.COPY_METRICS.cached === 0) console.log('CR1',row)      
     this.rowTransformation(row)
@@ -235,7 +242,7 @@ class YadamuOutputManager extends Transform {
   processOutOfSequenceMessages() {
 
     if (this.outOfSequenceMessageCache.length > 0) {
-  	  // this.yadamuLogger.qa(['WARNING',this.tableName,`INCORRECT MESSAGE SEQUENCE`],`Encounted ${this.outOfSequenceMessageCache.length} out of sequence 'data' messages prior to receiving 'table' message.`)  
+  	  // this.LOGGER.qa(['WARNING',this.tableName,`INCORRECT MESSAGE SEQUENCE`],`Encounted ${this.outOfSequenceMessageCache.length} out of sequence 'data' messages prior to receiving 'table' message.`)  
 	  this.COPY_METRICS.receivedOoS = this.outOfSequenceMessageCache.length
 	}
 	
@@ -259,7 +266,7 @@ class YadamuOutputManager extends Transform {
     this.cacheRow(data)
 	if (this.flushBatch()) {
       if (this.dbi.REPORT_BATCHES) {
-        this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.COPY_METRICS.written}.`);
+        this.LOGGER.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.COPY_METRICS.written}.`);
 	  }
 	  this.COPY_METRICS.pending+= this.COPY_METRICS.cached
 	  const pushResult = this.push({batch:this.batch, snapshot: Object.assign({}, this.COPY_METRICS)})
@@ -267,7 +274,7 @@ class YadamuOutputManager extends Transform {
 	  }	  
     else {
 	  if ((this.dbi.FEEDBACK_MODEL === 'ALL') && (this.COPY_METRICS.received % this.dbi.FEEDBACK_INTERVAL === 0)) {
-        this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows Cached: ${this.COPY_METRICS.cached}.`);
+        this.LOGGER.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows Cached: ${this.COPY_METRICS.cached}.`);
       }
 	}
   }
@@ -298,7 +305,7 @@ class YadamuOutputManager extends Transform {
  
   async doTransform(messageType,obj) {
 	 
-	// this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.COPY_METRICS.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
+	// this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.COPY_METRICS.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
 	
 	/* 
 	**
@@ -317,7 +324,7 @@ class YadamuOutputManager extends Transform {
             case 'SKIP':
             case 'FLUSH':
         	  // Ignore the error 
-	          this.yadamuLogger.handleException([`PIPELINE`,`WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
+	          this.LOGGER.handleException([`PIPELINE`,`WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
 		      return
             case 'ABORT': 
             default:
@@ -345,7 +352,7 @@ class YadamuOutputManager extends Transform {
 	    break;  
 	  case 'eod':
         // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
-        // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,'EMIT'],`"allDataReceived"`)  
+        // this.LOGGER.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,'EMIT'],`"allDataReceived"`)  
         this.emit(YadamuConstants.END_OF_DATA)
         break;  
       default:
@@ -360,7 +367,7 @@ class YadamuOutputManager extends Transform {
 	this.doTransform(messageType,obj).then(() => { 
 	  callback() 
 	}).catch((e) => { 
-      this.yadamuLogger.handleException([`PIPELINE`,`WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
+      this.LOGGER.handleException([`PIPELINE`,`WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
       this.underlyingError = e;
       callback(e) 
     })
@@ -369,7 +376,7 @@ class YadamuOutputManager extends Transform {
 
   async processPendingRows() {
 	  
-	// this.yadamuLogger.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.COPY_METRICS.received,this.COPY_METRICS.committed,this.COPY_METRICS.written,this.COPY_METRICS.cached],`processPendingRows(${this.hasPendingRows()})`)
+	// this.LOGGER.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.COPY_METRICS.received,this.COPY_METRICS.committed,this.COPY_METRICS.written,this.COPY_METRICS.cached],`processPendingRows(${this.hasPendingRows()})`)
 	
     if (this.hasPendingRows()) {
       this.COPY_METRICS.pending+= this.COPY_METRICS.cached
@@ -391,7 +398,7 @@ class YadamuOutputManager extends Transform {
 
   _flush(callback) {
 
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished],'YadamuOutputManager._flush()')
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished],'YadamuOutputManager._flush()')
 	this.doFlush().then(() => { callback()}).catch((e) => { callback(e)})
     
   }
@@ -415,7 +422,7 @@ class YadamuOutputManager extends Transform {
 	  } catch(e) {
 	   this.underlyingError = e
 	   e.cause = err
-	   this.yadamuLogger.handleException([`PIPELINE`,`STREAM WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);
+	   this.LOGGER.handleException([`PIPELINE`,`STREAM WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);
 	   throw e
 	  }	
 	}
@@ -423,7 +430,7 @@ class YadamuOutputManager extends Transform {
 	
   _destroy (err,callback)  {
 	  
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.readableLength,this.writableLength],`YadamuOutputManager._destroy(${err ? err.message : 'Normal'})`)
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.readableLength,this.writableLength],`YadamuOutputManager._destroy(${err ? err.message : 'Normal'})`)
     this.doDestroy(err).then(() => { callback(err) }).catch((e) => { callback(e) })
   }
 }

@@ -56,7 +56,7 @@ class YugabyteCompare extends YadamuCompare {
   		  results = Object.values(results.rows[0])
           compareResults.push(results)
 		} catch (e) {
-		  // this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'QA','COMPARE_SCHEMA'],e)  
+		  // this.LOGGER.handleException([this.dbi.DATABASE_VENDOR,'QA','COMPARE_SCHEMA'],e)  
 		  compareResults.push([table[0],-1,-1,-1,-1,e.message])
 		}
 	  }

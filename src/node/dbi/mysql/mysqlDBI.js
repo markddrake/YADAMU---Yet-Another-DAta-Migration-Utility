@@ -139,7 +139,7 @@ class MySQLDBI extends YadamuDBI {
         case 'lower_case_table_names':
           this.LOWER_CASE_TABLE_NAMES = row.Value
           if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
-			this.yadamuLogger.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`)
+			this.LOGGER.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`)
 	      }
           break;
        }
@@ -164,7 +164,7 @@ class MySQLDBI extends YadamuDBI {
 		
 	  // Need to change the setting.
 		
-      this.yadamuLogger.info([this.DATABASE_VENDOR],`Increasing MAX_ALLOWED_PACKET to 1G.`)
+      this.LOGGER.info([this.DATABASE_VENDOR],`Increasing MAX_ALLOWED_PACKET to 1G.`)
       results = await this.executeSQL(sqlSetPacketSize)
 	  
 	  if (existingConnection) {
@@ -203,7 +203,7 @@ class MySQLDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     this.SQL_TRACE.comment(`Gettting Connection From Pool.`)
     
@@ -223,7 +223,7 @@ class MySQLDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined)},${(typeof this.connection.release === 'function')})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined)},${(typeof this.connection.release === 'function')})`)
 
     if (this.keepAliveHdl) {
       clearInterval(this.keepAliveHdl)
@@ -249,7 +249,7 @@ class MySQLDBI extends YadamuDBI {
       
   async closePool(options) {
       
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,],`closePool(${this.pool !== undefined)},${(typeof this.pool.end === 'function')})`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,],`closePool(${this.pool !== undefined)},${(typeof this.pool.end === 'function')})`)
 	      
     if ((this.pool !== undefined) && (typeof this.pool.end === 'function')) {
       let stack;
@@ -444,7 +444,7 @@ class MySQLDBI extends YadamuDBI {
   
   async beginTransaction() {
       
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
     let stack
     this.SQL_TRACE.traceSQL(`begin transaction`)
@@ -467,7 +467,7 @@ class MySQLDBI extends YadamuDBI {
   
   async commitTransaction() {
     
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     let stack
     this.SQL_TRACE.traceSQL(`commit transaction`)
@@ -490,7 +490,7 @@ class MySQLDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -512,7 +512,7 @@ class MySQLDBI extends YadamuDBI {
   
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
@@ -520,7 +520,7 @@ class MySQLDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -537,7 +537,7 @@ class MySQLDBI extends YadamuDBI {
 
   async releaseSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)   
     super.releaseSavePoint()
@@ -563,7 +563,7 @@ class MySQLDBI extends YadamuDBI {
       inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
     })
 	
-    const exportFileHeader = new ExportFileHeader (is, importFilePath, this.yadamuLogger)
+    const exportFileHeader = new ExportFileHeader (is, importFilePath, this.LOGGER)
 
 	try {
 	  await finished(exportFileHeader);
@@ -586,7 +586,7 @@ class MySQLDBI extends YadamuDBI {
   processLog(results,operation) {
     if (results[0].logRecords !== null) {
       const log = JSON.parse(results[0].logRecords)
-      super.processLog(log, operation, this.status, this.yadamuLogger)
+      super.processLog(log, operation, this.status, this.LOGGER)
       return log
     }
     else {
@@ -688,7 +688,7 @@ class MySQLDBI extends YadamuDBI {
     let keepAliveHdl = undefined
    
     if (this.keepAliveInterval > 0) {
-      this.yadamuLogger.info([`${this.constructor.name}.getInputStream()`],`Stating Keep Alive. Interval ${this.keepAliveInterval}ms.`)
+      this.LOGGER.info([`${this.constructor.name}.getInputStream()`],`Stating Keep Alive. Interval ${this.keepAliveInterval}ms.`)
       keepAliveHdl = setInterval(this.keepAlive,this.keepAliveInterval,this)
     }
 
@@ -703,7 +703,7 @@ class MySQLDBI extends YadamuDBI {
         const is = this.connection.query(queryInfo.SQL_STATEMENT).stream()
         is.on('end',() => {
 		  this.activeInputStream = false;
-          // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${queryInfo.TABLE_NAME}`],``) 
+          // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${queryInfo.TABLE_NAME}`],``) 
           if (keepAliveHdl !== undefined) {
             clearInterval(keepAliveHdl)
             keepAliveHdl = undefined
@@ -737,7 +737,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    this.parser = new MySQLParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    this.parser = new MySQLParser(this,queryInfo,this.LOGGER,parseDelay)
     return this.parser;
   }  
     

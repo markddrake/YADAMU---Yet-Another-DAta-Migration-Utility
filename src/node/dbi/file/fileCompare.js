@@ -14,9 +14,15 @@ import StatisticsCollector from './statisticsCollector.js';
 
 class FileCompare extends YadamuCompare {   
   
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+  
   constructor(dbi,configuration) {
 	super(dbi,configuration)
-	this.yadamuLogger = this.dbi.yadamuLogger
+	this.LOGGER = this.dbi.LOGGER
     this.deepCompare = false;
     this.sort = false;
   }
@@ -44,7 +50,7 @@ class FileCompare extends YadamuCompare {
 
   async getContentMetadata(file,sort) {
       
-    const jsonParser  = new JSONParser(this.yadamuLogger, 'COMPARE', file)
+    const jsonParser  = new JSONParser(this.LOGGER, 'COMPARE', file)
     let readStream
     try {
       readStream = fs.createReadStream(file);         
@@ -63,7 +69,7 @@ class FileCompare extends YadamuCompare {
       return statisticsCollector.getStatistics()
     } catch (err) {
 	  console.log('Pipeline Failed',err)
-      this.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
+      this.LOGGER.logException([`${this.constructor.name}.getConentMetadata()`],err);
     }
   }
   
@@ -122,23 +128,23 @@ class FileCompare extends YadamuCompare {
       cStats = {size : -1}
     }
     	 
-    this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-    this.yadamuLogger.writeDirect(`| ${'GRANDPARENT FILE'.padEnd(colSizes[0])} |`
+    this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+    this.LOGGER.writeDirect(`| ${'GRANDPARENT FILE'.padEnd(colSizes[0])} |`
                                 + ` ${'GRANDPARENT SIZE'.padStart(colSizes[1])} |`
                                 + ` ${'PARENT_SIZE'.padStart(colSizes[2])} |` 
                                 + ` ${'DELTA'.padStart(colSizes[3])} |`
                                 + ` ${'CHILD SIZE'.padStart(colSizes[4])} |` 
                                 + ` ${'DELTA'.padStart(colSizes[5])} |`
                           + '\n');
-    this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-    this.yadamuLogger.writeDirect(`| ${grandparent.padEnd(colSizes[0])} |`
+    this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+    this.LOGGER.writeDirect(`| ${grandparent.padEnd(colSizes[0])} |`
                                 + ` ${gStats.size.toString().padStart(colSizes[1])} |`
                                 + ` ${pStats.size.toString().padStart(colSizes[2])} |` 
                                 + ` ${(gStats.size - pStats.size).toString().padStart(colSizes[3])} |` 
                                 + ` ${cStats.size.toString().padStart(colSizes[4])} |` 
                                 + ` ${(pStats.size - cStats.size).toString().padStart(colSizes[5])} |` 
                           + '\n');
-    this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+    this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
  
     colSizes = [48, 18, 12, 12, 12, 12, 18, 12, 12, 12, 12, 48]
     seperatorSize = (colSizes.length * 3) - 1;
@@ -163,8 +169,8 @@ class FileCompare extends YadamuCompare {
                          + (metrics[3][mappedTableName] ? (metrics[3][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10);
  
       if (idx === 0) {                            
-        this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-        this.yadamuLogger.writeDirect(`| ${'TABLE NAME'.padStart(colSizes[0])} |`
+        this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+        this.LOGGER.writeDirect(`| ${'TABLE NAME'.padStart(colSizes[0])} |`
                                     + ` ${'GRANDPARENT ROWS'.padStart(colSizes[1])} |`
                                     + ` ${'PARENT_ROWS'.padStart(colSizes[2])} |` 
                                     + ` ${'DELTA'.padStart(colSizes[3])} |`
@@ -177,11 +183,11 @@ class FileCompare extends YadamuCompare {
                                     + ` ${'DELTA'.padStart(colSizes[10])} |`
                                     + ` ${'TIMINGS'.padStart(colSizes[11])} |`
                                     + '\n');
-        this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+        this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
       }
 
       	
-      this.yadamuLogger.writeDirect(`| ${table.padStart(colSizes[0])} |`
+      this.LOGGER.writeDirect(`| ${table.padStart(colSizes[0])} |`
                                   + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
                                   + ` ${pMetadata[mappedTableName].rowCount.toString().padStart(colSizes[2])} |`
                                   + ` ${(gMetadata[table].rowCount - pMetadata[mappedTableName].rowCount).toString().padStart(colSizes[3])} |`
@@ -204,7 +210,7 @@ class FileCompare extends YadamuCompare {
       }
 	  
       if (idx+1 === tables.length) {
-          this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+          this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
       }
     })
 	

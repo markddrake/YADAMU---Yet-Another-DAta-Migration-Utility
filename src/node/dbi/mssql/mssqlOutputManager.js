@@ -110,7 +110,7 @@ class MsSQLOutputManager extends YadamuOutputManager {
 		    case "NULLIFY":
 			  return (col, idx) => {
 			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+                  this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
 	  		      return null;
 				}
 			    return col
@@ -141,7 +141,7 @@ class MsSQLOutputManager extends YadamuOutputManager {
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
 		// ### Should this use HandleIterative Error ???
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
+        this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
         this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
 		this.COPY_METRICS.skipped++
         return

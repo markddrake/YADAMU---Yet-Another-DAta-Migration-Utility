@@ -151,7 +151,7 @@ class RedshiftDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new RedshiftError(this.DRIVER_ID,err,this.redshiftStack,this.redshiftsOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
       // throw pgErr
     })
 
@@ -159,7 +159,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
 
 	
 	let stack
@@ -208,14 +208,14 @@ class RedshiftDBI extends YadamuDBI {
         case '00000': // Table not found on Drop Table if exists
 	      break;
         default:
-          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
+          this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
       }
     })  
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new RedshiftError(this.DRIVER_ID,err,this.redshiftStack,this.redshiftsOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
       // throw pgErr
     })
    
@@ -228,7 +228,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -246,7 +246,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async closePool(options) {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
 
     if (this.pool !== undefined && this.pool.end) {
       let stack
@@ -338,7 +338,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+     // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
      await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
 	 super.beginTransaction()
@@ -353,7 +353,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
@@ -368,7 +368,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
+   // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
 
     this.checkConnectionState(cause)
 
@@ -385,7 +385,7 @@ class RedshiftDBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
     // await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
@@ -393,7 +393,7 @@ class RedshiftDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
     this.checkConnectionState(cause)
 	 
@@ -411,7 +411,7 @@ class RedshiftDBI extends YadamuDBI {
 
   async releaseSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await // this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
     super.releaseSavePoint()
@@ -431,7 +431,7 @@ class RedshiftDBI extends YadamuDBI {
   */
 
   processLog(log,operation) {
-    super.processLog(log, operation, this.status, this.yadamuLogger)
+    super.processLog(log, operation, this.status, this.LOGGER)
     return log
   }
 
@@ -447,7 +447,7 @@ class RedshiftDBI extends YadamuDBI {
       }
     }
     else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`)
+      this.LOGGER.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`)
       // Return value will be parsed....
       return [];
     }
@@ -529,7 +529,7 @@ class RedshiftDBI extends YadamuDBI {
   }
 
   createParser(tableInfo,parseDelay) {
-    return new RedshiftParser(this,tableInfo,this.yadamuLogger,parseDelay)
+    return new RedshiftParser(this,tableInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -538,7 +538,7 @@ class RedshiftDBI extends YadamuDBI {
 
   async getInputStream(queryInfo) {       
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
     /*
     **
@@ -613,7 +613,7 @@ class RedshiftDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement)
       }))
     } catch (e) {
-	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
+	 this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	 results = e;
     }
 	return results;
@@ -667,7 +667,7 @@ class RedshiftDBI extends YadamuDBI {
 	 } 
      err.cause = causes;	 
 	 err.sql = metrics.sql;
-	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
+	 this.LOGGER.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
 
   async copyOperation(tableName,copyOperation,metrics) {
@@ -695,7 +695,7 @@ class RedshiftDBI extends YadamuDBI {
   		    cause.cause = e
 	      }
         }
-        this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'Copy',tableName],cause)
+        this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'Copy',tableName],cause)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

@@ -58,7 +58,7 @@ class OracleCompare extends YadamuCompare {
 		  // ComapareSchema throws missing table on the Global TemporaryTable following an ORA-3113 and getting a new connection from the Pool. 
 		  // Problem apperas to be reslved by closing and re-opening the connection Pool.
 		  if (e.missingTable()) {
-			this.yadamuLogger.handleWarning([`COMPARE`,`${this.dbi.DATABASE_VENDOR}`],e)
+			this.LOGGER.handleWarning([`COMPARE`,`${this.dbi.DATABASE_VENDOR}`],e)
 			retryCount++
 			await this.dbi.closeConnection()
 			await this.dbi.closePool(0)

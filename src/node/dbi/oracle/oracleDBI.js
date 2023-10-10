@@ -252,7 +252,7 @@ class OracleDBI extends YadamuDBI {
     // Oracle always has a transaction in progress, so beginTransaction is a no-op
 
 	this.TRANSACTION_IN_PROGRESS = true;
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Constructor Complete')
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Constructor Complete')
 	
   }
   
@@ -310,9 +310,9 @@ class OracleDBI extends YadamuDBI {
 	this.vendorProperties.poolMax = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 3
 	try {
       stack = new Error().stack
-      // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
+      // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
 	  this.pool = await oracledb.createPool(this.vendorProperties)
-      // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Pool Created')
+      // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Pool Created')
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.createPool()'))
@@ -321,7 +321,7 @@ class OracleDBI extends YadamuDBI {
 
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
 
 	//  Do not Configure Connection here.
 	
@@ -330,9 +330,9 @@ class OracleDBI extends YadamuDBI {
 	try {
       stack = new Error().stack
       const sqlStartTime = performance.now()
-      // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Requestng Connection From Pool')
+      // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Requestng Connection From Pool')
 	  const connection = await this.pool.getConnection()
-      // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Connection Assigned')
+      // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Connection Assigned')
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return connection
     } catch (e) {
@@ -351,7 +351,7 @@ class OracleDBI extends YadamuDBI {
 
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
 
 	if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
       let stack;
@@ -368,7 +368,7 @@ class OracleDBI extends YadamuDBI {
 
   async closePool(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closePool(${(this.pool instanceof oracledb.Pool) },${(this.pool.status === oracledb.POOL_STATUS_OPEN)},${options.drainTime})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closePool(${(this.pool instanceof oracledb.Pool) },${(this.pool.status === oracledb.POOL_STATUS_OPEN)},${options.drainTime})`)
 	
     if ((this.pool instanceof oracledb.Pool) && (this.pool.status === oracledb.POOL_STATUS_OPEN)) {
       let stack;
@@ -427,7 +427,7 @@ class OracleDBI extends YadamuDBI {
       const blob = await this.createLob(oracledb.BLOB)
       stack = new Error().stack
   	  await pipeline(readable,blob)
-      // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,'WRITE TO BLOB'],`Bytes Written: ${blob.offset-1}.`)
+      // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'WRITE TO BLOB'],`Bytes Written: ${blob.offset-1}.`)
 	  return blob
 	} catch(e) {
 	  throw e instanceof OracleError ? e : new OracleError(this.DRIVER_ID,e,stack,operation)
@@ -469,7 +469,7 @@ class OracleDBI extends YadamuDBI {
       const clob = await this.createLob(oracledb.CLOB)
       stack = new Error().stack
   	  await pipeline(readable,clob)
-      // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,'WRITE TO CLOB'],`Characters Written: ${clob.offset-1}.`)
+      // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'WRITE TO CLOB'],`Characters Written: ${clob.offset-1}.`)
 	  return clob
 	} catch(e) {
 	  throw e instanceof OracleError ? e : new OracleError(this.DRIVER_ID,e,stack,operation)
@@ -547,24 +547,24 @@ class OracleDBI extends YadamuDBI {
 	
 	if (this.isManager()) {
       if (this.MAX_STRING_SIZE <= OracleConstants.VARCHAR_MAX_SIZE_EXTENDED) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Maximum VARCHAR2 size for JSON operations is ${this.MAX_STRING_SIZE}.`)
+        this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Maximum VARCHAR2 size for JSON operations is ${this.MAX_STRING_SIZE}.`)
       }
 
       if (!this.EXTENDED_STRING) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`VARCHAR MAX_SIZE set to ${this.VARCHAR_MAX_SIZE}.`)
+        this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`VARCHAR MAX_SIZE set to ${this.VARCHAR_MAX_SIZE}.`)
       }
 
       if (this.XMLTYPE_STORAGE_CLAUSE !== this.XMLTYPE_STORAGE_MODEL ) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.XMLTYPE_STORAGE_CLAUSE}.`)
+        this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.XMLTYPE_STORAGE_CLAUSE}.`)
       }
-	  this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`JSON storage model is ${this.DATA_TYPES.storageOptions.JSON_TYPE}.`)
+	  this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`JSON storage model is ${this.DATA_TYPES.storageOptions.JSON_TYPE}.`)
     }
   }
 
   processLog(results,operation) {
     if (results.outBinds.log !== null) {
       const log = JSON.parse(results.outBinds.log.replace(/\\r/g,'\\n'))
-      this.logSummary = super.processLog(log, operation, this.status, this.yadamuLogger)
+      this.logSummary = super.processLog(log, operation, this.status, this.LOGGER)
 	  return log
     }
     else {
@@ -602,8 +602,8 @@ class OracleDBI extends YadamuDBI {
       const results = await this.executeSQL(this.StatementLibrary.SQL_ENABLE_CONSTRAINTS,args)
       this.processLog(results,'Enable Constraints')
 	} catch (e) {
-      this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'CONSTRAINTS'],`Unable to re-enable constraints.`)
-      this.yadamuLogger.handleException(['MATERIALIZED VIEWS',this.DATABASE_VENDOR,],e)
+      this.LOGGER.error(['DBA',this.DATABASE_VENDOR,'CONSTRAINTS'],`Unable to re-enable constraints.`)
+      this.LOGGER.handleException(['MATERIALIZED VIEWS',this.DATABASE_VENDOR,],e)
     }
 
   }
@@ -616,8 +616,8 @@ class OracleDBI extends YadamuDBI {
       const results = await this.executeSQL(this.StatementLibrary.SQL_REFRESH_MATERIALIZED_VIEWS,args)
       this.processLog(results,'Materialized View Refresh')
     } catch (e) {
-      this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'MATERIALIZED VIEWS'],`Unable to refresh materialzied views.`)
-      this.yadamuLogger.handleException(['MATERIALIZED VIEWS',this.DATABASE_VENDOR,],e)
+      this.LOGGER.error(['DBA',this.DATABASE_VENDOR,'MATERIALIZED VIEWS'],`Unable to refresh materialzied views.`)
+      this.LOGGER.handleException(['MATERIALIZED VIEWS',this.DATABASE_VENDOR,],e)
     }
 
   }
@@ -927,7 +927,7 @@ class OracleDBI extends YadamuDBI {
       results = this.processLog(results,'DDL Execution')
     }
 
-    this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Errors: ${this.logSummary.errors}, Warnings: ${this.logSummary.warnings}, Ingnoreable ${this.logSummary.ignoreable}, Duplicates: ${this.logSummary.duplicates}, Unresolved: ${this.logSummary.reference}, Compilation: ${this.logSummary.recompilation}, Miscellaneous ${this.logSummary.aq}.`)
+    this.LOGGER.ddl([this.DATABASE_VENDOR],`Errors: ${this.logSummary.errors}, Warnings: ${this.logSummary.warnings}, Ingnoreable ${this.logSummary.ignoreable}, Duplicates: ${this.logSummary.duplicates}, Unresolved: ${this.logSummary.reference}, Compilation: ${this.logSummary.recompilation}, Miscellaneous ${this.logSummary.aq}.`)
 	return results
 
   }
@@ -976,7 +976,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async finalizeData() {
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`finalizeData()`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],`finalizeData()`)
     await this.refreshMaterializedViews()
     await this.enableConstraints()
   }
@@ -1013,7 +1013,7 @@ class OracleDBI extends YadamuDBI {
   */
   async commitTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     this.SQL_TRACE.traceSQL(`commit transaction`)
 
@@ -1037,7 +1037,7 @@ class OracleDBI extends YadamuDBI {
 
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
 	this.checkConnectionState(cause)
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
@@ -1060,7 +1060,7 @@ class OracleDBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT,[])
 	super.createSavePoint()
@@ -1068,7 +1068,7 @@ class OracleDBI extends YadamuDBI {
 
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -1104,7 +1104,7 @@ class OracleDBI extends YadamuDBI {
     })
 
 	const multiplexor = new PassThrough()
-	const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
+	const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.LOGGER)
 
     const blob = await this.createLob(oracledb.BLOB)
     await pipeline(is,multiplexor,blob)
@@ -1317,7 +1317,7 @@ class OracleDBI extends YadamuDBI {
   }
 		
   createParser(queryInfo,parseDelay) {
-	const parser = new OracleParser(this,queryInfo,this.yadamuLogger,parseDelay)
+	const parser = new OracleParser(this,queryInfo,this.LOGGER,parseDelay)
     this.inputStream.on('metadata',(resultSetMetadata) => {parser.setColumnMetadata(resultSetMetadata)})
 	return parser;
   }
@@ -1337,8 +1337,8 @@ class OracleDBI extends YadamuDBI {
       const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" ENABLE ALL TRIGGERS`;
 	  return this.isManager() ? await this.executeSQL(sqlStatement,[]) : await this.manager.executeSQL(sqlStatement,[])
 	} catch (e) {
-	  this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'TRIGGERS',tableName],`Unable to re-enable triggers.`)
-      this.yadamuLogger.handleException(['TRIGGERS',this.DATABASE_VENDOR,],e)
+	  this.LOGGER.error(['DBA',this.DATABASE_VENDOR,'TRIGGERS',tableName],`Unable to re-enable triggers.`)
+      this.LOGGER.handleException(['TRIGGERS',this.DATABASE_VENDOR,],e)
     }
   }
   
@@ -1445,7 +1445,7 @@ class OracleDBI extends YadamuDBI {
   */
 
   async generateStatementCache(schema) {
-    const statementGenerator = new this.StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.yadamuLogger)
+    const statementGenerator = new this.StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.LOGGER)
     this.statementCache = await statementGenerator.generateStatementCache()
 	this.emit(YadamuConstants.CACHE_LOADED)
 	return this.statementCache
@@ -1495,7 +1495,7 @@ class OracleDBI extends YadamuDBI {
       Object.keys(metadata).forEach((table) => {
         const mappedTableName = metadata[table].tableName.length > 30 ? metadata[table].tableName.substring(0,30) : undefined
         if (mappedTableName) {
-		  this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName],`Identifier Too Long (${metadata[table].tableName.length}). Identifier re-mapped as "${mappedTableName}".`)
+		  this.LOGGER.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName],`Identifier Too Long (${metadata[table].tableName.length}). Identifier re-mapped as "${mappedTableName}".`)
           dbMappings[table] = {
 			tableName : mappedTableName
 		  }
@@ -1504,7 +1504,7 @@ class OracleDBI extends YadamuDBI {
         metadata[table].columnNames.forEach((columnName) => {
 		  if (columnName.length > 30) {
 			const mappedColumnName =  columnName.substring(0,30)
-  		    this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName,columnName],`Identifier Too Long (${columnName.length}). Identifier re-mapped as "${mappedColumnName}".`)
+  		    this.LOGGER.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName,columnName],`Identifier Too Long (${columnName.length}). Identifier re-mapped as "${mappedColumnName}".`)
    		    columnMappings[columnName] = {name: mappedColumnName}
 		  }
 		})
@@ -1616,7 +1616,7 @@ class OracleDBI extends YadamuDBI {
 	    if (e.copyFileNotFoundError && e.copyFileNotFoundError()) {
 		  e = new StagingFileError(this.DRIVER_ID,this.LOCAL_DIRECTORY_PATH,this.SQL_DIRECTORY_PATH,e)
 	    }
-	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
+	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

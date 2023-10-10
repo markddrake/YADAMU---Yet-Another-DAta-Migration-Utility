@@ -128,7 +128,7 @@ class MongoWriter extends YadamuWriter {
 	  return this.skipTable
     } catch (cause) {
 	  this.reportBatchError(batch.map((r) => { return Object.values(r)}),`INSERT MANY`,cause)
-      this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+      this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
     } 
     
          

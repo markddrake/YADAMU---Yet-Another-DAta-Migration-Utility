@@ -105,7 +105,7 @@ class CloudDBI extends LoaderDBI {
   }
   
   async loadMetadataFiles(copyStagedData) {
-    // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
+    // this.LOGGER.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
  	const metadata = {}
     if (this.controlFile.metadata) {
       const metdataRecords = await Promise.all(Object.keys(this.controlFile.metadata).map((tableName) => {
@@ -154,7 +154,7 @@ class CloudDBI extends LoaderDBI {
   
   async initializeImport() {
 	 
-    // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+    // this.LOGGER.trace([this.constructor.name],`initializeImport()`)
       	
 	this.DIRECTORY = this.TARGET_DIRECTORY
     await this.cloudService.verifyBucketContainer()	
@@ -163,7 +163,7 @@ class CloudDBI extends LoaderDBI {
 
     this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
 	this.DESCRIPTION = this.IMPORT_FOLDER
-    this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.getURI(this.IMPORT_FOLDER)}"`);
+    this.LOGGER.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.getURI(this.IMPORT_FOLDER)}"`);
     
     const dataFileList = {}
     const metadataFileList = {}
@@ -172,7 +172,7 @@ class CloudDBI extends LoaderDBI {
   }
   
   getFileOutputStream(tableName) {
-    // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
+    // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
 	const file = this.makeAbsolute(this.getDataFileName(tableName))
 	const extension = path.extname(file);
 	const contentType = mime.lookup(extension) || 'application/octet-stream'
@@ -188,7 +188,7 @@ class CloudDBI extends LoaderDBI {
 
   async loadControlFile() {
 
-	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	// this.LOGGER.trace([this.constructor.name],`initializeExport()`)
 
     this.DIRECTORY = this.SOURCE_DIRECTORY
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
@@ -205,7 +205,7 @@ class CloudDBI extends LoaderDBI {
 
   async getInputStream(filename) {
 
-    // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating readable stream on ${this.getDataFileName(tableName)}`)
+    // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating readable stream on ${this.getDataFileName(tableName)}`)
     const stream = await this.cloudService.createReadStream(filename)
 	return stream
   }
@@ -219,6 +219,13 @@ class CloudDBI extends LoaderDBI {
   async getComparator(configuration) {
 	 await this.initialize()
 	 return new CloudCompare(this,configuration)
+  }
+
+  async truncateTable(schema,tableName) {
+
+    const datafilePath = this.makeAbsolute(this.getDataFileName(tableName));
+    await await this.cloudService.removeFile(dataFilePath)
+	
   }
 	  
 }

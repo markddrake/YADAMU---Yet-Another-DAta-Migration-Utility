@@ -12,8 +12,8 @@ class ErrorDBI extends FileDBI {
  
   getOutputStream(tableName) {
     // Override parent method to allow output stream to be passed to worker
-    // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
-	const os = new ErrorOutputManager(this,tableName,this.firstTable,this.yadamuLogger)
+    // this.LOGGER.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
+	const os = new ErrorOutputManager(this,tableName,this.firstTable,this.LOGGER)
     return os
   }
   

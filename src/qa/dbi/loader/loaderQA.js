@@ -84,10 +84,10 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
 
   async initializeExport() {
 
-	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	// this.LOGGER.trace([this.constructor.name],`initializeExport()`)
 	
 	await this.loadControlFile()
-	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`);
+	this.LOGGER.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`);
 
   }
   

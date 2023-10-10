@@ -106,7 +106,7 @@ class TeradataDBI extends _TeradataDBI {
 
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     //  Do not Configure Connection here. 
 
@@ -122,7 +122,7 @@ class TeradataDBI extends _TeradataDBI {
     this.SQL_TRACE.comment( `enqueueTask :disconnect()`)
 	
 	if (this.worker) {
-	  // this.yadamuLogger.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminating Worker')
+	  // this.LOGGER.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminating Worker')
 	  
 	  /*
 	  **
@@ -142,7 +142,7 @@ class TeradataDBI extends _TeradataDBI {
       this.worker.unref()
       this.worker = undefined
 
-      // this.yadamuLogger.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminated')	  
+      // this.LOGGER.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminated')	  
 	}
   }
     
@@ -166,7 +166,7 @@ class TeradataDBI extends _TeradataDBI {
   }
   
   async getInputStream(tableInfo) {
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
 	try {
 	  const is = new TeradataReader(this.worker,this.vendorProperties,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)

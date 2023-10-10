@@ -334,6 +334,12 @@ class YadamuDBI extends EventEmitter {
     }
   } 
   
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super()
     this.DRIVER_ID = performance.now()
@@ -345,7 +351,9 @@ class YadamuDBI extends EventEmitter {
     this.status = yadamu.STATUS
     
     
-    this.yadamuLogger = yadamu.LOGGER;
+    this.LOGGER = yadamu.LOGGER;
+	this.DEBUGGER = yadamu.DEBUGGER
+	
     this.initializeParameters(parameters || {})
     this.FEEDBACK_MODEL = this.parameters.FEEDBACK
     // if (manager) console.log(this.parameters,this.constructor.name,manager.ROLE,manager.CURRENT_SCHEMA,manager.FROM_USER,manager.TO_USER,this.parameters.FROM_USER,this.parameters.TO_USER,this.IS_READER,this.IS_WRITER,this.ROLE)
@@ -384,7 +392,7 @@ class YadamuDBI extends EventEmitter {
     
     if (manager) {
       this.workerReady = new Promise((resolve,reject) => {
-        this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { this.yadamuLogger.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e) })
+        this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { this.LOGGER.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e) })
       })
     }
     else {
@@ -421,16 +429,16 @@ class YadamuDBI extends EventEmitter {
     
     this.ddlComplete = new Promise((resolve,reject) => {
       this.once(YadamuConstants.DDL_COMPLETE,(startTime,state) => {
-        // this.yadamuLogger.trace([this.constructor.name],`${this.constructor.name}.on(ddlComplete): (${state instanceof Error}) "${state ? `${state.constructor.name}(${state.message})` : state}"`)
+        // this.LOGGER.trace([this.constructor.name],`${this.constructor.name}.on(ddlComplete): (${state instanceof Error}) "${state ? `${state.constructor.name}(${state.message})` : state}"`)
         this.ddlInProgress = false
         if (state instanceof Error) {
-          this.yadamuLogger.ddl([this.DATABASE_VENDOR],`One or more DDL operations Failed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
-          this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],state)
+          this.LOGGER.ddl([this.DATABASE_VENDOR],`One or more DDL operations Failed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
+          this.LOGGER.handleException([this.DATABASE_VENDOR,'DDL'],state)
           state.ignoreUnhandledRejection = true;
           reject(state)
         }
         else {
-          this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
+          this.LOGGER.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
           if (this.PARTITION_LEVEL_OPERATIONS) {
             // Need target schema metadata to determine if we can perform partition level write operations.
             this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { reject(e) })
@@ -469,14 +477,14 @@ class YadamuDBI extends EventEmitter {
       await this.setWorkerConnection()
       await this.configureConnection()
 	} catch (e) {
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e)
+	  this.LOGGER.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e)
 	  manager.activeWorkers.delete(this)
 	}
   }
   
   loadTableList(tableListPath) {
     try {
-      const tableList = YadamuLibrary.loadJSON(tableListPath,this.yadamuLogger) 
+      const tableList = YadamuLibrary.loadJSON(tableListPath,this.LOGGER) 
       if (Array.isArray(tableList)) {
         return tableList
       }
@@ -629,7 +637,7 @@ class YadamuDBI extends EventEmitter {
     }) 
     
     if (summary.exceptions.length > 0) {
-      this.yadamuLogger.error([this.DATABASE_VENDOR, status.operation, operation],`Server side operation resulted in ${summary.exceptions.length} errors.`)
+      this.LOGGER.error([this.DATABASE_VENDOR, status.operation, operation],`Server side operation resulted in ${summary.exceptions.length} errors.`)
       const err = new Error(`${this.DATABASE_VENDOR} ${operation} failed.`)
       err.causes = summary.exceptions
       throw err
@@ -855,7 +863,7 @@ class YadamuDBI extends EventEmitter {
       if (tableMappings) {
         if ((tableMappings.tableName) && (metadata[table].tableName !== tableMappings.tableName)) {
           if (reportMappedIdentifiers) { 
-            this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',metadata[table].tableName],`Table name re-mapped to "${tableMappings.tableName}".`)
+            this.LOGGER.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',metadata[table].tableName],`Table name re-mapped to "${tableMappings.tableName}".`)
           }
           metadata[table].tableName = tableMappings.tableName
         }
@@ -869,11 +877,11 @@ class YadamuDBI extends EventEmitter {
             if (idx > -1) {
               if (reportMappedIdentifiers) { 
                 if (columnNames[idx] !== mappedColumnName) {
-                  this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
+                  this.LOGGER.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
                 }
                 /*
                 if (dataTypes[idx] !== mappedDataType) {
-                  this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Data type "${dataTypes[idx] }" re-mapped to "${mappedDataType}".`)
+                  this.LOGGER.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Data type "${dataTypes[idx] }" re-mapped to "${mappedDataType}".`)
                 }
                 */
               }
@@ -898,7 +906,7 @@ class YadamuDBI extends EventEmitter {
       if (tableMappings) {
         if ((tableMappings.tableName) && (metadata[table].tableName !== tableMappings.tableName)) {
           if (reportMappedIdentifiers) { 
-            this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',metadata[table].tableName],`Table name re-mapped to "${tableMappings.tableName}".`)
+            this.LOGGER.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',metadata[table].tableName],`Table name re-mapped to "${tableMappings.tableName}".`)
           }
           metadata[table].tableName = tableMappings.tableName
         }
@@ -910,7 +918,7 @@ class YadamuDBI extends EventEmitter {
             if (idx > -1) {
               if (reportMappedIdentifiers) { 
                 if (columnNames[idx] !== mappedColumnName) {
-                  this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
+                  this.LOGGER.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
                 }
               }
               columnNames[idx] = mappedColumnName          
@@ -931,7 +939,7 @@ class YadamuDBI extends EventEmitter {
         const mappedDataType = tableMappings.columnMappings[columnName].dataType || mappedDataTypes[idx]
         if (idx > -1) {
           if (mappedDataTypes[idx] !== mappedDataType) {
-            this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',tableName,columnName],`Data type "${mappedDataTypes[idx] }" re-mapped to "${mappedDataType}".`)
+            this.LOGGER.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',tableName,columnName],`Data type "${mappedDataTypes[idx] }" re-mapped to "${mappedDataType}".`)
           }
           mappedDataTypes[idx] = mappedDataType       
         }
@@ -972,8 +980,8 @@ class YadamuDBI extends EventEmitter {
         return this.executeSQL(ddlStatement,{})
       }))
     } catch (e) {
-     const exceptionFile = this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
-     await this.yadamuLogger.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
+     const exceptionFile = this.LOGGER.handleException([this.DATABASE_VENDOR,'DDL'],e)
+     await this.LOGGER.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
      results = e;
     }
     return results;
@@ -1032,7 +1040,7 @@ class YadamuDBI extends EventEmitter {
         dmlStatementCount++;
       }
     })   
-    this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
+    this.LOGGER.ddl([this.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
     ddlStatements = this.prepareDDLStatements(ddlStatements)    
     return ddlStatements    
   }  
@@ -1066,7 +1074,7 @@ class YadamuDBI extends EventEmitter {
  
     if ((this.COPY_METRICS !== undefined) && (this.COPY_METRICS.lost  !== undefined) && (this.COPY_METRICS.written  !== undefined)) {
       if (this.COPY_METRICS.written > 0) {
-        this.yadamuLogger.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.COPY_METRICS.written} uncommitted rows discarded when connection lost.`)
+        this.LOGGER.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.COPY_METRICS.written} uncommitted rows discarded when connection lost.`)
         this.COPY_METRICS.lost += this.COPY_METRICS.written;
         this.COPY_METRICS.written = 0;
       }
@@ -1083,10 +1091,10 @@ class YadamuDBI extends EventEmitter {
     const TRANSACTION_IN_PROGRESS = this.TRANSACTION_IN_PROGRESS 
     const SAVE_POINT_SET = this.SAVE_POINT_SET
 
-    this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Connection Lost: Attemping reconnection.`)
+    this.LOGGER.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Connection Lost: Attemping reconnection.`)
     
     if (cause instanceof Error) {
-      this.yadamuLogger.handleWarning([`RECONNECT`,this.DATABASE_VENDOR,operation],cause)
+      this.LOGGER.handleWarning([`RECONNECT`,this.DATABASE_VENDOR,operation],cause)
     }
     
     /*
@@ -1114,8 +1122,8 @@ class YadamuDBI extends EventEmitter {
         await this.closeConnection()
       } catch (e) {
         if (!YadamuError.lostConnection(e)) {
-          this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Error closing existing connection.`)
-          this.yadamuLogger.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],e)
+          this.LOGGER.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Error closing existing connection.`)
+          this.LOGGER.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],e)
         }
       }  
          
@@ -1129,14 +1137,14 @@ class YadamuDBI extends EventEmitter {
           }
         }
 
-        this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`New connection available.`)
+        this.LOGGER.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`New connection available.`)
         this.failedPrematureClose = false;
         cause.yadamuReconnected = true;
       } catch (connectionFailure) {
         // Reconnection failed. If cause is "server unavailable" wait 0.5 seconds and retry (up to 10 times)
         if (YadamuError.serverUnavailable(connectionFailure)) {
           connectionUnavailable = connectionFailure;
-          this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Waiting for restart.`)
+          this.LOGGER.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Waiting for restart.`)
           await setTimeout(5000)
           retryCount++;
           continue;
@@ -1144,7 +1152,7 @@ class YadamuDBI extends EventEmitter {
         else {
           // Reconnection attempt failed for some other reason. Throw the error
           this.RECONNECT_IN_PROGRESS = false;
-          this.yadamuLogger.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],connectionFailure)
+          this.LOGGER.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],connectionFailure)
           throw cause;
         }
       }
@@ -1232,7 +1240,7 @@ class YadamuDBI extends EventEmitter {
     */
     
     if (this.parameters.PARAMETER_TRACE === true) {
-      this.yadamuLogger.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`)
+      this.LOGGER.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`)
     }
     
     if (this.isDatabase()) {
@@ -1259,7 +1267,7 @@ class YadamuDBI extends EventEmitter {
   
   async final(){
     
-    // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE],`Waiting for ${this.activeWorkers.size} Writers to terminate. [${this.activeWorkers}]`)
+    // this.LOGGER.trace([this.constructor.name,'final()',this.ROLE],`Waiting for ${this.activeWorkers.size} Writers to terminate. [${this.activeWorkers}]`)
       
     if (this.ddlInProgress) {
       await this.ddlComplete
@@ -1270,10 +1278,10 @@ class YadamuDBI extends EventEmitter {
     await this.writersFinished()
 
     if (this.isManager()) {
-      // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
+      // this.LOGGER.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
       const stillWorking = Array.from(this.activeWorkers).map((worker) => { return worker.workerState })
       await Promise.all(stillWorking)
-      // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
+      // this.LOGGER.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
     }     
 
     await this.closeConnection(closeOptions)
@@ -1284,7 +1292,7 @@ class YadamuDBI extends EventEmitter {
 
   async destroy(err) {
 	 
-    // this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber(),this.DESTORYED],`doDestroy(${this.activeWorkers.size},${err ? err.message : 'normal'})`)
+    // this.LOGGER.trace([this.constructor.name,this.ROLE,this.getWorkerNumber(),this.DESTORYED],`doDestroy(${this.activeWorkers.size},${err ? err.message : 'normal'})`)
     
     /*
     **
@@ -1299,13 +1307,13 @@ class YadamuDBI extends EventEmitter {
       if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
         // Active Workers contains the set of Workers that have not terminated.
         // We need to force them to terminate and release any database connections they own.
-        this.yadamuLogger.error([this.DATABASE_VENDOR,this.ROLE,'destroy()'],`Aborting ${this.activeWorkers.size} active workers).`)
+        this.LOGGER.error([this.DATABASE_VENDOR,this.ROLE,'destroy()'],`Aborting ${this.activeWorkers.size} active workers).`)
         this.activeWorkers.forEach((worker) => {
           try {
-            this.yadamuLogger.log([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',this.getWorkerNumber()],`Found Active Worker ${worker.getWorkerNumber()}`)
+            this.LOGGER.log([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',this.getWorkerNumber()],`Found Active Worker ${worker.getWorkerNumber()}`)
             worker.destroy()
           } catch(e) {
-            this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',worker.getWorkerNumber()],e)
+            this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',worker.getWorkerNumber()],e)
           }
         })
       }
@@ -1318,7 +1326,7 @@ class YadamuDBI extends EventEmitter {
           this.logDisconnect()
         } catch (e) {
           if (!YadamuError.lostConnection(e)) {
-            this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','closeConnection()'],e)
+            this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','closeConnection()'],e)
           }
         }
       }
@@ -1329,7 +1337,7 @@ class YadamuDBI extends EventEmitter {
           await this.closePool(closeOptions)
         } catch (e) {
           if (!YadamuError.lostConnection(e)) {
-            this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','closePool()'],e)
+            this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','closePool()'],e)
           }
         }
       }
@@ -1357,7 +1365,7 @@ class YadamuDBI extends EventEmitter {
      // Used by Rollback and Restore save point to log errors encountered while performing the required operation and throw the original cause.
 
       if (cause instanceof Error) {
-        this.yadamuLogger.handleException([this.DATABASE_VENDOR,operation],newError)
+        this.LOGGER.handleException([this.DATABASE_VENDOR,operation],newError)
         throw cause
       }
       throw newError
@@ -1437,7 +1445,7 @@ class YadamuDBI extends EventEmitter {
       const startTime = performance.now()
       const jsonHndl = await this.uploadFile(this.UPLOAD_FILE)
       const elapsedTime = performance.now() - startTime;
-      this.yadamuLogger.info([this.DATABASE_VENDOR,`UPLOAD`],`File "${this.UPLOAD_FILE}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+      this.LOGGER.info([this.DATABASE_VENDOR,`UPLOAD`],`File "${this.UPLOAD_FILE}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
       await this.initializeImport()
       const log = await this.processFile(jsonHndl)
       await this.finalizeImport()
@@ -1565,7 +1573,7 @@ class YadamuDBI extends EventEmitter {
         throw new CommandLineError(`Could not resolve the following table names : "${invalidTableNames}".`)
       }
     
-      this.yadamuLogger.info([this.DATABASE_VENDOR],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
+      this.LOGGER.info([this.DATABASE_VENDOR],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
          
       schemaInformation = this.TABLE_FILTER.flatMap((tableName) => {
         return schemaInformation.filter((tableInformation) => {
@@ -1701,13 +1709,13 @@ class YadamuDBI extends EventEmitter {
   }
   
   async getVendorDataTypeMappings(StatementGenerator) {
-    const statementGenerator = new StatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+    const statementGenerator = new StatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.LOGGER);
     await statementGenerator.init()
     return JSON.stringify(Array.from(statementGenerator.TYPE_MAPPINGS.entries()))
   }
   
   async generateStatementCache(StatementGenerator,schema) {
-    const statementGenerator = new StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.yadamuLogger)
+    const statementGenerator = new StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.LOGGER)
     this.statementCache = await statementGenerator.generateStatementCache()
     this.emit(YadamuConstants.CACHE_LOADED  )
     return this.statementCache
@@ -1720,7 +1728,7 @@ class YadamuDBI extends EventEmitter {
   getTableInfo(tableName) {
       
     if (this.statementCache === undefined) {
-      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Statement Cache undefined. Cannot obtain required information.`)
+      this.LOGGER.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Statement Cache undefined. Cannot obtain required information.`)
     }
     
     // Statement Cache is keyed by actual table name so we need the mapped name if there is a mapping.
@@ -1736,7 +1744,7 @@ class YadamuDBI extends EventEmitter {
     tableInfo.skipTable = tableInfo.skipTable || this.MODE === 'DDL_ONLY';    
 
     if (tableInfo === undefined) {
-      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName,mappedTableName],`No Statement Cache entry for "${mappedTableName}". Current entries: ${JSON.stringify(Object.keys(this.statementCache))}`)
+      this.LOGGER.logInternalError([this.constructor.name,`getTableInfo()`,tableName,mappedTableName],`No Statement Cache entry for "${mappedTableName}". Current entries: ${JSON.stringify(Object.keys(this.statementCache))}`)
     }
     
     tableInfo.tableName = mappedTableName
@@ -1804,12 +1812,12 @@ class YadamuDBI extends EventEmitter {
   }
   
   getOutputManager(OutputManager,tableName,metrics) {
-    return new OutputManager(this,tableName,metrics,this.status,this.yadamuLogger)
+    return new OutputManager(this,tableName,metrics,this.status,this.LOGGER)
   }
 
   getOutputStream(TableWriter,tableName,metrics) {
-    // this.yadamuLogger.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
-    return new TableWriter(this,tableName,metrics,this.status,this.yadamuLogger)
+    // this.LOGGER.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
+    return new TableWriter(this,tableName,metrics,this.status,this.LOGGER)
   }
   
   
@@ -1888,6 +1896,7 @@ class YadamuDBI extends EventEmitter {
     this.statementCache     = this.manager.statementCache
     this.statementGenerator = this.manager.statementGenerator
     this.partitionMetadata  = this.manager.partitionMetadata
+	this.vendorProperties   = this.manager.vendorProperties
     
     this.IDENTIFIER_MAPPINGS =  this.manager.IDENTIFIER_MAPPINGS
   }   
@@ -1908,16 +1917,16 @@ class YadamuDBI extends EventEmitter {
   
   async writersFinished() {
       
-    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()',this.ROLE,this.getWorkerNumber()],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
+    // this.LOGGER.trace([this.constructor.name,'writersFinished()',this.ROLE,this.getWorkerNumber()],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
 
-    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
+    // this.LOGGER.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
     await Promise.allSettled(this.activeWriters)
-    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
+    // this.LOGGER.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
 
   }
   
   async destroyWorker() {
-    // this.yadamuLogger.trace([this.constructor.name,'destroyWorker()',this.ROLE,this.getWorkerNumber()],`Terminating Worker`)
+    // this.LOGGER.trace([this.constructor.name,'destroyWorker()',this.ROLE,this.getWorkerNumber()],`Terminating Worker`)
     await this.writersFinished()
     await this.releaseWorkerConnection() 
     this.emit(YadamuConstants.DESTROYED)
@@ -1941,7 +1950,7 @@ class YadamuDBI extends EventEmitter {
   }
   
   reportCopyOperationMode(copyEnabled,controlFilePath,contentType) {
-    this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY',`${contentType}`],`Processing ${controlFilePath}" using ${copyEnabled ? 'COPY' : 'PIPELINE' } mode.`)
+    this.LOGGER.info([this.DATABASE_VENDOR,'COPY',`${contentType}`],`Processing ${controlFilePath}" using ${copyEnabled ? 'COPY' : 'PIPELINE' } mode.`)
     return copyEnabled
   } 
     
@@ -1996,7 +2005,7 @@ class YadamuDBI extends EventEmitter {
     } catch(e) {
       metrics.writerError = e
       try {
-        this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+        this.LOGGER.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
         let results = await this.rollbackTransaction()
       } catch (e) {
         e.cause = metrics.writerError

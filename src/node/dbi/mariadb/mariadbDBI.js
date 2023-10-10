@@ -122,7 +122,7 @@ class MariadbDBI extends YadamuDBI {
 		case 'lower_case_table_names':
           this.LOWER_CASE_TABLE_NAMES = parseInt(row[1])
           if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
-	        this.yadamuLogger.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`)
+	        this.LOGGER.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`)
 	      }
         break;
 	  }
@@ -146,7 +146,7 @@ class MariadbDBI extends YadamuDBI {
 		
 	  // Need to change the setting.
 		
-      this.yadamuLogger.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to 1G.`)
+      this.LOGGER.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to 1G.`)
       results = await this.executeSQL(sqlSetPacketSize)
 	  
 	  if (existingConnection) {
@@ -171,7 +171,7 @@ class MariadbDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`getConnectionFromPool()`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`getConnectionFromPool()`)
 
     let stack
     this.SQL_TRACE.comment(`Gettting Connection From Pool.`)
@@ -189,7 +189,7 @@ class MariadbDBI extends YadamuDBI {
 
   async closeConnection(options) {
 	  
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined)},${(typeof this.connection.end === 'function')})`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined)},${(typeof this.connection.end === 'function')})`)
 	  
     if ((this.connection !== undefined) && (typeof this.connection.end === 'function')) {
       let stack;
@@ -206,7 +206,7 @@ class MariadbDBI extends YadamuDBI {
    
   async closePool(options) {
 	  
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,],`closePool(${this.pool !== undefined)},${(typeof this.pool.end === 'function')})`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,],`closePool(${this.pool !== undefined)},${(typeof this.pool.end === 'function')})`)
 	  
     if ((this.pool !== undefined) && (typeof this.pool.end === 'function')) {
       let stack;
@@ -341,7 +341,7 @@ class MariadbDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
     let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
@@ -378,7 +378,7 @@ class MariadbDBI extends YadamuDBI {
   
   async commitTransaction() {
 	    
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     let stack
     this.SQL_TRACE.traceSQL(`commit transaction`)
@@ -409,7 +409,7 @@ class MariadbDBI extends YadamuDBI {
     
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 	
 	this.checkConnectionState(cause)
 	
@@ -433,14 +433,14 @@ class MariadbDBI extends YadamuDBI {
   
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
 	super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState()
 
@@ -457,7 +457,7 @@ class MariadbDBI extends YadamuDBI {
 
   async releaseSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
 	super.releaseSavePoint()
@@ -541,7 +541,7 @@ class MariadbDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new MariadbParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new MariadbParser(this,queryInfo,this.LOGGER,parseDelay)
   }  
 
   inputStreamError(cause,sqlStatement) {

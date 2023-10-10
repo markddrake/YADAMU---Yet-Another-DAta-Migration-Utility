@@ -101,7 +101,7 @@ class MySQLOutputManager extends YadamuOutputManager {
 		    case 'NULLIFY':
 			  return (col, idx) => {
 			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+                  this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
 	  		      return null;
 				}
 			    return col
@@ -147,7 +147,7 @@ class MySQLOutputManager extends YadamuOutputManager {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
-    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
+    // this.LOGGER.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
 	
 	try {
 	  
@@ -167,7 +167,7 @@ class MySQLOutputManager extends YadamuOutputManager {
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
+        this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
         this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
 		this.COPY_METRICS.skipped++
         return

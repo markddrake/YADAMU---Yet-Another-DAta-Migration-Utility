@@ -3,11 +3,17 @@ import {Readable} from 'stream'
 
 class MsSQLReader extends Readable {
       
+    get LOGGER()             { return this._LOGGER }
+    set LOGGER(v)            { this._LOGGER = v }
+   
+    get DEBUGGER()           { return this._DEBUGGER }
+    set DEBUGGER(v)          { this._DEBUGGER = v }
+
     constructor(request,sqlStatement,tableName,yadamuLogger) {
 	  super({objectMode:true}) 
 	  this.request = request
 	  this.tableName = tableName
-      this.yadamuLogger = yadamuLogger
+      this.LOGGER = yadamuLogger
 	  this.stagingArea = []
       this.highWaterMark = 1024
 	  this.lowWaterMark = 512
@@ -32,7 +38,7 @@ class MsSQLReader extends Readable {
 		  }
 		}
 	  }).on('error',(err, p) => {
-        // this.yadamuLogger.trace([this.constructor.name,this.tableName,`sql.Request(stream).error()`],err)
+        // this.LOGGER.trace([this.constructor.name,this.tableName,`sql.Request(stream).error()`],err)
 		if (this.streamCanceled && (err.code && (err.code === 'ECANCEL'))) {
 		  this.destroy();
 		  return;
@@ -72,7 +78,7 @@ class MsSQLReader extends Readable {
 	}
 	
 	async _destroy(cause,callback) {
-       // this.yadamuLogger.trace([this.constructor.name,this.tableName],`_destroy(${cause ? cause.message : 'Normal'})`)
+       // this.LOGGER.trace([this.constructor.name,this.tableName],`_destroy(${cause ? cause.message : 'Normal'})`)
 	   if (!this.streamComplete) {
 		 try {
 		   await this.request.cancel();

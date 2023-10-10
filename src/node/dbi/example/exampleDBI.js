@@ -188,7 +188,7 @@ class ExampleDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 	 
 	/*
 	**
@@ -210,7 +210,7 @@ class ExampleDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     /*
 	**
@@ -232,7 +232,7 @@ class ExampleDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+   // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -257,7 +257,7 @@ class ExampleDBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 																
     /*
 	**
@@ -272,7 +272,7 @@ class ExampleDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
     /*
 	**
@@ -335,7 +335,7 @@ class ExampleDBI extends YadamuDBI {
   */
 
   processLog(log,operation) {
-    super.processLog(log, operation, this.status, this.yadamuLogger)
+    super.processLog(log, operation, this.status, this.LOGGER)
     return log
   }
 
@@ -418,7 +418,7 @@ class ExampleDBI extends YadamuDBI {
   }   
 
   createParser(queryInfo,parseDelay) {
-    return new ExampleParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new ExampleParser(this,queryInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -429,7 +429,7 @@ class ExampleDBI extends YadamuDBI {
 
     // Either return the databases native readable stream or use the ExampleReader to create a class that wraps a cursor or event stream in a Readable
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
     return new ExampleReader(this.connection,queryInfo.SQL_STATEMENT)
 	

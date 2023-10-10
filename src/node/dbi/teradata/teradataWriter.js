@@ -48,7 +48,7 @@ class TeradataWriter extends YadamuWriter {
 		}
 		*/
 		this.reportBatchError(batch,`INSERT MANY`,cause)
-		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'   
       }
     }

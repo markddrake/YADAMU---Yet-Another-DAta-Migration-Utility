@@ -21,15 +21,22 @@ const CompareRules            = JSON.parse(fs.readFileSync(join(__dirname,'../..
 
 class YadamuCompare {
 
-   static get COMPARE_RULES()      { return CompareRules };    
+  static get COMPARE_RULES()      { return CompareRules };    
 
-   get OPERATION_NAME()    { return 'COMPARE' }
+  get OPERATION_NAME()    { return 'COMPARE' }
 
-   constructor(dbi,configuration) {
-	 this.dbi = dbi
-	 this.configuration = configuration
-     this.yadamuLogger = this.dbi.yadamu.LOGGER
-   }
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
+  constructor(dbi,configuration) {
+	this.dbi = dbi
+	this.configuration = configuration
+
+	this.LOGGER   = this.dbi.LOGGER
+	this.DEBUGGER = this.dbi.DEBUGGER
+  }
   
   formatCompareRules(rules) {
 	return {
@@ -109,47 +116,47 @@ class YadamuCompare {
 									 : xmlCompareRule
 	    
     if (compareRules.DOUBLE_PRECISION !== null) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Double precision limited to ${compareRules.DOUBLE_PRECISION} digits`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Double precision limited to ${compareRules.DOUBLE_PRECISION} digits`);
     }
     
     if (compareRules.NUMERIC_SCALE !== null) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Numeric scale restricted to ${compareRules.NUMERIC_SCALE} digits`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Numeric scale restricted to ${compareRules.NUMERIC_SCALE} digits`);
     }
 
     if (compareRules.SPATIAL_PRECISION !== 18) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Spatial precision limited to ${compareRules.SPATIAL_PRECISION} digits`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Spatial precision limited to ${compareRules.SPATIAL_PRECISION} digits`);
     }
     
     if (compareRules.EMPTY_STRING_IS_NULL === true) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Empty Strings treated as NULL`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Empty Strings treated as NULL`);
     }
     
     if (compareRules.MIN_BIGINT_IS_NULL === true) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Minimum (Most Negative) BIGINT value treated as NULL`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Minimum (Most Negative) BIGINT value treated as NULL`);
     }
     
     if (compareRules.INFINITY_IS_NULL === true) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Infinity, -Infinity and NaN treated as NULL`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Infinity, -Infinity and NaN treated as NULL`);
     }
     
     if (compareRules.XML_COMPARISON_RULE !== null) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Target XML storage model: "${this.configuration.parameters.XML_STORAGE_MODEL || 'XML'}". Using comparision rule "${compareRules.XML_COMPARISON_RULE}".`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Target XML storage model: "${this.configuration.parameters.XML_STORAGE_MODEL || 'XML'}". Using comparision rule "${compareRules.XML_COMPARISON_RULE}".`);
     }
     
     if (compareRules.TIMESTAMP_PRECISION) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Timestamp precision limited to ${compareRules.TIMESTAMP_PRECISION} digits`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Timestamp precision limited to ${compareRules.TIMESTAMP_PRECISION} digits`);
     }
     
     if (compareRules.ORDERED_JSON === true) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Using "Ordered JSON" when performing JSON comparisons.`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Using "Ordered JSON" when performing JSON comparisons.`);
     }
 
     if (compareRules.SERIALIZED_JSON === true) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Target does not support JSON data. Using JSON Parser when comparing JSON values.`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Target does not support JSON data. Using JSON Parser when comparing JSON values.`);
     }
 
     if (compareRules.OBJECTS_COMPARISON_RULE !== null) {
-      this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Comapring Oracle Objects using ${compareRules.OBJECTS_COMPARISON_RULE}.`);
+      this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Comapring Oracle Objects using ${compareRules.OBJECTS_COMPARISON_RULE}.`);
     }
     this.configuration.rules = compareRules
     return compareRules;
@@ -178,12 +185,12 @@ class YadamuCompare {
       seperatorSize += size;
     });
    
-    this.yadamuLogger.writeDirect(`\n`)
+    this.LOGGER.writeDirect(`\n`)
 
     rowCounts.sort().forEach((row,idx) => {          
       if (idx === 0) {
-       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+       this.LOGGER.writeDirect(`|`
                                      + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
                                      + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
                                      + ` ${'ROWS READ'.padStart(colSizes[2])} |`
@@ -192,8 +199,8 @@ class YadamuCompare {
                                      + ` ${'COUNT'.padStart(colSizes[5])} |`
                                      + ` ${'DELTA'.padStart(colSizes[6])} |`
                                      + '\n');
-       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+       this.LOGGER.writeDirect(`|`
                                      + ` ${row[0].padStart(colSizes[0])} |`
                                      + ` ${row[1].padStart(colSizes[1])} |`
                                      + ` ${row[3].toString().padStart(colSizes[2])} |` 
@@ -204,7 +211,7 @@ class YadamuCompare {
                                      + '\n');
       }
       else {
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect(`|`
                                      + ` ${''.padStart(colSizes[0])} |`
                                      + ` ${row[1].padStart(colSizes[1])} |`
                                      + ` ${row[3].toString().padStart(colSizes[2])} |` 
@@ -217,7 +224,7 @@ class YadamuCompare {
     })
 
     if (rowCounts.length > 0) {
-     this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+     this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }     
 
   }
@@ -237,11 +244,11 @@ class YadamuCompare {
       seperatorSize += size;
     });
     
-    this.yadamuLogger.writeDirect(`\n`)
+    this.LOGGER.writeDirect(`\n`)
     results.successful.sort().forEach((row,idx) => {
       if (idx === 0) {
-       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+       this.LOGGER.writeDirect(`|`
                                      + ` ${'RESULT'.padEnd(colSizes[0])} |`
                                      + ` ${'SOURCE SCHEMA'.padStart(colSizes[1])} |`
                                      + ` ${'TARGET SCHEMA'.padStart(colSizes[2])} |` 
@@ -250,20 +257,20 @@ class YadamuCompare {
                                      + ` ${'ELAPSED TIME'.padStart(colSizes[5])} |`
                                      + ` ${'THROUGHPUT'.padStart(colSizes[6])} |`
                                      + '\n');
-       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+       this.LOGGER.writeDirect(`|`
                                      + ` ${'SUCCESSFUL'.padEnd(colSizes[0])} |`
                                      + ` ${row[0].padStart(colSizes[1])} |`
                                      + ` ${row[1].padStart(colSizes[2])} |`)
       }
       else {
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect(`|`
                                      + ` ${''.padEnd(colSizes[0])} |`
                                      + ` ${''.padStart(colSizes[1])} |`
                                      + ` ${''.padStart(colSizes[2])} |` )
       }
 
-     this.yadamuLogger.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
+     this.LOGGER.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                    + ` ${row[3].toString().padStart(colSizes[4])} |` 
                                    + ` ${YadamuLibrary.stringifyDuration(parseInt(row[4])).padStart(colSizes[5])} |` 
                                    + ` ${(row[5] === 'NaN/s' ? '' : row[5]+"/s").padStart(colSizes[6])} |` 
@@ -271,7 +278,7 @@ class YadamuCompare {
     })
         
     if (results.successful.length > 0) {
-     this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+     this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
 
     colSizes = [12, 32, 32, 48, 14, 14, 32, 32, 72]
@@ -324,8 +331,8 @@ class YadamuCompare {
         row[7] = lines.shift()
       } 
       if (idx === 0) {
-       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+       this.LOGGER.writeDirect(`|`
                                      + ` ${'RESULT'.padEnd(colSizes[0])} |`
                                      + ` ${'SOURCE SCHEMA'.padStart(colSizes[1])} |`
                                      + ` ${'TARGET SCHEMA'.padStart(colSizes[2])} |` 
@@ -336,20 +343,20 @@ class YadamuCompare {
                                      + ` ${(results.isFileBased ? 'TARGET CHECKSUM' : 'EXTRA ROWS').padStart(colSizes[7])} |`
                                      + ` ${'NOTES'.padEnd(colSizes[8])} |`
                                      + '\n');
-       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+       this.LOGGER.writeDirect(`|`
                                      + ` ${'FAILED'.padEnd(colSizes[0])} |`
                                      + ` ${row[0].padStart(colSizes[1])} |`
                                      + ` ${row[1].padStart(colSizes[2])} |`) 
       }
       else {
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect(`|`
                                      + ` ${''.padEnd(colSizes[0])} |`
                                      + ` ${''.padStart(colSizes[1])} |`
                                      + ` ${''.padStart(colSizes[2])} |`)
       }
                 
-     this.yadamuLogger.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
+     this.LOGGER.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                    + ` ${row[3].toString().padStart(colSizes[4])} |` 
                                    + ` ${row[4].toString().padStart(colSizes[5])} |` 
                                    + ` ${row[5].toString().padStart(colSizes[6])} |` 
@@ -359,7 +366,7 @@ class YadamuCompare {
 
                                
       lines.forEach((line) => {
-       this.yadamuLogger.writeDirect(`|`
+       this.LOGGER.writeDirect(`|`
                                      + ` ${''.padEnd(colSizes[0])} |`
                                      + ` ${''.padStart(colSizes[1])} |`
                                      + ` ${''.padStart(colSizes[2])} |`
@@ -375,7 +382,7 @@ class YadamuCompare {
     })
 	
     if (results.failed.length > 0) {
-     this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+     this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
   
   }
@@ -395,7 +402,7 @@ class YadamuCompare {
       const compareResults = await this.compareSchemas(this.configuration.source.schema,this.configuration.target.schema,this.configuration.rules);
       
       compareResults.elapsedTime = performance.now() - startTime;
-      //this.yadamuLogger.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(compareResults.elapsedTime)}s`);
+      //this.LOGGER.qa([`COMPARE`,`${this.configuration.source.vendor}`,`${this.configuration.target.vendor}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(compareResults.elapsedTime)}s`);
      
       compareResults.successful.forEach((row,idx) => {          
         const mappedTableName = this.configuration.metrics.hasOwnProperty(row[2]) ? row[2] : this.dbi.getMappedTableName(row[2],this.configuration.identifierMappings)
@@ -410,7 +417,7 @@ class YadamuCompare {
       return compareResults
 	  
     } catch (e) {
-     this.yadamuLogger.handleException([`COMPARE`],e)
+     this.LOGGER.handleException([`COMPARE`],e)
       return {
 	    success: []
 	  , failed: []

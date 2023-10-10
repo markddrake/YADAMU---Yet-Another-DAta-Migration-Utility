@@ -116,7 +116,7 @@ class TeradataDBI extends YadamuDBI {
 
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     //  Do not Configure Connection here. 
     
@@ -154,7 +154,7 @@ class TeradataDBI extends YadamuDBI {
 
   async closeConnection(options) {
       
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${(this.connection !== undefined && this.connection.destroy)})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${(this.connection !== undefined && this.connection.destroy)})`)
       
     if (this.connection !== undefined && this.connection.destroy) {
       await this.connection.destroy()
@@ -189,8 +189,8 @@ class TeradataDBI extends YadamuDBI {
       }
     } catch (e) {
       console.log(e)
-	 const exceptionFile = this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
-	 await this.yadamuLogger.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
+	 const exceptionFile = this.LOGGER.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	 await this.LOGGER.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
 	 results = e;
     }
     return results;
@@ -258,7 +258,7 @@ class TeradataDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
      
     this.setTransactionCursor()
     await this.executeSQL(TeradataStatementLibrary.SQL_BEGIN_TRANSACTION,[])
@@ -274,7 +274,7 @@ class TeradataDBI extends YadamuDBI {
    
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     super.commitTransaction()
     await this.executeSQL(TeradataStatementLibrary.SQL_COMMIT_TRANSACTION,[])
@@ -290,7 +290,7 @@ class TeradataDBI extends YadamuDBI {
 
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+   // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -374,7 +374,7 @@ class TeradataDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new TeradataParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new TeradataParser(this,queryInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -382,7 +382,7 @@ class TeradataDBI extends YadamuDBI {
   }
 
   async getInputStream(queryInfo) {
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
 	try {
       return new TeradataReader(this.connection.cursor(),queryInfo.SQL_STATEMENT)

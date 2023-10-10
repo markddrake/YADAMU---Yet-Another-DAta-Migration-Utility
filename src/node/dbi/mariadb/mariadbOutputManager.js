@@ -90,7 +90,7 @@ class MariadbOutputManger extends YadamuOutputManger {
 				switch (true) {
 				  // case (typeof col === "string" && !isInfite(parseInt(col))):
 			      case (!isFinite(col)):
-                    this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+                    this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
 	  		        return null;
 				  default:
 				}
@@ -129,7 +129,7 @@ class MariadbOutputManger extends YadamuOutputManger {
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
+        this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
         this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
 		this.COPY_METRICS.skipped++
         return

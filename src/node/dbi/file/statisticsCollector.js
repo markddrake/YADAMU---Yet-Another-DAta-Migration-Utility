@@ -37,7 +37,7 @@ class StatisticsCollector extends Writable {
   }
   
   async doWrite(messageType,obj) {
-	  // this.yadamuLogger.trace([this.constructor.name,'doTransform()'],`${messageType}`)
+	  // this.LOGGER.trace([this.constructor.name,'doTransform()'],`${messageType}`)
 	  switch (messageType) {
 	    case 'data':
 		  this.processRow(obj.data)
@@ -60,7 +60,7 @@ class StatisticsCollector extends Writable {
 	this.doWrite(messageType,obj).then(() => { 
 	  callback()
 	}).catch((e) => { 
-	  this.yadamuLogger.handleException(['FILE','EVENT STREAM',`_TRANSFORM(${messageType})`],e);
+	  this.LOGGER.handleException(['FILE','EVENT STREAM',`_TRANSFORM(${messageType})`],e);
       callback(e)
 	})
   };
