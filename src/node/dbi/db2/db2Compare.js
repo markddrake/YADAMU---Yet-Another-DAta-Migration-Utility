@@ -83,7 +83,7 @@ class DB2Compare extends YadamuCompare {
 		  results = Object.values(results[0])
           compareResults.push(results)
 		} catch (e) {
-		  // this.yadamuLogger.handleException([this.DATABASE_VENDOR,'QA','COMPARE_SCHEMA'],e)  
+		  // this.LOGGER.handleException([this.DATABASE_VENDOR,'QA','COMPARE_SCHEMA'],e)  
 		  compareResults.push([table.TABLE_NAME,-1,-1,-1,-1,e.message])
 		}
 	  }

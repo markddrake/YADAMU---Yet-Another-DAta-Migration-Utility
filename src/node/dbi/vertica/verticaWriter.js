@@ -90,7 +90,7 @@ class VerticaWriter extends YadamuWriter {
      err.cause = causes;     
      err.sql = statement;
      this.dbi.yadamu.REJECTION_MANAGER.rejectRows(this.tableName,failed)
-     this.yadamuLogger.handleException([...err.tags,this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],err)
+     this.LOGGER.handleException([...err.tags,this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],err)
   }
   
   cleanupStagingFile(stagingFile,loadSuccessful) {
@@ -208,7 +208,7 @@ class VerticaWriter extends YadamuWriter {
         this.cleanupStagingFile(stagingFilePath,false);
         await this.reportBatchError(batch[key],`COPY`,cause)
         await this.dbi.restoreSavePoint(cause);
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);  
+        this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);  
         for (const key of Object.keys(copyOperations)) {     
           batch.insert.push(...batch[key])     
         }

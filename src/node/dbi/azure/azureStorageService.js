@@ -42,11 +42,17 @@ class ByteCounter extends PassThrough {
 class AzureStorageService {
 
   get CHUNK_SIZE()     { return this.parameters.CHUNK_SIZE  || AzureConstants.CHUNK_SIZE }  
+
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
    
   constructor(dbi,parameters) {
 	this.dbi = dbi
 	this.blobServiceClient = dbi.cloudConnection
-	this.yadamuLogger = dbi.yadamuLogger
+	this.LOGGER = dbi.yadamuLogger
 	this.parameters = parameters || {}
 
 	this.containerClient = this.blobServiceClient.getContainerClient(this.dbi.CONTAINER);
@@ -60,20 +66,20 @@ class AzureStorageService {
   }
    
   createWriteStream(key,contentType,activeWriters) {
-	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
+	// this.LOGGER.trace([this.constructor.name],`createWriteStream(${key})`)
 	// const passThrough =  new ByteCounter()
 	const passThrough =  new PassThrough()
 	const blockBlobClient = this.containerClient.getBlockBlobClient(key);
 	const writeOperation = blockBlobClient.uploadStream(passThrough, undefined, undefined, { blobHTTPHeaders: { blobContentType: contentType}})
 	activeWriters.add(writeOperation);
     writeOperation.then(() => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,key],``);		
+      // this.LOGGER.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,key],``);		
       activeWriters.delete(writeOperation)
 	}).catch((err) => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],``);		
-      this.yadamuLogger.handleException([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],err);
+      // this.LOGGER.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],``);		
+      this.LOGGER.handleException([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],err);
     }).finally(() => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`Removing Active Writer`);		
+      // this.LOGGER.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`Removing Active Writer`);		
       activeWriters.delete(writeOperation)
 	})
 	return compose(passThrough, new NullWritable())
@@ -165,7 +171,7 @@ class AzureStorageService {
 		if ((retryOn404) && (e.statusCode && (e.statusCode === 404))) {
    		  retryOn404 = false
   		  await setTimeout(100)
-		  this.yadamuLogger.qaWarning([AzureConstants.DATABASE_VENDOR,'READ',`RETRY`,key],`Retrying after 404`);		
+		  this.LOGGER.qaWarning([AzureConstants.DATABASE_VENDOR,'READ',`RETRY`,key],`Retrying after 404`);		
 		  continue
 		}
 	    throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
@@ -189,6 +195,23 @@ class AzureStorageService {
     }
   }
 
+  async deleteFile(key,params) {
+
+    /*
+    let stack	 
+	let operation 
+    try {
+      stack = new Error().stack
+	  operation = `Azure.containerClient.listBlobsFlat("${key}")`
+	  for await (const blob of this.containerClient.listBlobsFlat({prefix: key})) {
+        operation = `Azure.containerClient.deleteBlob("${blob.name}")`
+	    this.containerClient.deleteBlob(blob.name, {deleteSnapshots : "include"})
+	  }  
+    } catch (e) {
+	  throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
+    }
+	*/
+  }
 }
 
 export {AzureStorageService as default }

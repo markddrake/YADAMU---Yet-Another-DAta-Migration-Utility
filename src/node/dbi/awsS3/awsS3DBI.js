@@ -79,8 +79,8 @@ class AWSS3DBI extends CloudDBI {
 	try {
 	  url = new URL(url ? url : 'http://0.0.0.0')
 	} catch (e) {
-      this.yadamuLogger.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${vendorProperties.endpoint}"`)
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
+      this.LOGGER.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${vendorProperties.endpoint}"`)
+	  this.LOGGER.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
 	  url = new URL('http://0.0.0.0')
 	}
 
@@ -108,7 +108,7 @@ class AWSS3DBI extends CloudDBI {
   }
   
   async createConnectionPool() {
-	// this.yadamuLogger.trace([this.constructor.name],`new AWS.S3()`)
+	// this.LOGGER.trace([this.constructor.name],`new AWS.S3()`)
 	this.cloudConnection = await new AWS.S3(this.vendorProperties)
 	this.cloudService = new AWSS3StorageService(this,{})
   }

@@ -104,12 +104,20 @@ import parseByteA from 'postgres-bytea'
 
 
 class VerticaReader extends Readable {
+
+    get LOGGER()             { return this._LOGGER }
+    set LOGGER(v)            { this._LOGGER = v }
+  
+    get DEBUGGER()           { return this._DEBUGGER }
+    set DEBUGGER(v)          { this._DEBUGGER = v }
       
     constructor(connection,sqlStatement,tableName,yadamuLogger) {
 	  super({objectMode:true}) 
 	  this.connection = connection
 	  this.tableName = tableName
-      this.yadamuLogger = yadamuLogger
+
+      this.LOGGER = yadamuLogger
+	  
 	  this.stagingArea = []
       this.highWaterMark = 1024
 	  this.lowWaterMark = 512
@@ -206,7 +214,7 @@ class VerticaReader extends Readable {
 	
 	/*
 	async _destroy(cause,callback) {
-       // this.yadamuLogger.trace([this.constructor.name,this.tableName],`_destroy(${cause ? cause.message : 'Normal'})`)
+       // this.LOGGER.trace([this.constructor.name,this.tableName],`_destroy(${cause ? cause.message : 'Normal'})`)
 	   if (!this.streamComplete) {
 		 try {
 		   await this.request.cancel();

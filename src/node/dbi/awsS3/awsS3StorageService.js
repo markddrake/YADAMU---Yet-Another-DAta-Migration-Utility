@@ -34,11 +34,17 @@ class AWSS3StorageService {
   get CHUNK_SIZE()   { return this.parameters.CHUNK_SIZE  || AWSS3Constants.CHUNK_SIZE }  
   get RETRY_COUNT()  { return this.parameters.RETRY_COUNT ||  AWSS3Constants.RETRY_COUNT }
   
+  get LOGGER()             { return this._LOGGER }
+  set LOGGER(v)            { this._LOGGER = v }
+  
+  get DEBUGGER()           { return this._DEBUGGER }
+  set DEBUGGER(v)          { this._DEBUGGER = v }
+
   constructor(dbi,parameters) {
 	this.dbi = dbi
 	this.s3Connection = this.dbi.cloudConnection
 	this.parameters = parameters || {}
-	this.yadamuLogger = this.dbi.yadamuLogger
+	this.LOGGER = this.dbi.yadamuLogger
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
 	this.offset = 0;
   }
@@ -48,7 +54,7 @@ class AWSS3StorageService {
   }
   	   
   createWriteStream(key,contentType,activeWriters) {
-	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
+	// this.LOGGER.trace([this.constructor.name],`createWriteStream(${key})`)
   
     const params = { 
 	  Bucket      : this.dbi.BUCKET
@@ -59,14 +65,14 @@ class AWSS3StorageService {
 	const writeOperation = new Promise((resolve,reject) => {
 	  this.s3Connection.upload(params).send((err, data) => {
 		if (err) {
-   	      // this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
-          this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
+   	      // this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
+          this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
 		  // Destroying Body with err should terminate the current pipeline
 		  params.Body.destroy(err);
           // reject(err)
 	    } 
 	    else {
-          // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,params.Key],`Removing Active Writer`);		
+          // this.LOGGER.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,params.Key],`Removing Active Writer`);		
 	    }
         activeWriters.delete(writeOperation)
         resolve(params.Key)
@@ -172,7 +178,7 @@ class AWSS3StorageService {
 
   async createReadStream(key,params) {
 	  
-	// this.yadamuLogger.trace([this.constructor.name],`createReadStream(${key})`)
+	// this.LOGGER.trace([this.constructor.name],`createReadStream(${key})`)
 	
 	params = params || {}
 	params.Bucket = this.dbi.BUCKET
@@ -212,6 +218,26 @@ class AWSS3StorageService {
         throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.deleteObjects(s3://${this.dbi.BUCKET}/${deleteParams.Delete.Objects.length})`)
 	  }
 	} while (folder.IsTruncated);
+  }
+
+  async deleteFile(key,params) {
+	 
+	/* 
+	params = params || {}
+	params.Bucket = this.dbi.BUCKET
+	params.Prefix = key.split(path.sep).join(path.posix.sep)
+    const deleteParams = {
+	  Bucket : this.dbi.BUCKET
+	, Delete : { Objects : folder.Contents.map((c) => { return {Key : c.Key }})}
+	}
+	let stack
+    try {
+      stack = new Error().stack
+	  await this.s3Connection.deleteObjects(deleteParams).promise();
+    } catch (e) {
+      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.deleteObjects(s3://${this.dbi.BUCKET}/${deleteParams.Delete.Objects.length})`)
+	}
+	*/
   }
 
 }

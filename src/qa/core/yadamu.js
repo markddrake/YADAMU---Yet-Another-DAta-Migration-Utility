@@ -130,6 +130,19 @@ class Yadamu extends _Yadamu {
     return (this.killConfiguration && (this.killConfiguration.process === role) && ((this.killConfiguration.worker === workerNumber )  || ((this.killConfiguration.worker === undefined) && (workerNumber === 'Manager'))))
   } 
   
+  invalidParameter(parameterName) {
+    switch (parameterName.toUpperCase()) {
+      case 'CONN':		  
+      case '--CONN':
+      case 'CONNECTION':		  
+      case '--CONNECTION':
+        break;   
+	  default:
+ 	   super.invalidParameter(parameterName);
+   	}
+  }
+
+  
   recordMetrics(tableName,metrics) {    
 
     if (metrics.read - metrics.committed - metrics.lost - metrics.skipped !== 0) {

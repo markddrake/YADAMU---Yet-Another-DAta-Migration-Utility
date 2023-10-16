@@ -126,6 +126,9 @@ class Yadamu {
   get YADAMU_QA()                     { return false }
   
   get LOG_FILE()                      { return this.parameters.LOG_FILE }
+  
+  get DEBUG_ENABLED()                 { return this.parameters.DEBUG_ENABLED || process.env.YADAMU_DEUBG_ENABLED }
+  
   get IDENTIFIER_MAPPING_FILE()       { return this.parameters.IDENTIFIER_MAPPING_FILE }
 
   get CONFIGURATION_FILE_PATH()       { return this.COMMAND_LINE_PARAMETERS.CONFIG }
@@ -153,6 +156,10 @@ class Yadamu {
       return logger
     })();
     return this._LOGGER
+  }
+  
+  get DEBUGGER() {
+    return this.DEBUG_ENABLED ? this.LOGGER : YadamuLogger.NULL_LOGGER 
   }
   
   get REJECTION_MANAGER() {
@@ -202,8 +209,8 @@ class Yadamu {
 	  else {
 	    this.commandPrompt.output.write(charsToWrite.length > 1 ? charsToWrite : "*")
       }
-    };	
-
+    }
+	
   }
 
   async reset(parameters) {
@@ -595,6 +602,10 @@ class Yadamu {
 	  })
 	})
   }
+
+  invalidParameter(parameterName) {
+	console.log(`${new Date().toISOString()}[WARNING][YADAMU][PARAMETERS]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
+  }
   
   readCommandLineParameters() {
    
@@ -821,7 +832,7 @@ class Yadamu {
 			  console.log(`${new Date().toISOString()}[WARNING][YADAMU][PARAMETERS]: Adding parameter: "${parameterName}" with value ${parameters[parameterName]} to parameter list.`) 
 			}
 			else {
-              console.log(`${new Date().toISOString()}[WARNING][YADAMU][PARAMETERS]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
+			  this.invalidParameter(parameterName)
 		    }
         }
       }

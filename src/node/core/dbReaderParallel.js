@@ -39,7 +39,7 @@ class DBReaderParallel extends DBReader {
       while (taskList.length > 0) {
 	    task = taskList.shift();
 		// this.yadamuLogger.trace(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],'Allocated')
-		await this.pipelineTable(task,readerDBI,writerDBI)
+		await this.pipelineTable(task,readerDBI,writerDBI,true)
 		// this.yadamuLogger.trace(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],'Completed')
       }
 	} catch (cause) {

@@ -122,9 +122,9 @@ class DBReader extends Readable {
   }
   
   async pipelineTable(task,readerDBI,writerDBI,retryOnError) {
-	 
-	retryOnError = retryOnError || (readerDBI.ON_ERROR === 'RETRY')
 	  
+	retryOnError = retryOnError && (readerDBI.ON_ERROR === 'RETRY')
+
     let queryInfo
 
 	const yadamuPipeline = []
@@ -148,8 +148,7 @@ class DBReader extends Readable {
 	try {
 	  // Track active read streams.. Used to when aborting parallel operations
 	  const activeReader = yadamuPipeline[0]
-	  activeReader.once('close',() => {
-		  
+	  activeReader.once('close',() => {		  
 		 this.activeReaders.delete(activeReader)
 	  })
 	  this.activeReaders.add(activeReader)
@@ -157,6 +156,7 @@ class DBReader extends Readable {
 	  this.setReader(yadamuPipeline)
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
       pipelineMetrics.pipeStartTime = performance.now();
+	  // this.traceStreamEvents(yadamuPipeline,queryInfo.TABLE_NAME)
 	  await pipeline(...yadamuPipeline)
 	  pipelineMetrics.pipeEndTime = performance.now();
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
@@ -259,7 +259,7 @@ class DBReader extends Readable {
 	  const task = taskList.shift()
       // this.yadamuLogger.trace(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
       try {
-	    await this.pipelineTable(task,readerDBI,writerDBI)
+	    await this.pipelineTable(task,readerDBI,writerDBI,true)
 	  } catch (cause) {
 		  // this.yadamuLogger.trace(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],cause)
 		this.yadamuLogger.handleException(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME,readerDBI.ON_ERROR],cause)

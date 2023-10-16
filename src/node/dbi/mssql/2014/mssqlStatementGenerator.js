@@ -15,7 +15,16 @@ class MsSQLStatementGenerator extends _MsSQLStatementGenerator {
       const table = this.metadata[tableName]
       const columnsXML = table.columnNames.map((columnName) => {return `<columnName>${columnName}</columnName>`}).join('');
       const dataTypesXML = table.dataTypes.map((dataType) => {return `<dataType>${dataType}</dataType>`}).join('');
-      const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`}).join('');
+	  const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {
+		switch (sizeConstraint.length) {
+		  case 0:
+			return `<sizeConstraint/>`
+		  case 1:
+		    return `<sizeConstraint><precision>${sizeConstraint[0]}</precision></sizeConstraint>`
+		  case 2:
+		    return `<sizeConstraint><precision>${sizeConstraint[0]}</precision><scale>${sizeConstraint[1]}</scale></sizeConstraint>`
+		}
+	  }).join('');
       return `<table><vendor>${table.vendor}</vendor><tableSchema>${table.tableSchema}</tableSchema><tableName>${table.tableName}</tableName><columnNames>${columnsXML}</columnNames><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
     }).join('');
     return `<metadata>${metadataXML}</metadata>`
@@ -23,7 +32,8 @@ class MsSQLStatementGenerator extends _MsSQLStatementGenerator {
   }
 
   getSourceTypeMappings() {
-     return `<typeMappings>${Array.from(this.TYPE_MAPPINGS.entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><mssqlType>${mapping[1]}</mssqlType></typeMapping>` }).join('')}</typeMappings>`
+	 const mappings = `<typeMappings>${Array.from(this.TYPE_MAPPINGS.entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><mssqlType>${mapping[1]}</mssqlType></typeMapping>` }).join('')}</typeMappings>`
+     return mappings
   }
   
 }

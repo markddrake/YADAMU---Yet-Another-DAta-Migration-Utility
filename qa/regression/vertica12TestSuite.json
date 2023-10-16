@@ -4,9 +4,7 @@
 , "tasks"             : "tasks.json"
 , "recreateSchema"    : true
 , "parameters": {
-    "REMOTE_STAGING_AREA"      : "/mnt/shared/stagingArea/db/vertica"
-  , "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/db/vertica"
-  , "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/verticaMappings.json"
+	"IDENTIFIER_MAPPING_FILE"  : "qa/mappings/verticaMappings.json"
   , "MERGEOUT_INSERT_COUNT"    : 128
   }
 , "tests"               : [{

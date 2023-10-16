@@ -34,8 +34,16 @@ class SnowflakeWriter extends YadamuWriter {
   async _writeBatch(batch,rowCount) {
 	  
 	let sqlStatement
+
+	if (this.tableInfo.parserRequired && (this.dbi.countBinding(batch) > this.dbi.ARRAY_BINDING_THRESHOLD)) {
+	  // Disable Single Batch Insert. Split into 'n' batches where each batch is (probably) smaller than the ARRAY_BINDING_THRESHOLD
+  	  this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`ARRAY_BINDING_THRESHOLD exceeded. Switching to Multi-Batch mode.`);        
+      this.tableInfo.insertMode = 'MultiBatch'
+    } 
+ 
     if (this.tableInfo.insertMode === 'Batch') {
-      try {
+				
+	  try {
 		sqlStatement = `${this.tableInfo.dml}  ${this.tableInfo.parserRequired ? new Array(rowCount).fill(0).map(() => {return this.tableInfo.args}).join(',') : this.tableInfo.args}`
 		const result = await this.dbi.executeSQL(sqlStatement,batch);
         this.endTime = performance.now();
@@ -44,7 +52,7 @@ class SnowflakeWriter extends YadamuWriter {
         return this.skipTable
       } catch (cause) {
 		this.reportBatchError(batch,`INSERT MANY`,cause)
-		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
 		this.tableInfo.insertMode = 'BinarySplit'   
       }
     }
@@ -74,13 +82,26 @@ class SnowflakeWriter extends YadamuWriter {
 
     let nextBatch
     let rowNumbers
-    const batches = [batch]
-    const rowTracking = [Array.from(Array(rowCount).keys())]
+	let batches = []
     let operationCount = 0
-	
+    const rowTracking = [Array.from(Array(rowCount).keys())]
+ 
 	if (this.tableInfo.parserRequired) {
-	  // console.log('Snowflake Writer','Variant',batch.slice(0,this.tableInfo.columnNames.length))
       let batchRowCount
+
+	  if (this.tableInfo.insertMode === "MultiBatch") {   
+        const batchRowCount = Math.floor(this.dbi.countBinding(batch)/this.dbi.ARRAY_BINDING_THRESHOLD)
+	    const batchLength = batchRowCount * this.tableInfo.columnNames.length	  
+	    while (batch.length > 0) {
+   	      batches.push(batch.splice(0,batchLength))
+		  rowTracking.push(rowTracking[0].splice(0,batchRowCount))
+	    }
+	    rowTracking.shift()
+	  }
+	  else {
+        batches.push(batch)
+	  }
+	  
 	  const columnCount = this.tableInfo.columnNames.length
 	  while (batches.length > 0) {
 		try {
@@ -90,7 +111,7 @@ class SnowflakeWriter extends YadamuWriter {
 		  sqlStatement = `${this.tableInfo.dml} ${new Array(batchRowCount).fill(0).map(() => {return this.tableInfo.args}).join(',')}`
 		  const opStartTime = performance.now()
           operationCount++
-          // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1],batchRowCount],`Operation ${operationCount}`)
+          // this.LOGGER.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1],batchRowCount],`Operation ${operationCount}`)
           const result = await this.dbi.executeSQL(sqlStatement,nextBatch);
 		  sqlExectionTime+= performance.now() - opStartTime
           this.dbi.SQL_TRACE.disable()
@@ -117,13 +138,14 @@ class SnowflakeWriter extends YadamuWriter {
 	  }  
     }
 	else {
+      batches.push(batch)
 	  while (batches.length > 0) {
 	    try {
 		  nextBatch = batches.shift()
           rowNumbers = rowTracking.shift();
 		  const opStartTime = performance.now()
           operationCount++  
-          // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1]],`Operation ${operationCount}`)
+          // this.LOGGER.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1]],`Operation ${operationCount}`)
        	  sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.args}`
 		  const result = await this.dbi.executeSQL(sqlStatement,nextBatch)
 		  sqlExectionTime+= performance.now() - opStartTime
@@ -150,7 +172,7 @@ class SnowflakeWriter extends YadamuWriter {
       }
     }
 
-    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.COPY_METRICS.skipped],`Binary insert required ${operationCount} operations`)
+    // this.LOGGER.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.COPY_METRICS.skipped],`Binary insert required ${operationCount} operations`)
 	this.dbi.SQL_TRACE.enable()
 	
     this.endTime = performance.now();

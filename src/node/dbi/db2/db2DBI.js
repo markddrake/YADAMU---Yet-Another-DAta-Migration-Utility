@@ -105,7 +105,7 @@ class DB2DBI extends YadamuDBI {
   }
   
   async createConnectionPool() {	
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
 	this.connectionPool = new this.ibmdb.Pool()
   }
   
@@ -138,7 +138,7 @@ class DB2DBI extends YadamuDBI {
   
   async getConnectionFromPool() {
     
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
     
 	// Get a connection from the connection pool
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
@@ -185,7 +185,7 @@ class DB2DBI extends YadamuDBI {
 
     // Close a connection and return it to the connection pool
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
 	if (await this.badConnection()) {
 	  // Do not return failed connections to the pool.
       await this.connection.realClose()
@@ -201,7 +201,7 @@ class DB2DBI extends YadamuDBI {
 
     // Close the connection pool
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],`closePool()`)
     await this.connectionPool.close()
 
  }
@@ -256,7 +256,7 @@ class DB2DBI extends YadamuDBI {
 
         /*
         setTimeout(10000,null,{ref: false, signal: timerAbort.signal}).then(() => {
-          this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,,'BATCH INSERT'],`Batch Insert operation timed out`)
+          this.LOGGER.warning([this.DATABASE_VENDOR,this.ROLE,,'BATCH INSERT'],`Batch Insert operation timed out`)
 		  return
 	    }).catch((e) => { console.log(e) })
 	 	*/
@@ -325,7 +325,7 @@ class DB2DBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 	 
 	/*
 	**
@@ -347,7 +347,7 @@ class DB2DBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     /*
 	**
@@ -369,7 +369,7 @@ class DB2DBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+   // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -394,7 +394,7 @@ class DB2DBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 																
     /*
 	**
@@ -409,7 +409,7 @@ class DB2DBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
     /*
 	**
@@ -472,7 +472,7 @@ class DB2DBI extends YadamuDBI {
   */
 
   processLog(log,operation) {
-    super.processLog(log, operation, this.status, this.yadamuLogger)
+    super.processLog(log, operation, this.status, this.LOGGER)
     return log
   }
 
@@ -566,7 +566,7 @@ class DB2DBI extends YadamuDBI {
   }   
 
   createParser(queryInfo,parseDelay) {
-    return new DB2Parser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new DB2Parser(this,queryInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -577,7 +577,7 @@ class DB2DBI extends YadamuDBI {
 
     // Either return the databases native readable stream or use the DB2Reader to create a class that wraps a cursor or event stream in a Readable
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
 
     this.streamingStackTrace = new Error().stack;
     this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)

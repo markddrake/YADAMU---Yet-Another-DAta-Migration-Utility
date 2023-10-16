@@ -7,8 +7,8 @@ import {
 							          
 /* Database Vendors API */                                    
 		
-import snowflake from 'snowflake-sdk';
-
+import snowflake                      from 'snowflake-sdk';
+import snowflakeParameters            from 'snowflake-sdk/lib/parameters.js';
 /* Yadamu Core */                                    
 
 import YadamuConstants                from '../../lib/yadamuConstants.js'
@@ -95,6 +95,8 @@ class SnowflakeDBI extends YadamuDBI {
   }    
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
+  
+  get ARRAY_BINDING_THRESHOLD() { return this.vendorProperties.arrayBindingThreshold }
     
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
@@ -156,7 +158,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
   	// Snowflake-SDK does not support connection pooling
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+  	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     this.setDatabase()
     this.logConnectionProperties()
@@ -180,14 +182,14 @@ class SnowflakeDBI extends YadamuDBI {
     this._DATABASE_VERSION = results[0].DATABASE_VERSION
 
     if ((this.isManager()) && (this.DATA_TYPES.storageOptions.XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.DATA_TYPES.storageOptions.XML_TYPE}.`)
+       this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.DATA_TYPES.storageOptions.XML_TYPE}.`)
     }	
 
   }
 
   async closeConnection(options) {
 	  
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
+  	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.destroy) {
       await this.connection.destroy()
@@ -202,15 +204,16 @@ class SnowflakeDBI extends YadamuDBI {
   updateVendorProperties(vendorProperties) {
 
 	// Convert supplied parameters to format expected by connection mechansim
-	
+		
     this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
 	
-    vendorProperties.account           = this.parameters.ACCOUNT    || vendorProperties.account 
-    vendorProperties.username          = this.parameters.USERNAME   || vendorProperties.username 
-    vendorProperties.password          = this.parameters.PASSWORD   || vendorProperties.password  
-    vendorProperties.warehouse         = this.parameters.WAREHOUSE  || vendorProperties.warehouse
-    vendorProperties.database          = this.parameters.DATABASE   || vendorProperties.database   
-     
+    vendorProperties.account                = this.parameters.ACCOUNT                    || vendorProperties.account 
+    vendorProperties.username               = this.parameters.USERNAME                   || vendorProperties.username 
+    vendorProperties.password               = this.parameters.PASSWORD                   || vendorProperties.password  
+    vendorProperties.warehouse              = this.parameters.WAREHOUSE                  || vendorProperties.warehouse
+    vendorProperties.database               = this.parameters.DATABASE                   || vendorProperties.database   
+	vendorProperties.arrayBindingThreshold  = this.parameters.SNOWFLAKE_BUFFER_SIZE      || vendorProperties.arrayBindingThreshold || 100000      
+    vendorProperties.insecureConnect        = this.parameters.SNOWFLAKE_INSECURE_CONNECT || vendorProperties.insecureConnect || false      
   }
 
   executeSQL(sqlStatement,args) {
@@ -234,7 +237,7 @@ class SnowflakeDBI extends YadamuDBI {
 	      				       attemptReconnect = false
 			   			       try {
                                  await this.reconnect(cause,'SQL')
-                                 results = await this.executeSQL(sqlStatement,args)
+                                 const results = await this.executeSQL(sqlStatement,args)
 							     resolve(results)
 						       } catch (e) {
                                  reject(e)
@@ -265,7 +268,7 @@ class SnowflakeDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement,[])
       }))
     } catch (e) { 
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
+	  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	  results = e
     }
     return results;
@@ -292,7 +295,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 	 
 	/*
 	**
@@ -314,7 +317,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     /*
 	**
@@ -336,7 +339,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+   // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -498,7 +501,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }     
   
   createParser(queryInfo,parseDelay) {
-    return new SnowflakeParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new SnowflakeParser(this,queryInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -506,7 +509,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }
   
   async getInputStream(queryInfo) {
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
     this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     const statement = this.connection.execute({sqlText: queryInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
@@ -573,7 +576,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	} catch (e) {
       err.cause = e
 	}
-	this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)	   	
+	this.LOGGER.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)	   	
   }  
     
   async initializeCopy() {
@@ -600,7 +603,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   	} catch(e) {
 	  metrics.writerError = e
 	  try {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
+  	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError
@@ -624,6 +627,22 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	 await this.initialize()
 	 return new SnowflakeCompare(this,configuration)
   }
+  
+  countBinding(binds) {
+
+    if(!Array.isArray(binds))   {
+      return 0;
+    }
+  
+    var count = 0;
+    for(var index = 0; index < binds.length; index++) {
+      if(binds[index] != null) {
+        count += binds[index].length;
+      }
+    }
+    return count;
+  }
+
     
 }
 

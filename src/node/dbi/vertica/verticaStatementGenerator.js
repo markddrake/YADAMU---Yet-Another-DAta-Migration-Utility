@@ -151,7 +151,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     this.TABLE_LOB_COUNT = lobList.length
 
 	if (this.TABLE_LOB_LIMIT < this.dbi.DATA_TYPES.LOB_LENGTH) {
-      this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR,tableName],`LONG VARCHAR and LONG VARBINARY columns restricted to ${this.TABLE_LOB_LIMIT} bytes`);
+      this.LOGGER.ddl([this.dbi.DATABASE_VENDOR,tableName],`LONG VARCHAR and LONG VARBINARY columns restricted to ${this.TABLE_LOB_LIMIT} bytes`);
       
       lobList.forEach((idx) => {
         const column_suffix = String(idx+1).padStart(3,"0");
@@ -366,6 +366,12 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
           copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS UUID)`
           insertOperators[idx] = null
           break;
+        case this.dbi.DATA_TYPES.NUMBER_TYPE:
+		  if (this.dbi.CSV_NUMBER_PARSING_ISSUE) {
+	        copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(1026), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS ${this.generateStorageClause(columnDataTypes[idx],sizeConstraints[idx])})`
+            insertOperators[idx] = null
+            break;
+	      }
         default:
           copyColumnDefinitions[idx] =`"${columnName}"`
           insertOperators[idx] = null

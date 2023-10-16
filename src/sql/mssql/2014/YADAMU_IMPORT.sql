@@ -203,7 +203,6 @@ begin
                                                                                                else @MSSQL_DATA_TYPE
       end                                                                                     
                                                                                                else @MSSQL_DATA_TYPE
-else @MSSQL_DATA_TYPE
   end
 end;
 --
@@ -306,7 +305,7 @@ begin
                                "TARGET_DATA_TYPE"
                              when "TARGET_DATA_TYPE" in('text','ntext')  then
                                CONCAT("TARGET_DATA_TYPE",' collate ',@LEGACY_COLLATION)
-                             when "TARGET_DATA_TYPE" in('xml','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
+                             when "TARGET_DATA_TYPE" in('xml','image','real','float','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
                                "TARGET_DATA_TYPE"                
                              when "DATA_TYPE_SCALE" IS NOT NULL then
                                CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
@@ -329,7 +328,7 @@ begin
                                   case
                                     when "TARGET_DATA_TYPE" LIKE '%(%)%' then
                                       "TARGET_DATA_TYPE"
-                                    when "TARGET_DATA_TYPE" in ('json','xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry') then
+                                    when "TARGET_DATA_TYPE" in ('json','xml','text','ntext','image','real','float','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry') then
                                       "TARGET_DATA_TYPE"                 
                                     when "DATA_TYPE_SCALE" IS NOT NULL then
                                       CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')

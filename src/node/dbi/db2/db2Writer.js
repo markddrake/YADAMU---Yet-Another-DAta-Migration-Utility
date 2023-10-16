@@ -27,29 +27,32 @@ class DB2Writer extends YadamuWriter {
 	
 	batch.ArraySize = rowCount
 	
-	let idxList = Object.keys(Array(batch.params.length).fill(0))
-	
-	// Calculate Length for all string based arrays
-	
-	for (let i=0; i < rowCount && idxList.length > 0; i++) {
-	  idxList = idxList.flatMap((idx) => {
-	    const value = batch.params[idx].Data[i] 
-		if (value !== null) {
-		  if (typeof value === 'string') {
-		    // const byteLength = this.dbi.DATA_TYPES.UCS2_TYPES.includes(this.tableInfo.targetDataTypes[idx]) ? value.length * 2 : Buffer.byteLength(value)
-			// batch.params[idx].SQLType = this.tableInfo.targetDataTypes[idx] === this.dbi.DATA_TYPES.NCLOB_TYPE ? this.dbi.DATA_TYPES.NCLOB_TYPE : batch.params[idx].SQLType
-			// Test using ">" to ensure value is set if not already defined (undefined > byteLength is false)
-		    const byteLength = Buffer.byteLength(value) 
-			batch.params[idx].SQLType = 1
-		    batch.params[idx].Length = batch.params[idx].Length > byteLength ? batch.params[idx].Length : byteLength
-			return idx
+    batch.params.filter((param) => {
+	  switch (param.SQLType) {
+		case this.dbi.DATA_TYPES.CHAR_TYPE:
+        case this.dbi.DATA_TYPES.NCHAR_TYPE:
+        case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+        case this.dbi.DATA_TYPES.NARCHAR_TYPE:
+        case this.dbi.DATA_TYPES.CLOB_TYPE:
+        case this.dbi.DATA_TYPES.NCLOB_TYPE:
+		  for (const value of param.Data) {
+  		    const byteLength = Buffer.byteLength(value)
+   		    param.Length = param.Length > byteLength ? param.Length : byteLength
 		  }
-		  return []
-	    }
-		return idx
-	  })
-	}	
-	
+		  break;
+        case this.dbi.DATA_TYPES.BINARY_TYPE:
+        case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+        case this.dbi.DATA_TYPES.BLOB_TYPE:
+		  for (const value of param.Data) {
+   		    param.Length = param.Length > value.length ? param.Length : value.length
+		  }
+		  break;
+	  }
+	   
+    })
+		
+	console.dir(batch,{depth:null})
+
 	/*
 	**
 	
@@ -74,7 +77,7 @@ class DB2Writer extends YadamuWriter {
       } catch (cause) {
 	    this.reportBatchError(`INSERT MANY`,cause,batch,rowCount)
         // await this.dbi.restoreSavePoint(cause);
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+        this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'    
       }
     }

@@ -7,8 +7,6 @@
 , "verifyOperation"                   : true
 , "parameters"                        : {
     "DIRECTORY"                       : "export/json/%location%"
-  , "REMOTE_STAGING_AREA"             : "/mnt/shared/stagingArea/db/vertica"
-  , "LOCAL_STAGING_AREA"              : "/usr/src/YADAMU/stagingArea/db/vertica"
   }
 , "tests" : [{
 	"operation" : "import"

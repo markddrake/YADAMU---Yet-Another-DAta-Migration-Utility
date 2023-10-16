@@ -25,19 +25,33 @@ class DB2StatementGenerator extends YadamuStatementGenerator{
 	    return 'SYSTOOLS.JSON2BSON(?)' 
 	  case this.dbi.DATA_TYPES.XML_TYPE:
 	    return 'XMLPARSE(DOCUMENT CAST(? AS CLOB) PRESERVE WHITESPACE)' 
+	  /*
+	  **
+	  **
+	  
       case this.dbi.DATA_TYPES.BINARY_TYPE:
 	  case this.dbi.DATA_TYPES.VARBINARY_TYPE:
 	    return 'HEXTORAW(?)' 
       case this.dbi.DATA_TYPES.BLOB_TYPE:
 	    return 'YADAMU.HEXTOBLOB(?)' 
+	  
+	  **
+	  */
+	  
 	  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
 	    switch (this.SPATIAL_FORMAT) {
-		  case 'WKT':
-		  case 'EWKT':
-    	    return null
 		  case 'WKB':
     	  case 'EWKB':
+		    /*
+		    **
+			
     	    return ' YADAMU.HEXTOBLOB(?)'
+
+  		    **
+		    */
+		  case 'WKT':
+		  case 'EWKT':
+    	    return '?'
 		  case 'GeoJSON':
     	    return 'SYSTOOLS.JSON2BSON(?)' 
 		}

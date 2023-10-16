@@ -21,7 +21,7 @@ class DB2OutputManager extends YadamuOutputManager {
     this.tableInfo.paramsTemplate = []
 	
     return  this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
-	  const paramDefinition = { ParamType: "ARRAY", SQLType: 1, Data: []}
+	  const paramDefinition = { ParamType: "ARRAY", SQLType: this.dbi.DATA_TYPES.VARCHAR_TYPE, Data: []}
 	  this.tableInfo.paramsTemplate.push(paramDefinition)
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(targetDataType);
 	  switch (dataTypeDefinition.type.toUpperCase()) {
@@ -68,7 +68,7 @@ class DB2OutputManager extends YadamuOutputManager {
 			    if (isFinite(col)) {
 				  return typeof col === 'string' ? col : col.toExponential(17)
 			    }	
-    	        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`)
+    	        this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`)
                 return null
 		      }   
             default :
@@ -86,15 +86,36 @@ class DB2OutputManager extends YadamuOutputManager {
 		  }			
 		case this.dbi.DATA_TYPES.BINARY_TYPE:
 		case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+		  /*
+		  **
+		  
           paramDefinition.SQLType = this.dbi.DATA_TYPES.VARCHAR_TYPE
 		  return (col,idx) => {
 			return Buffer.isBuffer(col) ? col.toString('hex') : col
 		  }
+		  
+		  **
+		  */
+		  paramDefinition.SQLType = this.dbi.DATA_TYPES.BINARY_TYPE
+		  return (col,idx) => {
+			return typeof col === 'string' ? Buffer.from(col,'hex') : col
+		  }
 		case this.dbi.DATA_TYPES.BLOB_TYPE:
+		  /*
+		  **
+
           paramDefinition.SQLType = this.dbi.DATA_TYPES.CLOB_TYPE
  		  return (col,idx) => {
             return Buffer.isBuffer(col) ?  col.toString('hex') : col
 		  }     
+
+		  **
+		  */
+
+          paramDefinition.SQLType = this.dbi.DATA_TYPES.BLOB_TYPE
+		  return (col,idx) => {
+			return typeof col === 'string' ? Buffer.from(col,'hex') : col
+		  }
 		case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
           return (col,idx) => {
             return typeof col === 'boolean' ? col : YadamuLibrary.toBoolean(col)
@@ -149,10 +170,20 @@ class DB2OutputManager extends YadamuOutputManager {
 		    switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
 		      case 'WKB':
 		      case 'EWKB':
+			    /* 
+				**
+ 
                 paramDefinition.SQLType = this.dbi.DATA_TYPES.CLOB_TYPE
  		        return (col,idx) => {
                   return Buffer.isBuffer(col) ?  col.toString('hex') : col
-		      }     
+		        }     
+
+				**
+				*/
+                paramDefinition.SQLType = this.dbi.DATA_TYPES.BLOB_TYPE
+		        return (col,idx) => {
+    			  return typeof col === 'string' ? Buffer.from(col,'hex') : col
+		        }
               case "WKT":
               case "EWKT":
       		    paramDefinition.SQLType = this.dbi.DATA_TYPES.CLOB_TYPE

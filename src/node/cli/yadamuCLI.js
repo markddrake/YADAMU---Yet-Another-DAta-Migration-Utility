@@ -160,7 +160,10 @@ class YadamuCLI {
     })
     return this._ARGUMENT_SYNONYMS
   }
-	  
+
+  createYadamu() {	  
+	return new Yadamu(this.command);
+  }
 
   constructor() {  
 
@@ -182,7 +185,7 @@ class YadamuCLI {
 	    this.command = this.getOperation(className)
 	}		
 
-    this.yadamu = new Yadamu(this.command);
+    this.yadamu = this.createYadamu()
     
     this.yadamuLogger = this.yadamu.LOGGER
 
@@ -281,59 +284,64 @@ class YadamuCLI {
 	return this.command
   }
   
+  setParameter(parameterName,parameterValue) {
+
+    switch (parameterName.toUpperCase()) {
+	  case 'EXPORT':		  
+	  case '--EXPORT':
+        commands.push('EXPORT')
+        this.parameters.FILE = parameterValue;
+	    break;
+      case 'IMPORT':		  
+      case '--IMPORT':
+        commands.push('IMPORT')
+        this.parameters.FILE = parameterValue;
+	    break;
+      case 'UPLOAD':		  
+      case '--UPLOAD':
+        commands.push('UPLOAD')
+        this.parameters.FILE = parameterValue;
+	    break;
+      case 'COPY':		  
+      case '--COPY':
+        commands.push('COPY')
+        this.parameters.CONFIG = parameterValue;
+	    break;
+      case 'TEST':		  
+      case '--TEST':
+        commands.push('TEST')
+        this.parameters.CONFIG = parameterValue;
+	    break;
+      case 'OVERWRITE':		  
+      case '--OVERWRITE':
+        this.parameters.OVERWRITE = parameterValue.toUpperCase();
+	    break;
+      case 'FILE':		  
+      case '--FILE':
+        this.parameters.FILE = parameterValue;
+	    break;
+      case 'CONFIG':		  
+      case '--CONFIG':
+      case 'CONFIGURATION':		  
+      case '--CONFIGURATION':
+        this.parameters.CONFIG = parameterValue;
+	    break;   
+	}
+  }  
+  
   getOperation(className) {
-	  
+
 	const commands = []
     this.parameters = {}
-    process.argv.forEach((arg) => {
- 
+	
+	process.argv.forEach((arg) => {
       if (arg.indexOf('=') > -1) {
         const parameterName = arg.substring(0,arg.indexOf('='));
         const parameterValue = arg.substring(arg.indexOf('=')+1);
-        switch (parameterName.toUpperCase()) {
-	      case 'EXPORT':		  
-	      case '--EXPORT':
-  	        commands.push('EXPORT')
-  	        this.parameters.FILE = parameterValue;
-		    break;
-	      case 'IMPORT':		  
-	      case '--IMPORT':
-  	        commands.push('IMPORT')
-  	        this.parameters.FILE = parameterValue;
-		    break;
-	      case 'UPLOAD':		  
-	      case '--UPLOAD':
-  	        commands.push('UPLOAD')
-  	        this.parameters.FILE = parameterValue;
-		    break;
-	      case 'COPY':		  
-	      case '--COPY':
-  	        commands.push('COPY')
-  	        this.parameters.CONFIG = parameterValue;
-		    break;
-	      case 'TEST':		  
-	      case '--TEST':
-  	        commands.push('TEST')
-  	        this.parameters.CONFIG = parameterValue;
-		    break;
-	      case 'OVERWRITE':		  
-	      case '--OVERWRITE':
-  	        this.parameters.OVERWRITE = parameterValue.toUpperCase();
-		    break;
-	      case 'FILE':		  
-	      case '--FILE':
-  	        this.parameters.FILE = parameterValue;
-		    break;
-	      case 'CONFIG':		  
-	      case '--CONFIG':
-	      case 'CONFIGURATION':		  
-	      case '--CONFIGURATION':
-  	        this.parameters.CONFIG = parameterValue;
-		    break;   
-		}
+		this.setParameter(parameterName,parameterValue)
       }
     })	
-	
+
 	let err
 	let command
 	

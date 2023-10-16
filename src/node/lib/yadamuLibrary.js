@@ -225,8 +225,10 @@ class YadamuLibrary {
   }
   
   static intervalDaySecondTo8601(interval) {
-	let components = interval.split(' ')
-	// Length > 1 Days and Time
+	  
+    let components = interval.split(' ')
+	// Length > 1 : Interval contains Day and Time components.
+	
 	const days = components[0].includes(':') ? undefined : components[0]
 	const time = components[0].includes(':') ? components[0] : components.length === 2 ? components[1] : undefined
 	components = time ? time.split(':') : []
@@ -234,7 +236,8 @@ class YadamuLibrary {
 	const mins  = components.length > 1 ? components[1] : undefined
 	let secs  = components.length > 2 ? components[2] : undefined
     const interval8601 = `P${days ? `${days}D` : ''}${time ? `T${hours ? `${hours}H${mins ? `${mins}M` : ''}${secs ? `${secs}S` : ''}` : ''}` : ''}`
-	return interval8601
+    return interval8601
+	
   }
   
   static parse8601Interval(interval) {
