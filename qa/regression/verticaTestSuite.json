@@ -4,14 +4,14 @@
 , "tasks"             : "tasks.json"
 , "recreateSchema"    : true
 , "parameters": {
-    "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/verticaMappings.json"
+   "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/verticaMappings.json"
   , "MERGEOUT_INSERT_COUNT"    : 128
   }
 , "tests"               : [{
     "operation"         : "import"
   , "source"            : "file-staging"
   , "targets"           : [
-       "vertica10","vertica23"
+       "vertica#1","vertica10"
 	]
   , "verifyOperation"   : true
   , "parameters"        : {
@@ -21,75 +21,81 @@
       "oracle","mysql","mssql"
     ]
   },{
+    "source"            : "vertica#1"
+  , "target"            : "vertica#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
     "source"            : "oracle#1"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "oracle18c"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "oracle12c"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "oracle11g"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "mssql#1"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "mssql19"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "postgres#1"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "mysql#1"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "mariadb#1"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "mongodb#1"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
     "source"            : "vertica10"
-  , "target"            : "vertica23"
+  , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "vertica23"
+    "source"            : "vertica#1"
   , "targets": [
-	  "vertica23","vertica10","oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  "oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1","vertica10"
     ]
   , "parameters": {
       "IDENTIFIER_MAPPING_FILE"  : null

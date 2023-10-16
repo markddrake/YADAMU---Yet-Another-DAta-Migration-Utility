@@ -11,7 +11,43 @@
 		"TIMESTAMP_PRECISION"     : 6
 	},
 	"tests": [{
+			"source": "postgres#1",
+			"target": "postgres#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
 			"source": "oracle#1",
+			"target": "postgres#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle19c",
+			"target": "postgres#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle18c",
+			"target": "postgres#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle12c",
+			"target": "postgres#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle11g",
+			"target": "postgres#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mssql#1",
 			"target": "postgres#1",
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -23,13 +59,13 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "postgres#1",
+			"source": "mysql#1",
 			"target": "postgres#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "mysql#1",
+			"source": "mariadb#1",
 			"target": "postgres#1",
 			"tasks": [
 				"oracle","mssql","mysql"

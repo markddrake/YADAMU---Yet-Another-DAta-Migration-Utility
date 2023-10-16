@@ -12,7 +12,7 @@
 			"operation": "export",
 			"createDirectory": true,
 	        "verifyOperation": false,
-			"source": "oracle23c",
+			"source": "oracle#1",
 			"target": "file-staging",
 			"tasks": [
 				"HR",
@@ -21,7 +21,7 @@
 		},{
 			"operation": "import",
 			"source": "file-staging",
-			"target": "oracle23c",
+			"target": "oracle#1",
 			"parameters": {
 				"DIRECTORY": "export/%mode%/%connection%"
 			},
@@ -30,8 +30,8 @@
 				"BI"
 			]
 		},{
-			"source": "oracle23c",
-			"target": "oracle23c",
+			"source": "oracle#1",
+			"target": "oracle#1",
 			"tasks": [
 				"HR",
 				"BI"

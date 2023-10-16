@@ -23,31 +23,8 @@ services:
       - YADAMU_01-SHARED:/mnt/shared
     restart: always
 
-  ORA2303-01: 
-    container_name: ORA2303-01
-    # image:  oracle/database:21.3.0-ee
-    image:  container-registry.oracle.com/database/free:latest
-    mem_limit: '12gb'
-    security_opt:
-      - seccomp:unconfined
-    shm_size: '4gb'
-    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "1521:1521"
-    environment:
-      ORACLE_SID: FREE
-      ORACLE_PDB: FREEPDB1 
-      ORACLE_PWD: oracle 
-      ORACLE_CHARACTERSET: AL32UTF8
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA2303-01-DATA:/opt/oracle/admin
-      - ORA2303-01-DATA:/opt/oracle/oradata
-      - ORA2303-01-DIAG:/opt/oracle/diag
-    restart: always
-
+  # ORA2303-01: 1521
+  
   ORA1120-01: 
     container_name: ORA1120-01
     # image:  oracle/database:11.2.0.4-ee
@@ -149,7 +126,7 @@ services:
       - ORA1903-01-DATA:/opt/oracle/oradata
       - ORA1903-01-DIAG:/opt/oracle/diag
     restart: always
-
+  
   # ORA2103-01: 15216
   
   MARIA11-01: 
@@ -384,8 +361,6 @@ networks:
 volumes:
   YADAMU_01-SHARED:
     name: YADAMU_01-SHARED
-  ORA2303-01-DATA:
-  ORA2303-01-DIAG:
   ORA1903-01-DATA:
   ORA1903-01-DIAG:
   ORA1803-01-DATA:

@@ -6,7 +6,7 @@
 	"tests": [{
 			"operation": "import",
 			"source": "file-staging",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"verifyOperation": true,
 			"parameters": {
 				"DIRECTORY": "export/json/%location%"
@@ -24,7 +24,7 @@
 			"parameters": {
 				"DIRECTORY": "%operation%/%mode%/%connection%"
 			},
-			"source": "mssql#1",
+			"source": "mssql17",
 			"target": "file-staging",
 			"tasks": [
 				"oracle",
@@ -32,16 +32,16 @@
 				"mssql"
 			]
 		},{
-			"source": "oracle#1",
-			"target": "mssql#1",
+			"source": "mssql17",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
 				"mssql"
 			]
 		},{
-			"source": "oracle18c",
-			"target": "mssql#1",
+			"source": "oracle#1",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -49,7 +49,7 @@
 			]
 		},{
 			"source": "oracle12c",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -57,15 +57,7 @@
 			]
 		},{
 			"source": "oracle11g",
-			"target": "mssql#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mssql19",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -73,7 +65,15 @@
 			]
 		},{
 			"source": "mssql#1",
-			"target": "mssql#1",
+			"target": "mssql17",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mssql19",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -81,7 +81,7 @@
 			]
 		},{
 			"source": "postgres#1",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -89,7 +89,7 @@
 			]
 		},{
 			"source": "mysql#1",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -97,7 +97,7 @@
 			]
 		},{
 			"source": "mariadb#1",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -105,7 +105,7 @@
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "mssql#1",
+			"target": "mssql17",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
@@ -115,15 +115,14 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql#1",
+			"source": "mssql17",
 			"targets": [
-                "mssql#1",
                 "oracle#1",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",
 				"mssql#1",
-				"mssql19",
+                "mssql19",
 				"postgres#1",
 				"mysql#1",
 				"mariadb#1",

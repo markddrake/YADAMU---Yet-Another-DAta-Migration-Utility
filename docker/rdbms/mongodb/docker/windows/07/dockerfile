@@ -1,0 +1,15 @@
+# escape=`
+FROM yadamu/svr:vs22 
+#
+ADD https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-7.0.2-signed.msi .
+RUN start-process msiexec.exe -Wait -ArgumentList "/l*v", "mdbinstall.log", "/qb", "/i", """mongodb-windows-x86_64-7.0.2-signed.msi SHOULD_INSTALL_COMPASS=""0"" ADDLOCAL=""ServerNoService"""""; `
+    Remove-Item mongodb-windows-x86_64-7.0.2-signed.msi; `
+    [Environment]::SetEnvironmentVariable("""Path""", """c:\Program Files\MongoDB\Server\7.0\bin;""" +  $env:Path,"""Machine"""); 
+#
+WORKDIR C:/Program Files/MongoDB/Server/7.0/
+COPY mongod.cfg bin
+#
+WORKDIR c:/
+COPY Start.ps1 .
+ENTRYPOINT ["powershell","c:\\Start.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]

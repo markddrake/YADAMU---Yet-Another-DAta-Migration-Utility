@@ -1,14 +1,14 @@
 # escape=`
 FROM yadamu/svr:vs22
 #
-ADD https://get.enterprisedb.com/postgresql/postgresql-14.0-1-windows-x64.exe .
-RUN c:\postgresql-14.0-1-windows-x64.exe --mode unattended --superpassword oracle --unattendedmodeui none --extract-only yes; `
+ADD https://get.enterprisedb.com/postgresql/postgresql-14.9-1-windows-x64.exe .
+RUN c:\postgresql-14.9-1-windows-x64.exe --mode unattended --superpassword oracle --unattendedmodeui none --extract-only yes; `
     [Environment]::SetEnvironmentVariable("""Path""", """c:\Program Files\PostgreSQL\14\bin;""" +  $env:Path,"""Machine"""); 
 #
 # PostGIS
 #
-ADD http://download.osgeo.org/postgis/windows/pg14/postgis-bundle-pg14x64-setup-3.1.4-1.exe .
-RUN .\postgis-bundle-pg14x64-setup-3.1.4-1.exe /S /D="C:\Program Files\PostgreSQL\14"
+ADD http://download.osgeo.org/postgis/windows/pg14/postgis-bundle-pg14x64-setup-3.4.0-1.exe .
+RUN .\postgis-bundle-pg14x64-setup-3.4.0-1.exe  /S /D="C:\Program Files\PostgreSQL\14"
 #
 # Python 3
 #
@@ -16,8 +16,8 @@ ADD https://www.python.org/ftp/python/3.9.7/python-3.9.7-amd64.exe .
 RUN .\python-3.9.7-amd64.exe /quiet InstallAllUsers=1 PrependPath=1;
 RUN pip3 install lxml
 #
-RUN Remove-Item c:\postgresql-14.0-1-windows-x64.exe; `
-	Remove-Item c:\postgis-bundle-pg14x64-setup-3.1.4-1.exe; `
+RUN Remove-Item c:\postgresql-14.9-1-windows-x64.exe; `
+	Remove-Item c:\postgis-bundle-pg14x64-setup-3.4.0-1.exe ; `
 	Remove-Item c:\python-3.9.7-amd64.exe; 
 #`
 COPY Start.ps1 .

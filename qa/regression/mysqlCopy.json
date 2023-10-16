@@ -8,40 +8,73 @@
 	"parameters": {
 		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
-		"COMMIT_RATIO"            : 0
+		"TIMESTAMP_PRECISION"     : 6
 	},
 	"tests": [{
+			"source": "mysql#1",
+			"target": "mysql#1",
+			"tasks": [
+				"oracle","mssql","postgres"
+			]
+		},{
 			"source": "oracle#1",
 			"target": "mysql#1",
-			"parameters" : {
-				"SPATIAL_FORMAT": "WKT"
-		    },
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle","mssql","postgres"
+			]
+		},{
+			"source": "oracle19c",
+			"target": "mysql#1",
+			"tasks": [
+				"oracle","mssql","postgres"
+			]
+		},{
+			"source": "oracle18c",
+			"target": "mysql#1",
+			"tasks": [
+				"oracle","mssql","postgres"
+			]
+		},{
+			"source": "oracle12c",
+			"target": "mysql#1",
+			"tasks": [
+				"oracle","mssql","postgres"
+			]
+		},{
+			"source": "oracle11g",
+			"target": "mysql#1",
+			"tasks": [
+				"oracle","mssql","postgres"
+			]
+		},{
+			"source": "mssql#1",
+			"target": "mysql#1",
+			"tasks": [
+				"oracle","mssql","postgres"
 			]
 		},{
 			"source": "mssql19",
 			"target": "mysql#1",
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle","mssql","postgres"
 			]
 		},{
 			"source": "postgres#1",
 			"target": "mysql#1",
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle","mssql","postgres"
 			]
 		},{
-			"source": "mysql#1",
+			"source": "mariadb#1",
 			"target": "mysql#1",
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle","mssql","postgres"
 			]
 		},{
 			"source": "mongodb#1",
 			"target": "mysql#1",
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle","mssql","postgres"
 			]
 		}]
 }

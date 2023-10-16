@@ -11,9 +11,9 @@
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv"
 	},
 	"tests": [{
-			"source": "vertica23",
+			"source": "vertica#1",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -21,7 +21,47 @@
 		},{
 			"source": "oracle#1",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle18c",
+			"targets": [
+			   "vertica#1"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle#1",
+			"targets": [
+			   "vertica#1"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle12c",
+			"targets": [
+			   "vertica#1"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle11g",
+			"targets": [
+			   "vertica#1"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mssql#1",
+			"targets": [
+			   "vertica#1"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -29,7 +69,7 @@
 		},{
 			"source": "mssql19",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -37,7 +77,7 @@
 		},{
 			"source": "postgres#1",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -45,7 +85,15 @@
 		},{
 			"source": "mysql#1",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mariadb#1",
+			"targets": [
+			   "vertica#1"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -53,7 +101,7 @@
 		},{
 			"source": "mongodb#1",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
 		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
@@ -61,7 +109,7 @@
 		},{
 			"source": "vertica10",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
 		    ],
 			"parameters": {
   	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"

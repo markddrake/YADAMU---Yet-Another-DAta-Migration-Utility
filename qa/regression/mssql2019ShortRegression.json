@@ -1,0 +1,35 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "connections.json"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "parameters"                      : {
+    "DIRECTORY"                     : "export/json/%location%"
+  }
+, "tests" : [{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "mssql19"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "mssql19"
+  , "target": "file-staging"
+  , "parameters"                      : {
+       "DIRECTORY"                     : "export/json/%vendor%"
+    }
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "mssql19"
+  , "target": "mssql19"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

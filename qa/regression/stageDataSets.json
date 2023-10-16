@@ -9,13 +9,22 @@
   }
 , "tasks"                             : "tasks.json"
 , "tests" : [{
-    "source": "oracle#1"
-  , "target": "file-staging"
+    "source"                          : "oracle#1"
+  , "target"                          : "file-staging"
   , "parameters"                      : {
 	  "DIRECTORY"                     : "%operation%/json/%vendor%"
      }
   , "tasks": [
       "oracle"
+    ]
+  },{
+    "source"                          : "oracle18c"
+  , "target"                          : "file-staging"  
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "PM"
     ]
   },{
     "source"                          : "mysql#1"
@@ -27,7 +36,7 @@
       "mysql"
     ]
   },{
-    "source"                          : "mssql19"
+    "source"                          : "mssql#1"
   , "target"                          : "file-staging"
   , "parameters"                      : {
 	  "DIRECTORY"                     : "%operation%/json/%vendor%"
@@ -38,7 +47,7 @@
   },{
     "operation"                       : "import"
   , "source"                          : "file-staging"
-  , "target"                          : "mssql19"
+  , "target"                          : "mssql#1"
   , "parameters"                      : {
 	  "DIRECTORY"                     : "export/json/%vendor%"
     }
@@ -48,7 +57,7 @@
   },{                                 
     "operation"                       : "import"
   , "source"                          : "file-staging"
-  , "target"                          : "mssql19"
+  , "target"                          : "mssql#1"
   , "recreateSchema"                  : false
   , "parameters"                      : {
 	  "DIRECTORY"                     : "export/json/%vendor%"
@@ -57,7 +66,7 @@
       "AdventureWorks_AWA"
     ]  
   },{
-    "source"                          : "mssql19"
+    "source"                          : "mssql#1"
   , "target"                          : "file-staging"
   , "parameters"                      : {
 	  "DIRECTORY"                     : "%operation%/json/%vendor%"

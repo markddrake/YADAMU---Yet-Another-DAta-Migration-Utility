@@ -12,7 +12,7 @@
 , "tests"             : [{
     "operation"       : "import"
   , "source"          : "file-staging"
-  , "target"          : "oracle#1"
+  , "target"          : "oracle19c"
   , "verifyOperation" : true
   , "parameters"      : {
       "DIRECTORY"     : "export/json/%location%"
@@ -21,42 +21,63 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "oracle#1"
-  , "targets"         : [
-       "oracle#1"
-	]
+    "source"          : "oracle19c"
+  , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
-    "source"          : "mssql19"
-  , "targets"         : [
-        "oracle#1"
+    "source"               : "oracle#1"
+  , "target"               : "oracle19c"
+  , "homogeneousOperation" : true
+  , "tasks": [ 
+      "postgresDataTypes"
 	]
+  },{
+    "source"          : "oracle18c"
+  , "target"          : "oracle19c"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle12c"
+  , "target"          : "oracle19c"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle11g"
+  , "target"          : "oracle19c"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mssql#1"
+  , "target"          : "oracle19c"
+  , "tasks": [
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mssql19"
+  , "target"          : "oracle19c"
   , "tasks": [
       "postgresDataTypes"
 	]
   },{
     "source"          : "postgres#1"
-  , "targets"         : [
-       "oracle#1"
-	]
+  , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "mysql#1"
-  , "targets"         : [
-       "oracle#1"
-	]
+  , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
     "source"          : "mariadb#1"
-  , "targets"         : [
-       "oracle#1"
-	]
+  , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
@@ -65,16 +86,21 @@
 	"parameters"      : {
 	   "MONGO_STRIP_ID" : false
 	}
-  , "targets"         : [
-       "oracle#1"
-	]
+  , "target"           : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
-    "source"          : "oracle#1"
+    "source"          : "oracle19c"
+  , "target"          : "oracle#1"
+  , "homogeneousOperation" : true
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle19c"
   , "targets"         : [
-       "oracle#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+       "oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
 	]
   , "tasks": [ 
       "postgresDataTypes"

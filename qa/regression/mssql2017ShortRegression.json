@@ -5,19 +5,19 @@
 , "recreateSchema"                    : true
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
-, "parameters"                        : {
-    "DIRECTORY"                       : "export/json/%location%"
+, "parameters"                      : {
+    "DIRECTORY"                     : "export/json/%location%"
   }
 , "tests" : [{
 	"operation" : "import"
   , "source": "file-staging"
-  , "target": "vertica23"
+  , "target": "mssql17"
   , "tasks": [
        "HR","BI"
     ]
   },{
 	"operation" : "export"
-  , "source": "vertica23"
+  , "source": "mssql17"
   , "target": "file-staging"
   , "parameters"                      : {
        "DIRECTORY"                     : "export/json/%vendor%"
@@ -26,8 +26,8 @@
       "HR", "BI"
     ]
   },{
-    "source": "vertica23"
-  , "target": "vertica23"
+    "source": "mssql17"
+  , "target": "mssql17"
   , "tasks": [
        "HR","BI"
     ]

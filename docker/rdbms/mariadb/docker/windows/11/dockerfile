@@ -1,0 +1,24 @@
+# escape=`
+FROM yadamu/svr:vs22
+WORKDIR c:/
+#
+ADD https://mirrors.xtom.com/mariadb//mariadb-11.1.2/winx64-packages/mariadb-11.1.2-winx64.zip .
+ADD https://cdn.mysql.com//Downloads/MySQL-Shell/mysql-shell-8.1.1-windows-x86-64bit.zip .
+RUN Expand-Archive -Path C:\mariadb-11.1.2-winx64.zip  -destinationPath """C:\Program Files\MariaDB"""; `
+	Expand-Archive -Path C:\mysql-shell-8.1.1-windows-x86-64bit.zip -destinationPath """C:\Program Files\MySQL"""; ` 
+    Remove-Item mariadb-11.1.2-winx64.zip; `
+    Remove-Item mysql-shell-8.1.1-windows-x86-64bit.zip; `
+    Move-Item """C:\Program Files\MariaDB\mariadb-11.1.2-winx64""" """c:\Program Files\MariaDB\11"""; `
+	New-Item -ItemType directory -path """C:\Program Files\MySQL\8.1"""; `
+    Move-Item """C:\Program Files\MySQL\mysql-shell-8.1.1-windows-x86-64bit""" """C:\Program Files\MySQL\8.1\Shell"""; `
+    [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\MariaDB\11\bin;C:\Program Files\MySQL\8.1\Shell\bin;""" +  $env:Path,"""Machine"""); 
+#
+COPY my.ini c:/windows
+#
+# Defer creation of instance to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
+#
+COPY Start.ps1 .
+Copy utf-8.cnf C:/ProgramData/MariaDB/11/
+#CMD .\Startup
+ENTRYPOINT ["powershell","c:\\Start.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]

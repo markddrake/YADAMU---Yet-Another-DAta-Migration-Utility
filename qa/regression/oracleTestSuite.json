@@ -12,7 +12,7 @@
             "parameters": {
                 "DIRECTORY": "%operation%/%mode%/%connection%"
             },
-            "source": "oracle23c",
+            "source": "oracle#1",
             "target": "file-staging",
             "parameters": {
                 "DIRECTORY": "%operation%/json/%vendor%"
@@ -23,7 +23,7 @@
         },{
             "operation": "import",
             "source": "file-staging",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "verifyOperation": true,
             "parameters": {
                 "DIRECTORY": "export/json/%location%"
@@ -34,7 +34,7 @@
             ]
         },{
             "source": "oracle#1",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -42,7 +42,7 @@
             ]
         },{
             "source": "oracle18c",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -50,7 +50,7 @@
             ]
         },{
             "source": "oracle12c",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -58,52 +58,47 @@
             ]
         },{
             "source": "oracle11g",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
                 "mssql"
             ]
-        },
-        {
-            "source": "mssql19",
-            "target": "oracle23c",
-            "tasks": [
-                "oracle",
-                "mysql",
-                "mssql"
-            ]
-        },
-        {
+        },{
             "source": "mssql#1",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
+            "source": "mssql19",
+            "target": "oracle#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
             "source": "postgres#1",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
             "source": "mysql#1",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
             "source": "mariadb#1",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -111,7 +106,7 @@
             ]
         },{
             "source": "mongodb#1",
-            "target": "oracle23c",
+            "target": "oracle#1",
             "parameters": {
                 "MONGO_STRIP_ID": false
             },
@@ -121,10 +116,8 @@
                 "mssql"
             ]
         },{
-            "source": "oracle23c",
+            "source": "oracle#1",
             "targets": [
-                "oracle23c",
-				"oracle#1",
                 "oracle18c",
                 "oracle12c",
                 "oracle11g",

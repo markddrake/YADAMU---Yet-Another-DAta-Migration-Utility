@@ -10,7 +10,7 @@
 , "tests"                  : [{
     "source": "oracle18c"
   , "targets": [
-	  "oracle23c", "oracle19c"
+	  "oracle#1"
     ]
   , "recreateSchema"    : false
   , "parameters" : {

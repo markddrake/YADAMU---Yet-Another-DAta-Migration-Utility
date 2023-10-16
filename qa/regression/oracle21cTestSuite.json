@@ -33,6 +33,14 @@
                 "mssql"
             ]
         },{
+            "source": "oracle21c",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
             "source": "oracle#1",
             "target": "oracle21c",
             "tasks": [
@@ -64,17 +72,7 @@
                 "mysql",
                 "mssql"
             ]
-        },
-        {
-            "source": "mssql19",
-            "target": "oracle21c",
-            "tasks": [
-                "oracle",
-                "mysql",
-                "mssql"
-            ]
-        },
-        {
+        },{
             "source": "mssql#1",
             "target": "oracle21c",
             "tasks": [
@@ -82,8 +80,15 @@
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
+            "source": "mssql19",
+            "target": "oracle21c",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },{
             "source": "postgres#1",
             "target": "oracle21c",
             "tasks": [
@@ -91,8 +96,7 @@
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
             "source": "mysql#1",
             "target": "oracle21c",
             "tasks": [
@@ -100,8 +104,7 @@
                 "mysql",
                 "mssql"
             ]
-        },
-        {
+        },{
             "source": "mariadb#1",
             "target": "oracle21c",
             "tasks": [
@@ -123,9 +126,8 @@
         },{
             "source": "oracle21c",
             "targets": [
-                "oracle21c",
-				"oracle#1",
-                "oracle18c",
+                "oracle#1",
+				"oracle18c",
                 "oracle12c",
                 "oracle11g",
                 "mssql#1",

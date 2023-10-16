@@ -18,10 +18,10 @@
   },{
 	"operation" : "export"
   , "source": "vertica12"
-  , "target": "file-staging"
   , "parameters"                      : {
        "DIRECTORY"                     : "export/json/%vendor%"
     }
+  , "target": "file-staging"
   , "tasks": [
       "HR", "BI"
     ]

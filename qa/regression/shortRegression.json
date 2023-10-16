@@ -30,14 +30,14 @@
        "HR","BI"
     ]
   },{
-    "source": "mssql19"
-  , "target": "mssql19"
+    "source": "mssql#1"
+  , "target": "mssql#1"
   , "tasks": [
        "HR","BI"
     ]
   },{
-    "source": "mssql#1"
-  , "target": "mssql#1"
+    "source": "mssql19"
+  , "target": "mssql19"
   , "tasks": [
        "HR","BI"
     ]

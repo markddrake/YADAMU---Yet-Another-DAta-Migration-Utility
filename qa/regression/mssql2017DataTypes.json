@@ -1,0 +1,155 @@
+{
+    "operation": "dbRoundTrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "parameters": {
+        "INFINITY_MANAGEMENT": "NULLIFY",
+        "CIRCLE_FORMAT": "CIRCLE",
+        "BATCH_SIZE": 250,
+        "COMMIT_RATIO": 200
+    },
+    "tests": [
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "mssql17",
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "export/json/%location%"
+            },
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mssql17",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "targets": [
+                "mssql17"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "targets": [
+                "mssql17"
+            ],
+            "parameters": {
+                "MONGO_STRIP_ID": false
+            },
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mssql17",
+            "targets": [
+                "oracle#1",
+                "oracle18c",
+                "oracle12c",
+                "oracle11g",
+                "mssql#1",
+                "mssql1",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        }
+    ]
+}

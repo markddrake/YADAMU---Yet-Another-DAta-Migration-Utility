@@ -1,0 +1,37 @@
+version: "2.4"
+services:
+
+  ORA1903-01: 
+    container_name: ORA1903-01
+    # image:  oracle/database:19.3.0-ee
+    image:  yadamu/oracle:19.3.0
+    mem_limit: '10gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15215:1521"
+    environment:
+      ORACLE_SID: CDB19300 
+      ORACLE_PDB: PDB19300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1903-01-DATA:/opt/oracle/admin
+      - ORA1903-01-DATA:/opt/oracle/oradata
+      - ORA1903-01-DIAG:/opt/oracle/diag
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  ORA1903-01-DATA:
+  ORA1903-01-DIAG:

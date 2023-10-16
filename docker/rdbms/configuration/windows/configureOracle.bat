@@ -7,8 +7,7 @@ REM
 docker stop                             %CONTAINER_NAME%
 docker cp docker/rdbms/oracle/setup     %CONTAINER_NAME%:c:\stage
 docker cp docker/rdbms/oracle/testdata  %CONTAINER_NAME%:c:\stage
-docker cp src/install/oracle/sql        %CONTAINER_NAME%:c:\stage
-docker cp qa/sql/oracle/YADAMU_TEST.sql %CONTAINER_NAME%:c:\stage\sql
+docker cp src/sql/oracle                %CONTAINER_NAME%:c:\stage
 docker start                            %CONTAINER_NAME%
 docker exec -it                         %CONTAINER_NAME% robocopy c:\stage c:\oracle\oradata\stage /MIR 
 docker exec -it                         %CONTAINER_NAME% cmd /c c:\oracle\oradata\stage\setup\configure.bat 

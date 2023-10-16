@@ -1,145 +1,163 @@
 {
-	"operation": "dbRoundTrip",
-	"connections": "connections.json",
-	"tasks": "tasks.json",
-	"recreateSchema": true,
-	"tests": [{
-			"operation": "import",
-			"source": "file-staging",
-			"target": "yugabyte#1",
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "export/json/%location%"
-			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"operation": "export",
-			"recreateSchema": true,
-			"createDirectory": true,
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "%operation%/%mode%/%connection%"
-			},
-			"source": "yugabyte#1",
-			"target": "file-staging",
-			"parameters": {
-				"DIRECTORY": "%operation%/json/%vendor%"
-			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle18c",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle12c",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle11g",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mssql19",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mssql#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "postgres#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mysql#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mariadb#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mongodb#1",
-			"target": "yugabyte#1",
+    "connections": "connections.json",
+    "operation": "dbRoundTrip",
+    "recreateSchema": true,
+    "tasks": "tasks.json",
+    "tests": [
+        {
+            "operation": "import",
+            "parameters": {
+                "DIRECTORY": "export/json/%location%"
+            },
+            "source": "file-staging",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ],
+            "verifyOperation": true
+        },
+        {
+            "createDirectory": true,
+            "operation": "export",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%vendor%"
+            },
+            "recreateSchema": true,
+            "source": "yugabyte#1",
+            "target": "file-staging",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ],
+            "verifyOperation": true
+        },
+        {
+            "source": "yugabyte#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "yugabyte#1",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "yugabyte#1",
-			"targets": [
-                "yugabyte#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "parameters": {
+                "IDENTIFIER_MAPPING_FILE": ""
+            },
+            "source": "yugabyte#1",
+            "targets": [
                 "oracle#1",
-				"oracle18c",
-				"oracle12c",
-				"oracle11g",
-				"mssql#1",
-				"mssql19",
-				"postgres#1",
-				"mysql#1",
-				"mariadb#1",
-				"mongodb#1"
-			],
-			"parameters" : {
-               "IDENTIFIER_MAPPING_FILE" : ""
-			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		}
-	]
+                "oracle18c",
+                "oracle12c",
+                "oracle11g",
+                "mssql#1",
+                "mssql19",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        }
+    ]
 }

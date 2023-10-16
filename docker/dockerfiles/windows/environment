@@ -3,9 +3,9 @@ FROM yadamu/svr:vs22
 #
 # Install Node
 #
-ADD https://nodejs.org/dist/v17.0.0/node-v17.0.0-x64.msi .
-RUN Start-Process MsiExec.exe -Wait -ArgumentList """/i""", """node-v17.0.0-x64.msi""", """/qn"""; `
-    Remove-Item node-v17.0.0-x64.msi
+ADD https://nodejs.org/dist/v20.8.1/node-v20.8.1-x64.msi .
+RUN Start-Process MsiExec.exe -Wait -ArgumentList """/i""", """node-v20.8.1-x64.msi""", """/qn"""; `
+    Remove-Item node-v20.8.1-x64.msi
 #
 # Install Oracle Instant Client
 # 
@@ -28,8 +28,6 @@ WORKDIR C:/YADAMU
 COPY src\package.json .
 RUN npm install --global electron; `
     npm install
-# Patch Query Stream until oracleb 5.3
-COPY patch/oracledb/lib/queryStream.js node_modules/oracledb/lib
 ENTRYPOINT ["powershell","wait-event"]
 
  

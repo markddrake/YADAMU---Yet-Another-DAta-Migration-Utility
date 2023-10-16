@@ -7,8 +7,7 @@ REM
 docker stop                               %CONTAINER_NAME%
 docker cp docker/rdbms/postgres/setup     %CONTAINER_NAME%:c:\stage
 docker cp docker/rdbms/postgres/testdata  %CONTAINER_NAME%:c:\stage
-docker cp src/install/postgres/sql        %CONTAINER_NAME%:c:\stage
-docker cp qa/sql/postgres/YADAMU_TEST.sql %CONTAINER_NAME%:c:\stage\sql
+docker cp src/sql/postgres                %CONTAINER_NAME%:c:\stage
 docker start                              %CONTAINER_NAME%
 docker exec -it                           %CONTAINER_NAME% robocopy c:\stage c:\ProgramData\Postgres\14\stage /MIR 
 docker exec -it                           %CONTAINER_NAME% cmd /c c:\stage\setup\configure.bat

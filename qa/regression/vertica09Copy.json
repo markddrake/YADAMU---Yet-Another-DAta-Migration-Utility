@@ -27,6 +27,46 @@
 				"oracle","mssql","mysql"
 			]
 		},{
+			"source": "oracle19c",
+			"targets": [
+			   "vertica09"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle18c",
+			"targets": [
+			   "vertica09"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle12c",
+			"targets": [
+			   "vertica09"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "oracle11g",
+			"targets": [
+			   "vertica09"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mssql#1",
+			"targets": [
+			   "vertica09"
+		    ],
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
 			"source": "mssql19",
 			"targets": [
 			   "vertica09"
@@ -72,7 +112,7 @@
 		},{
 			"source": "vertica09",
 			"targets": [
-			   "vertica23"
+			   "vertica#1"
 		    ],
 			"parameters": {
   	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
@@ -81,7 +121,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "vertica10",
+			"source": "vertica#1",
 			"targets": [
 			   "vertica09"
 		    ],
@@ -92,7 +132,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "vertica23",
+			"source": "vertica10",
 			"targets": [
 			   "vertica09"
 		    ],

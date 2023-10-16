@@ -32,6 +32,14 @@
 				"mssql"
 			]
 		},{
+			"source": "mssql14",
+			"target": "mssql14",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
 			"source": "oracle#1",
 			"target": "mssql14",
 			"tasks": [
@@ -64,7 +72,7 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql19",
+			"source": "mssql#1",
 			"target": "mssql14",
 			"tasks": [
 				"oracle",
@@ -72,7 +80,7 @@
 				"mssql"
 			]
 		},{
-			"source": "mssql14",
+			"source": "mssql19",
 			"target": "mssql14",
 			"tasks": [
 				"oracle",
@@ -117,12 +125,11 @@
 		},{
 			"source": "mssql14",
 			"targets": [
-                "mssql14",
                 "oracle#1",
 				"oracle18c",
 				"oracle12c",
 				"oracle11g",
-				"mssql14",
+				"mssql#1",
 				"mssql19",
 				"postgres#1",
 				"mysql#1",

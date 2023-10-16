@@ -1,0 +1,80 @@
+{
+    "operation": "dbRoundTrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "stagingArea": "loader-staging",
+    "reloadStagingArea" : false,
+    "parameters": {
+      "REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
+      "DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+      "COMMIT_RATIO"            : 0
+    },          
+    "tests": [{
+            "source": "oracle12c",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+            "source": "oracle#1",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle19c",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle18c",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle11g",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql#1",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql19",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "postgres#1",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mysql#1",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mariadb#1",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "monggo#1",
+            "target": "oracle12c",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    }]
+}

@@ -1,0 +1,25 @@
+# escape=`
+FROM yadamu/svr:vs22
+#
+ADD https://get.enterprisedb.com/postgresql/postgresql-16.0-1-windows-x64.exe .
+RUN c:\postgresql-16.0-1-windows-x64.exe --mode unattended --superpassword oracle --unattendedmodeui none --extract-only yes; `
+    [Environment]::SetEnvironmentVariable("""Path""", """c:\Program Files\PostgreSQL\16\bin;""" +  $env:Path,"""Machine"""); 
+#
+# PostGIS
+#
+ADD https://download.osgeo.org/postgis/windows/pg16/postgis-bundle-pg16x64-setup-3.4.0-1.exe .
+RUN .\postgis-bundle-pg16x64-setup-3.4.0-1.exe /S /D="C:\Program Files\PostgreSQL\16"
+#
+# Python 3
+#
+ADD https://www.python.org/ftp/python/3.12.0/python-3.12.0-amd64.exe .
+RUN .\python-3.12.0-amd64.exe /quiet InstallAllUsers=1 PrependPath=1;
+RUN pip3 install lxml
+#
+RUN Remove-Item c:\postgresql-16.0-1-windows-x64.exe; `
+	Remove-Item c:\postgis-bundle-pg16x64-setup-3.4.0-1.exe; `
+	Remove-Item python-3.12.0-amd64.exe; 
+#`
+COPY Start.ps1 .
+ENTRYPOINT ["powershell", "c:/Start.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]

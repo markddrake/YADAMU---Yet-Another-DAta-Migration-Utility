@@ -9,7 +9,6 @@ docker cp docker/rdbms/mariadb/setup/utf-8.cnf  %CONTAINER_NAME%:c:\stage
 docker cp docker/rdbms/mariadb/setup            %CONTAINER_NAME%:c:\stage
 docker cp docker/rdbms/mariadb/testdata         %CONTAINER_NAME%:c:\stage
 docker cp src/install/mariadb/js                %CONTAINER_NAME%:c:\stage
-docker cp qa/sql/mariadb/YADAMU_TEST.sql        %CONTAINER_NAME%:c:\stage\sql
 docker start                                    %CONTAINER_NAME%
 docker exec -it                                 %CONTAINER_NAME% robocopy c:\stage c:\ProgramData\MariaDB\10\stage /MIR 
 docker exec -it                                 %CONTAINER_NAME% cmd /c c:\ProgramData\MariaDB\10\stage\setup\configure.bat

@@ -12,12 +12,18 @@
     "operation"       : "import"
   , "source"          : "file-staging"
   , "targets"         : [
-       "vertica10","vertica11"
+       "vertica11","vertica10","vertica#1"
 	]
   , "verifyOperation" : true
   , "parameters"      : {
       "DIRECTORY"     : "export/json/%location%"
     }                    
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "vertica11"
+  , "target"          : "vertica11"
   , "tasks": [ 
       "postgresDataTypes"
 	]
@@ -76,12 +82,6 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "vertica10"
-  , "target"          : "vertica11"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
     "source"          : "mongodb#1",
 	"parameters"      : {
 	   "MONGO_STRIP_ID" : false
@@ -91,10 +91,22 @@
       "postgresDataTypes"
 	]
   },{
+    "source"          : "vertica#1"
+  , "target"          : "vertica11"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "vertica10"
+  , "target"          : "vertica11"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
     "source"          : "vertica11"
   , "targets"         : [
-       "vertica11","vertica10","oracle#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
-	]
+ 	  "oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1","vertica#1","vertica10"
+ 	]
   , "tasks": [ 
       "postgresDataTypes"
 	]

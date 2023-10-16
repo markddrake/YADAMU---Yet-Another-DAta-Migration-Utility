@@ -1,162 +1,166 @@
 {
-	"operation": "dbRoundTrip",
-	"connections": "connections.json",
-	"tasks": "tasks.json",
-	"recreateSchema": true,
-	"parameters": {},
-	"tests": [
-		{
-			"operation": "import",
-			"source": "file-staging",
-			"target": "tera#1",
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "export/json/%location%",
-				"XML_STORAGE_MODEL": "VARIANT"
-			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"operation": "export",
-			"recreateSchema": true,
-			"createDirectory": true,
-			"verifyOperation": true,
-			"parameters": {
-				"DIRECTORY": "%operation%/%mode%/%connection%"
-			},
-			"source": "tera#1",
-			"target": "file-staging",
-			"parameters": {
-				"DIRECTORY": "%operation%/json/%vendor%"
-			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle#1",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle18c",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle12c",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "oracle11g",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mssql19",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mssql#1",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "postgres#1",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mysql#1",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mariadb#1",
-			"target": "tera#1",
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "mongodb#1",
-			"target": "tera#1",
+    "connections": "connections.json",
+    "operation": "dbRoundTrip",
+    "parameters": {
+    },
+    "recreateSchema": true,
+    "tasks": "tasks.json",
+    "tests": [
+        {
+            "operation": "import",
+            "parameters": {
+                "DIRECTORY": "export/json/%location%",
+                "XML_STORAGE_MODEL": "VARIANT"
+            },
+            "source": "file-staging",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ],
+            "verifyOperation": true
+        },
+        {
+            "createDirectory": true,
+            "operation": "export",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%vendor%"
+            },
+            "recreateSchema": true,
+            "source": "tera#1",
+            "target": "file-staging",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ],
+            "verifyOperation": true
+        },
+        {
+            "source": "tera#1",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "target": "tera#1",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "tera#1",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},{
-			"source": "tera#1",
-			"targets": [
-				"tera#1",
-				"oracle#1",
-				"oracle18c",
-				"oracle12c",
-				"oracle11g",
-				"mssql#1",
-				"mssql19",
-				"postgres#1",
-				"mysql#1",
-				"mariadb#1",
-				"mongodb#1"
-			],
-			"tasks": [
-				"oracle",
-				"mysql",
-				"mssql"
-			]
-		},
-		{
-			"source": "tera#1",
-			"target": "tera#1",
-			"stagingArea": "loader-staging",
-			"reloadStagingArea": false,
-			"parameters": {
-				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-				"DIRECTORY": "loader/%targetConnection%/%sourceConnection%/csv",
-				"COMMIT_RATIO": 0
-			},
-			"tasks": [
-				"oracle",
-				"mssql",
-				"mysql"
-			]
-		}
-	]
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "parameters": {
+                "IDENTIFIER_MAPPING_FILE": ""
+            },
+            "source": "tera#1",
+            "targets": [
+                "oracle#1",
+                "oracle18c",
+                "oracle12c",
+                "oracle11g",
+                "mssql#1",
+                "mssql19",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        }
+    ]
 }

@@ -1,0 +1,140 @@
+{
+	"operation": "dbRoundTrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"tests": [{
+			"operation": "import",
+			"source": "file-staging",
+			"target": "mssql#1",
+			"verifyOperation": true,
+			"parameters": {
+				"DIRECTORY": "export/json/%location%"
+			},
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"operation": "export",
+			"recreateSchema": true,
+			"createDirectory": true,
+			"verifyOperation": true,
+			"parameters": {
+				"DIRECTORY": "%operation%/%mode%/%connection%"
+			},
+			"source": "mssql#1",
+			"target": "file-staging",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mssql#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "oracle#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "oracle18c",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "oracle12c",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "oracle11g",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mssql19",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "postgres#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mysql#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mariadb#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mongodb#1",
+			"target": "mssql#1",
+			"parameters": {
+				"MONGO_STRIP_ID": false
+			},
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		},{
+			"source": "mssql#1",
+			"targets": [
+                "oracle#1",
+				"oracle18c",
+				"oracle12c",
+				"oracle11g",
+				"mssql19",
+				"postgres#1",
+				"mysql#1",
+				"mariadb#1",
+				"mongodb#1"
+			],
+			"parameters" : {
+               "IDENTIFIER_MAPPING_FILE" : ""
+			},
+			"tasks": [
+				"oracle",
+				"mysql",
+				"mssql"
+			]
+		}
+	]
+}

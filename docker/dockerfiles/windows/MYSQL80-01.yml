@@ -1,0 +1,27 @@
+version: "2.4"
+services:
+
+  MYSQL80-01: 
+    container_name: MYSQL80-01
+    image:  yadamu/mysql:8
+    isolation: hyperv
+    depends_on:
+      - ORA1120-01    
+    mem_limit: 4096M
+    networks:
+      - YADAMU-NET
+    environment:
+      DELAY: 7200
+    volumes:
+      - YADAMU_01-SHARED:c:\shared
+      - MYSQL80-01-VOLUME:C:\ProgramData\MySQL\8.0
+    restart: always
+  
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MYSQL80-01-VOLUME:
