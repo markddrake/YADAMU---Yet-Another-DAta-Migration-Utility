@@ -56,7 +56,7 @@ class MySQLWriter extends YadamuWriter {
     }
   }
   
-  reportBatchError(batch, operation,cause) {
+  reportBatchError(operation,cause,batch) {
 	if (this.tableInfo.insertMode === 'Rows') {
       super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
 	}
@@ -86,7 +86,7 @@ class MySQLWriter extends YadamuWriter {
           this.releaseBatch(batch)
           return this.skipTable
         } catch (cause) {
-   		  this.reportBatchError(batch,'INSERT MANY',cause)
+   		  this.reportBatchError('INSERT MANY',cause,batch)
           await this.dbi.restoreSavePoint(cause);
           this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Multi-row insert mode.`);     
 		  this.tableInfo.insertMode = "Rows"
@@ -113,7 +113,7 @@ class MySQLWriter extends YadamuWriter {
 			  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromWKB\(\?\)/g,'ST_GeomFromText(?)')
 			  continue;
 		    }
-	   	    this.reportBatchError(batch,'INSERT ROWS',cause)
+	   	    this.reportBatchError('INSERT ROWS',cause,batch)
             this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);    
   		    this.tableInfo.insertMode = "Iterative"
             break;			

@@ -7,7 +7,9 @@ import {
 
 /* Database Vendors API */                                    
 
-import AWS                 from 'aws-sdk';
+import { 
+  S3Client
+}                                     from "@aws-sdk/client-s3";
 
 /* Yadamu Core */                                    
 							          
@@ -60,10 +62,18 @@ class AWSS3DBI extends CloudDBI {
   get BUCKET() {
     this._BUCKET = this._BUCKET || (() => { 
 	  const bucket = this.parameters.BUCKET || AWSS3Constants.BUCKET
-	  this._BUCKET = YadamuLibrary.macroSubstitions(bucket, this.yadamu.MACROS)
-	  return this._BUCKET
+	  return YadamuLibrary.macroSubstitions(bucket, this.yadamu.MACROS)
 	})();
 	return this._BUCKET
+  }
+  
+  set REGION(v) { this._REGION = v }
+  get REGION() {
+    this._REGION = this._REGION || (() => { 
+	  const region = this.parameters.REGION || this.vendorProperties.region   
+	  return region
+	})();
+	return this._REGION
   }
   
   get STORAGE_ID()            { return this.BUCKET }
@@ -89,13 +99,13 @@ class AWSS3DBI extends CloudDBI {
 	url.port                          = this.parameters.PORT      || url.port
 	url                               = url.toString()
 	
-    vendorProperties.accessKeyId       = this.parameters.USERNAME || vendorProperties.accessKeyId 
-    vendorProperties.secretAccessKey  = this.parameters.PASSWORD  || vendorProperties.secretAccessKey	
-	vendorProperties.region           = this.parameters.REGION    || vendorProperties.region
-	vendorProperties.endpoint         = url
+	vendorProperties.accessKeyId      = this.parameters.USERNAME     || vendorProperties.accessKeyId 
+    vendorProperties.secretAccessKey  = this.parameters.PASSWORD     || vendorProperties.secretAccessKey	
+	vendorProperties.region           = this.REGION
     vendorProperties.s3ForcePathStyle = true
     vendorProperties.signatureVersion = "v4"
-    
+    vendorProperties.endpoint         = url
+	
   }
 
   getCredentials(vendorKey) {
@@ -108,8 +118,20 @@ class AWSS3DBI extends CloudDBI {
   }
   
   async createConnectionPool() {
-	// this.LOGGER.trace([this.constructor.name],`new AWS.S3()`)
-	this.cloudConnection = await new AWS.S3(this.vendorProperties)
+	// this.LOGGER.trace([this.constructor.name],`new S3Client()`)
+	
+	const s3ClientConfig = {
+      region             : this.vendorProperties.region
+	, forcePathStyle     : this.vendorProperties.s3ForcePathStyle
+	, endpoint           : this.vendorProperties.endpoint
+	, signatureVersion   : this.vendorProperties.signatureVersion
+	, credentials        : {
+	    accessKeyId      : this.vendorProperties.accessKeyId
+	  , secretAccessKey  : this.vendorProperties.secretAccessKey  
+	  }
+	}
+	
+	this.cloudConnection = await new S3Client(s3ClientConfig)
 	this.cloudService = new AWSS3StorageService(this,{})
   }
 
@@ -119,10 +141,6 @@ class AWSS3DBI extends CloudDBI {
   ** Remember: Export is Reading data from an S3 Object Store - load.
   **
   */
-  
-  parseJSON(fileContents) {
-    return JSON.parse(fileContents.Body.toString())
-  }
 
   getContentLength(props) {
     return props.ContentLength

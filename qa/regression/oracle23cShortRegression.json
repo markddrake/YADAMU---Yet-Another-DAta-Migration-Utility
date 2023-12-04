@@ -1,0 +1,42 @@
+{
+	"operation": "dbRoundtrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"createDirectory": true,
+	"verifyOperation": true,
+	"parameters": {
+		"DIRECTORY": "%operation%/%mode%/%connection%",
+		"MODE"     : "DDL_AND_DATA"
+	},
+	"tests": [{
+			"operation": "export",
+			"createDirectory": true,
+	        "verifyOperation": false,
+			"source": "oracle23c",
+			"target": "file-staging",
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		},{
+			"operation": "import",
+			"source": "file-staging",
+			"target": "oracle23c",
+			"parameters": {
+				"DIRECTORY": "export/%mode%/%connection%"
+			},
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		},{
+			"source": "oracle23c",
+			"target": "oracle23c",
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		}
+	]
+}

@@ -1,7 +1,6 @@
 Set-Location -Path $ENV:ORACLE_HOME
 $service = Get-Service -Name OracleOraDB11Home1TNSListener -ErrorAction SilentlyContinue
 if($service -eq $null) {
-  Start-Sleep -Seconds $ENV:DELAY
   $NOW = Get-Date -Format "o"
   Write-Output "$NOW Oracle: Creating Network Service ""OracleOraDB11Home1TNSListener""."
   netca -silent -responseFile $ENV:ORACLE_HOME\assistants\netca\netca.rsp

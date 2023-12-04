@@ -104,7 +104,7 @@ class YadamuQA {
   get EMPTY_STRING_IS_NULL()                      { return this.test.hasOwnProperty('emptyStringIsNull') ? this.test.emptyStringIsNull : this.configuration.hasOwnProperty('emptyStringIsNull') ? this.configuration.emptyStringIsNull : undefined }
   get MIN_BIGINT_IS_NULL()                        { return this.test.hasOwnProperty('minBigEntIsNull') ? this.test.minBigEntIsNull : this.configuration.hasOwnProperty('minBigEntIsNull') ? this.configuration.minBigEntIsNull : undefined }
   get SKIP_DATA_STAGING()                         { return this.test.hasOwnProperty('skipDataStaging') ? this.test.skipDataStaging : this.configuration.hasOwnProperty('skipDataStaging') ? this.configuration.skipDataStaging : false }
-  
+  get FORCE_HOMOGENEOUS_OPERATION()               { return this.test.hasOwnProperty('homogeneousOperation') ? this.test.homogeneousOperation : this.configuration.hasOwnProperty('homogeneousOperation') ? this.configuration.homogeneousOperation : false }
   get EXPORT_PATH()                               { return this.test.exportPath || this.configuration.exportPath || '' }
   get IMPORT_PATH()                               { return this.test.importPath || this.configuration.importPath || '' }
   get OPERATION()                                 { return this.test.operation  || this.configuration.operation }
@@ -470,12 +470,12 @@ class YadamuQA {
   
   setPsuedoKeyTransformation(sourceDatabase,targetDatabase,parameters) {
      
-    if (sourceDatabase === 'mongodb') {
+	if (sourceDatabase === 'mongodb') {
        parameters.MONGO_STRIP_ID = parameters.MONGO_STRIP_ID || false
     }
     
     if (targetDatabase === 'mongodb') {
-      parameters.MONGO_STRIP_ID = parameters.MONGO_STRIP_ID || true
+      parameters.MONGO_STRIP_ID = (parameters.MONGO_STRIP_ID === false) ? false : true
     }
       
     if (sourceDatabase === 'cockroach') {
@@ -483,7 +483,7 @@ class YadamuQA {
     }
     
 	if (targetDatabase === 'cockroach') {
-      parameters.COCKROACH_STRIP_ROWID = parameters.COCKROACH_STRIP_ROWID || true
+      parameters.COCKROACH_STRIP_ROWID = (parameters.COCKROACH_STRIP_ROWID === false) ? false : true
     }
   
   }
@@ -619,7 +619,7 @@ class YadamuQA {
     , failed : []
     , elapsedTime : elapsedTime
     }
-    
+
     targetRowCounts.forEach((targetTable) => {
       if (stepMetrics.hasOwnProperty(targetTable[1])) {
         const sourceTable = sourceRowCounts.find((sourceTable) => { return targetTable[1] === sourceTable[1]})
@@ -660,7 +660,7 @@ class YadamuQA {
       
     Homogeneous operations (where the source and target database are identifcal) are optimized as follows:
     
-    DIRECT: The first step is performed in DDL_AND_DATA mod. A single operation is required to clone the schema and copy the data.
+    DIRECT: The first step is performed in DDL_AND_DATA mode. A single operation is required to clone the schema and copy the data.
     
     STAGED: The database loads the data directly from the staging area. 
     
@@ -701,7 +701,7 @@ class YadamuQA {
     let sourceConnectionName = test.source
     
     const stagedCopy = (this.STAGING_AREA !== undefined) && !this.SKIP_DATA_STAGING
-    const homogeneousCopy = sourceConnectionName === targetConnectionName
+    const homogeneousCopy = sourceConnectionName === targetConnectionName || this.FORCE_HOMOGENEOUS_OPERATION
     const taskMode = this.yadamu.MODE
 
     let results
@@ -806,6 +806,7 @@ class YadamuQA {
     if (stepMetrics instanceof Error) {
 	  const compareResults = await this.compare(sourceConnectionName,targetConnectionName,task.taskName,comparator)
 	  compareDBI.final();
+      this.metrics.recordFailed(compareResults.failed?.length || 0)
       this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
       this.metrics.recordError(this.LOGGER.getMetrics(true))
       return
@@ -893,6 +894,7 @@ class YadamuQA {
           if (stagingMetrics instanceof Error) {
 	        const compareResults = await this.compare(sourceConnectionName,stagingConnectionName,task.taskName,comparator)
 	        compareDBI.final();
+            this.metrics.recordFailed(compareResults.failed?.length || 0)
             this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
             this.metrics.recordError(this.LOGGER.getMetrics(true))
             return;
@@ -936,6 +938,7 @@ class YadamuQA {
 		if (stepMetrics instanceof Error) {
           const compareResults = await this.compare(sourceConnectionName,targetConnectionName,task.taskName,comparator)
 	      compareDBI.final();
+          this.metrics.recordFailed(compareResults.failed?.length || 0)
           this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
           this.metrics.recordError(this.LOGGER.getMetrics(true))
           return;
@@ -988,7 +991,8 @@ class YadamuQA {
       this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,targetConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (targetToSourceMetrics instanceof Error) {
         const compareResults = await this.compare(test.source,targetConnectionName,task.taskName,comparator)
-        compareDBI.final();
+        compareDBI.final()
+        this.metrics.recordFailed(compareResults.failed?.length || 0)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
         this.metrics.recordError(this.LOGGER.getMetrics(true))
         return;
@@ -1011,7 +1015,7 @@ class YadamuQA {
 	compareConfiguration.metrics = stepMetrics
 	const compareResults = await this.compare(sourceConnectionName,targetConnectionName,task.taskName,comparator)
 	compareDBI.final();
-
+    
 	this.metrics.recordFailed(compareResults.failed?.length || 0)
     this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
     const elapsedTime =  performance.now() - taskStartTime
@@ -1482,7 +1486,7 @@ class YadamuQA {
 
     if (metrics instanceof Error) {
       this.metrics.recordError(this.LOGGER.getMetrics(true))
-      return;
+      return sourceDatabase === 'file' ? path.join(importDirectory,filename) : path.dirname(fileReader.CONTROL_FILE_PATH);
     }    
 
     if ((this.VERIFY_OPERATION === true) && (this.yadamu.MODE !== 'DDL_ONLY')) {
@@ -1510,7 +1514,7 @@ class YadamuQA {
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,elapsedTime)
     this.metrics.recordTaskTimings([task.taskName,'TOTAL','',sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
     this.reportTimings(this.metrics.timings)
-    return sourceDatabase === 'file' ? importDirectory : path.dirname(fileReader.CONTROL_FILE_PATH)
+    return sourceDatabase === 'file' ? path.join(importDirectory,filename) : path.dirname(fileReader.CONTROL_FILE_PATH)
       
   }
  

@@ -1,0 +1,35 @@
+# escape=`
+FROM yadamu/svr:vs22
+#
+RUN New-Item -ItemType "directory" C:\INSTALL; `
+    New-Item -ItemType "directory" C:\INSTALL\CU
+#
+# Unpack SQL Server
+#
+WORKDIR c:/INSTALL
+COPY SQLServer2022-x64-ENU.exe .
+COPY SQLServer2022-x64-ENU.box .
+COPY SQLServer2022-Config.ini .							   
+RUN Start-Process .\SQLServer2022-x64-ENU.exe  -Wait -ArgumentList """/x:SQLServer2022-x64-ENU""", """/u"""; `
+    Remove-Item SQLServer2022-x64-ENU.exe; `
+    Remove-Item SQLServer2022-x64-ENU.box
+#
+# Install SQL Server RTM
+#
+RUN C:\INSTALL\SQLServer2022-x64-ENU\SETUP.exe /ConfigurationFile=C:\INSTALL\SQLServer2022-Config.ini									   
+#
+WORKDIR c:/
+#
+RUN  Stop-Service -Name """SQLTELEMETRY"""; `
+     Stop-Service -Name """SQLWRITER"""; `
+	 Set-Service  -Name """SQLTELEMETRY""" -StartupType """Manual"""; `
+     Set-Service  -Name """SQLWRITER""" -StartupType """Manual"""; `
+     Compress-Archive -Path """C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA""" -DestinationPath """C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Data.zip"""; `
+     Compress-Archive -Path """C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log"""  -DestinationPath """C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log.zip"""; `
+     Remove-Item -Recurse  """C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA"""; `
+     Remove-Item -Recurse  """C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log"""
+#	 
+COPY Start.ps1 .
+#ENTRYPOINT [ "powershell","c:\\Start.ps1","-ACCEPT_EULA $ENV:ACCEPT_EULA","-SA_PASSWORD $ENV:SA_PASSWORD"]
+ENTRYPOINT powershell "c:\\Start.ps1 -ACCEPT_EULA $ENV:ACCEPT_EULA -SA_PASSWORD $ENV:SA_PASSWORD
+#ENTRYPOINT ["powershell","wait-event"]

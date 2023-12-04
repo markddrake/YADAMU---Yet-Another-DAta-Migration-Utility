@@ -46,7 +46,13 @@ class OracleError extends DatabaseError {
   }
  
   constructor(driverId,cause,stack,sql,args,outputFormat) {
-    super(driverId,cause,stack,sql);
+	
+	super(driverId,cause,stack,sql);
+
+	if (this.lostConnection() ) {
+	  // this.cause.ignoreUnhandledRejection = true
+	}
+    
     this.args = this.obfuscateBindValues(args)
     this.outputFormat = outputFormat
     
@@ -61,7 +67,7 @@ class OracleError extends DatabaseError {
   
   lostConnection() {
 	const oracledbCode = this.cause.message.substring(0,this.cause.message.indexOf(':'))
-	return (OracleConstants.LOST_CONNECTION_ERROR.includes(this.cause.errorNum)) || (OracleConstants.ORACLEDB_LOST_CONNECTION.includes(oracledbCode))
+	return ((OracleConstants.ORACLEDB_LOST_CONNECTION.includes(oracledbCode)) || (OracleConstants.LOST_CONNECTION_ERROR.includes(this.cause.errorNum))) 
   }
 
   missingTable() {
@@ -78,6 +84,15 @@ class OracleError extends DatabaseError {
 
   spatialError() {
     return (this.cause.errorNum && OracleConstants.SPATIAL_ERROR.includes(this.cause.errorNum))
+  }
+
+  knownBug(bugNumber) {
+	switch (bugNumber) {
+	  case 33561708:
+        return (this.cause.errorNum && (this.cause.errorNum === 13199) && this.sql.includes("get_WKB()"))
+      default:
+	    return false;
+	}
   }
 
   copyFileNotFoundError() {

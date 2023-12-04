@@ -24,5 +24,5 @@ cat log/WorldWideImportersDW.log
 # Install YADAMU_IMPORT
 /opt/mssql-tools/bin/sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -e -i sql/YADAMU_IMPORT.sql > log/YADAMU_IMPORT.log
 cat log/YADAMU_IMPORT.log
-# Install YADAMU_TEST
-/opt/mssql-tools/bin/sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -e -i sql/YADAMU_TEST.sql   > log/YADAMU_TEST.log
+# Install YADAMU_COMPARE
+/opt/mssql-tools/bin/sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -e -i sql/YADAMU_COMPARE.sql   > log/YADAMU_COMPARE.log

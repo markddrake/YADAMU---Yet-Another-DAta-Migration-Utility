@@ -1,0 +1,45 @@
+{
+    "operation": "dbRoundtrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "parameters": {
+        "DIRECTORY": "export/json/%location%"
+    },
+    "tests": [
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "mongodb#1",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "operation": "export",
+            "source": "mongodb#1",
+            "target": "file-staging",
+            "parameters": {
+                "DIRECTORY": "export/json/%vendor%"
+            },
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "mongodb#1",
+            "parameters": {
+                "MONGO_STRIP_ID": false
+            },
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        }
+    ]
+}

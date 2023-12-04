@@ -9,6 +9,13 @@ RUN start-process msiexec.exe -Wait -ArgumentList "/l*v", "mdbinstall.log", "/qb
 WORKDIR C:/Program Files/MongoDB/Server/7.0/
 COPY mongod.cfg bin
 #
+#
+# Mongosh
+# 
+ADD https://downloads.mongodb.com/compass/mongosh-1.1.2-x64.msi .
+RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""", """/i""", """mongosh-1.1.2-x64.msi"""; `
+    Remove-Item .\mongosh-1.1.2-x64.msi;
+#
 WORKDIR c:/
 COPY Start.ps1 .
 ENTRYPOINT ["powershell","c:\\Start.ps1"]

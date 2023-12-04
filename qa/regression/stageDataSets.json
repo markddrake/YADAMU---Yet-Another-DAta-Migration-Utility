@@ -1,88 +1,81 @@
 {
-  "operation"                         : "export"
-, "connections"                       : "connections.json"
-, "recreateSchema"                    : true
-, "createDirectory"                   : true
-, "verifyOperation"                   : false
-, "parameters"                        : {
-	"DIRECTORY"                       : "%operation%/%mode%/%connection%"
-  }
-, "tasks"                             : "tasks.json"
-, "tests" : [{
-    "source"                          : "oracle#1"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "oracle"
+    "operation": "export",
+    "connections": "connections.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": false,
+    "parameters": {
+        "DIRECTORY": "%operation%/json/%vendor%"
+    },
+    "tasks": "tasks.json",
+    "tests": [
+        {
+            "source": "oracle#1",
+            "target": "file-staging",
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "file-staging",
+            "tasks": [
+                "PM"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "file-staging",
+            "tasks": [
+                "mysql"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "file-staging",
+            "tasks": [
+                "mssql"
+            ]
+        },
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "mssql#1",
+            "parameters": {
+                "DIRECTORY": "export/json/%vendor%"
+            },
+            "tasks": [
+                "Northwind_AWA"
+            ]
+        },
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "mssql#1",
+            "recreateSchema": false,
+            "parameters": {
+                "DIRECTORY": "export/json/%vendor%"
+            },
+            "tasks": [
+                "AdventureWorks_AWA"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "file-staging",
+            "tasks": [
+                "AdventureWorksAll"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "file-staging",
+            "parameters": {
+                "CIRCLE_FORMAT": "CIRCLE"
+            },
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        }
     ]
-  },{
-    "source"                          : "oracle18c"
-  , "target"                          : "file-staging"  
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "PM"
-    ]
-  },{
-    "source"                          : "mysql#1"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "mysql"
-    ]
-  },{
-    "source"                          : "mssql#1"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "mssql"
-    ]
-  },{
-    "operation"                       : "import"
-  , "source"                          : "file-staging"
-  , "target"                          : "mssql#1"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "export/json/%vendor%"
-    }
-  , "tasks": [                        
-      "Northwind_AWA"                 
-    ]                                 
-  },{                                 
-    "operation"                       : "import"
-  , "source"                          : "file-staging"
-  , "target"                          : "mssql#1"
-  , "recreateSchema"                  : false
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "export/json/%vendor%"
-     }
-  , "tasks": [
-      "AdventureWorks_AWA"
-    ]  
-  },{
-    "source"                          : "mssql#1"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "AdventureWorksAll"
-    ]
-  },{
-    "source"                          : "postgres#1"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%",
-      "CIRCLE_FORMAT"                 : "CIRCLE"
-    }
-  , "tasks"                           : [
-      "postgresDataTypes"
-	]
-  }]
 }

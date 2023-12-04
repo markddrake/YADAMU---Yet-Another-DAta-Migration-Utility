@@ -1,9 +1,10 @@
 version: '2.4'
 services:
+
   ROACH01-01:
     container_name: ROACH01-01
     image:  cockroachdb/cockroach
-    command: start --insecure --store=node1 --join=ROACH01-01,ROACH01-02,ROACH01-03
+    command: start --advertise-addr=ROACH01-01:26357  --listen-addr=ROACH01-01:26357  --http-addr=ROACH01-01:8080  --sql-addr=ROACH01-01:26257 --insecure --store=node1 --join=ROACH01-01,ROACH01-02,ROACH01-03
     mem_limit: '8gb'
     shm_size: '1gb'
     security_opt:
@@ -21,7 +22,7 @@ services:
   ROACH01-02:
     container_name: ROACH01-02
     image:  cockroachdb/cockroach
-    command: start --insecure --store=node2 --join=ROACH01-01,ROACH01-02,ROACH01-03 
+    command: start --advertise-addr=ROACH01-02:26357  --listen-addr=ROACH01-02:26357  --http-addr=ROACH01-02:8081  --sql-addr=ROACH01-02:26258  --insecure --join=ROACH01-01,ROACH01-02,ROACH01-03 
     mem_limit: '8gb'
     shm_size: '1gb'
     security_opt:
@@ -29,8 +30,8 @@ services:
     networks:
       - YADAMU-NET
     ports: 
-      - "26258:26257"
-      - "8081:8080"
+      - "26258:26258"
+      - "8081:8081"
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
       - ROACH01-02-DATA:/cockroach/cockroach-data
@@ -39,7 +40,7 @@ services:
   ROACH01-03:
     container_name: ROACH01-03
     image:  cockroachdb/cockroach
-    command: start --insecure --store=node3 --join=ROACH01-01,ROACH01-02,ROACH01-03 
+    command: start --advertise-addr=ROACH01-03:26357  --listen-addr=ROACH01-03:26357  --http-addr=ROACH01-03:8082  --sql-addr=ROACH01-03:26259  --insecure --join=ROACH01-01,ROACH01-02,ROACH01-03 
     mem_limit: '8gb'
     shm_size: '1gb'
     security_opt:
@@ -47,8 +48,8 @@ services:
     networks:
       - YADAMU-NET
     ports: 
-      - "26259:26257"
-      - "8082:8080"
+      - "26259:26259"
+      - "8082:8082"
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
       - ROACH01-03-DATA:/cockroach/cockroach-data

@@ -17,12 +17,6 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle19c",
-            "target": "oracle#1",
-            "tasks": [
-                "oracle","mssql","mysql"
-            ]
-    },{
 		    "source": "oracle18c",
             "target": "oracle#1",
             "tasks": [
@@ -71,7 +65,7 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "monggo#1",
+		    "source": "mongodb#1",
             "target": "oracle#1",
             "tasks": [
                 "oracle","mssql","mysql"

@@ -14,11 +14,11 @@ const ROW_SIZE_FUDGE_FACTOR = 160
 
 class TeradataWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
-    super(dbi,tableName,ddlComplete,status,yadamuLogger)
+  constructor(dbi,tableName,metrics,status,yadamuLogger) {
+    super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
-  reportBatchError(batch, operation,cause) {
+  reportBatchError( operation,cause,batch) {
     super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
 
@@ -47,7 +47,7 @@ class TeradataWriter extends YadamuWriter {
 		  console.log(results);
 		}
 		*/
-		this.reportBatchError(batch,`INSERT MANY`,cause)
+		this.reportBatchError(`INSERT MANY`,cause,batch)
 		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'   
       }

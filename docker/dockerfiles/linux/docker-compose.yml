@@ -14,7 +14,7 @@ services:
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     environment:
       TNS_ADMIN: /usr/src/YADAMU
-      YADAMU_PASSPHRAS: yabasc
+      YADAMU_PASSPHRASE: yabasc
     networks:
       - YADAMU-NET
     ports: 

@@ -8,7 +8,7 @@
   , "DECIMAL_TYPE"                                         : "DECIMAL"                                                          
   , "FLOAT_TYPE"                                           : "REAL"                                                   
   , "DOUBLE_TYPE"                                          : "DOUBLE"                                                   
-  , "SMALLINt_TYPE"                                        : "SMALLINT"                                                   
+  , "SMALLINT_TYPE"                                        : "SMALLINT"                                                   
   , "INTEGER_TYPE"                                         : "INTEGER"                                                   
   , "BIGINT_TYPE"                                          : "BIGINT"                                                   
   , "BINARY_TYPE"                                          : "BINARY"                                                        

@@ -1,6 +1,7 @@
-"use strict"
 
 import WKX from 'wkx';
+
+import YadamuDataTypes from '../dbi/base/yadamuDataTypes.js'
 
 class YadamuSpatialLibrary {
   
@@ -99,31 +100,8 @@ class YadamuSpatialLibrary {
       
     
     // Find the colunmns to be converted
-    const spatialColumnList = []
-    dataTypes.forEach((dataType,idx) => {
-      switch (dataType.toUpperCase()){
-        case 'GEOGRAPHY':
-        case 'GEOMETRY':
-  	    case 'POINT':
-		case 'LSEG':
-		case 'BOX':
-		case 'PATH':
-		case 'POLYGON':
-		case 'CIRCLE':
-		case 'LINESTRING':
-		case 'MULTIPOINT':
-		case 'MULTILINESTRING':
-		case 'MULTIPOLYGON':
-		case 'GEOMCOLLECTION':
-		case 'GEOMETRYCOLLECTION':
-        case 'ST_GEOMETRY':
-        case '"MDSYS"."SDO_GEOMETRY"':
-          spatialColumnList.push(idx)
-          break;
-        default:
-      }
-    })
-        
+	
+    const spatialColumnList = dataTypes.reduce((columnList,dataType,idx) => { if (YadamuDataTypes.isSpatial(dataType)) columnList.push(idx); return columnList},[])        
     if (spatialColumnList.length === 0) {
       return
     }  

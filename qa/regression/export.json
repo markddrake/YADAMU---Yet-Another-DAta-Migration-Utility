@@ -1,196 +1,176 @@
 {
-  "operation"                         : "export"
-, "connections"                       : "connections.json"
-, "recreateSchema"                    : true
-, "createDirectory"                   : true
-, "verifyOperation"                   : true
-, "parameters"                        : {
-	"DIRECTORY"                       : "%operation%/%mode%/%connection%"
-  }
-, "tasks"                             : "tasks.json"
-, "tests" : [{
-    "source": "oracle#1"
-  , "target": "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "oracle"
+    "operation": "export",
+    "connections": "connections.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "parameters": {
+        "DIRECTORY": "%operation%/json/%connection%"
+    },
+    "tasks": "tasks.json",
+    "tests": [
+        {
+            "source": "oracle#1",
+            "target": "file-lRegress",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_ONLY",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_AND_DATA",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "file-lRegress",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_ONLY",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_AND_DATA",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "target": "file-lRegress",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_ONLY",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_AND_DATA",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "target": "file-lRegress",
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_ONLY",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "target": "file-lRegress",
+            "parameters": {
+                "MODE": "DDL_AND_DATA",
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "file-lRegress",
+            "tasks": [
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "file-lRegress",
+            "tasks": [
+                "AdventureWorksAll"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "target": "file-lRegress",
+            "tasks": [
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "target": "file-lRegress",
+            "tasks": [
+                "AdventureWorksAll"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "file-lRegress",
+            "tasks": [
+                "mysql"
+            ]
+        }
     ]
-  },{
-    "source"                          : "mysql#1"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "mysql"
-    ]
-  },{
-    "source"                          : "mssql19"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "mssql"
-    ]
-  },{
-    "operation"                       : "import"
-  , "source"                          : "file-staging"
-  , "target"                          : "mssql19"
-  , "verifyOperation"                 : false
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "export/json/%vendor%"
-    }
-  , "tasks": [                        
-      "Northwind_AWA"                 
-    ]                                 
-  },{                                 
-    "operation"                       : "import"
-  , "source"                          : "file-staging"
-  , "target"                          : "mssql19"
-  , "recreateSchema"                  : false
-  , "verifyOperation"                 : false
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "export/json/%vendor%"
-     }
-  , "tasks": [
-      "AdventureWorks_AWA"
-    ]  
-  },{
-    "source"                          : "mssql19"
-  , "target"                          : "file-staging"
-  , "parameters"                      : {
-	  "DIRECTORY"                     : "%operation%/json/%vendor%"
-     }
-  , "tasks": [
-      "AdventureWorksAll"
-    ]
-  },{
-    "source": "oracle#1"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-     }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle#1"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle18c"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle18c"
-  , "target": "file-lRegress"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle18c"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle12c"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle12c"
-  , "target": "file-lRegress"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle12c"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle11g"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle11g"
-  , "target": "file-lRegress"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle11g"
-  , "target": "file-lRegress"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source"          : "mssql#1"
-  , "target"          : "file-lRegress"
-  , "tasks": [
-      "mssql"
-    ]
-  },{
-    "operation"       : "import"
-  , "source"          : "file-lRegress"
-  , "target"          : "mssql#1"
-  , "verifyOperation" : false
-  , "parameters"      : {
-	  "DIRECTORY"     : "export/%mode%/%connection%"
-    }
-  , "tasks": [
-      "Northwind_AWA"
-    ]  
-  },{
-    "operation"       : "import"
-  , "source"          : "file-lRegress"
-  , "target"          : "mssql#1"
-  , "recreateSchema"  : false
-  , "verifyOperation" : false
-  , "parameters"      : {
-	  "DIRECTORY"     : "export/%mode%/%connection%"
-    }
-  , "tasks": [
-      "AdventureWorks_AWA"
-    ]  
-  },{
-    "source"          : "mssql#1"
-  , "target"          : "file-lRegress"
-  , "tasks": [
-      "AdventureWorksAll"
-    ]
-  }]
 }

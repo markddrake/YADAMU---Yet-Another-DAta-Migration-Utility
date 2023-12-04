@@ -1,5 +1,4 @@
 docker rmi -f yadamu/secure:latest
-set DOCKER_BUILDKIT=1
-docker build -t  yadamu/secure:latest . -f docker/dockerfiles/secure
-
-
+copy docker\dockerfiles\windows\secure.dockerignore .dockerignore
+docker build -t  yadamu/secure:latest . -f docker\dockerfiles\windows\secure
+del .dockerignore

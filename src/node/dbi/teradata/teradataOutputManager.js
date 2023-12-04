@@ -11,8 +11,8 @@ import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class TeradataOutputManager extends YadamuOutputManager {
 
-  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
-    super(dbi,tableName,ddlComplete,status,yadamuLogger)
+  constructor(dbi,tableName,metrics,status,yadamuLogger) {
+    super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
   generateTransformations(dataTypes) {

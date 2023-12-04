@@ -8,17 +8,22 @@ RUN c:\postgresql-16.0-1-windows-x64.exe --mode unattended --superpassword oracl
 # PostGIS
 #
 ADD https://download.osgeo.org/postgis/windows/pg16/postgis-bundle-pg16x64-setup-3.4.0-1.exe .
-RUN .\postgis-bundle-pg16x64-setup-3.4.0-1.exe /S /D="C:\Program Files\PostgreSQL\16"
+RUN c:\postgis-bundle-pg16x64-setup-3.4.0-1.exe /S /D="C:\Program Files\PostgreSQL\16"
 #
 # Python 3
 #
-ADD https://www.python.org/ftp/python/3.12.0/python-3.12.0-amd64.exe .
-RUN .\python-3.12.0-amd64.exe /quiet InstallAllUsers=1 PrependPath=1;
+ADD https://www.python.org/ftp/python/3.11.6/python-3.11.6-amd64.exe .
+RUN c:\python-3.11.6-amd64.exe /quiet InstallAllUsers=1 PrependPath=1;
 RUN pip3 install lxml
+#
+#
+# ADD https://download.visualstudio.microsoft.com/download/pr/8bee1b10-0767-416b-a3c0-d658a719947b/96e08166034c5110cdb8361ba55f8a2010d0bad714b311a7c8f1c7c8f7c03bce/vs_BuildTools.exe .
+# RUN c:\vs_BuildTools.exe --quiet --norestart --wait --installPath "C:\VS_Build_Tools" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --nocache#
+# RUN pip3 install psycopg2
 #
 RUN Remove-Item c:\postgresql-16.0-1-windows-x64.exe; `
 	Remove-Item c:\postgis-bundle-pg16x64-setup-3.4.0-1.exe; `
-	Remove-Item python-3.12.0-amd64.exe; 
+	Remove-Item python-3.11.6-amd64.exe; 
 #`
 COPY Start.ps1 .
 ENTRYPOINT ["powershell", "c:/Start.ps1"]

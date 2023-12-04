@@ -195,6 +195,285 @@ begin
   end if;
 end;
 --
+$IF DBMS_DB_VERSION.VERSION = 21 $THEN
+-- 
+function DISABLE_VALUE_CLOB(P_VALUE_CLOB CLOB) 
+return CLOB
+as
+  NORMAL_CLOB CLOB;
+begin
+  NORMAL_CLOB := P_VALUE_CLOB;
+  return NORMAL_CLOB;
+end;
+--
+$END
+--
+$IF DBMS_DB_VERSION.VERSION > 19 $THEN
+--
+function GET_SCHEMA_METADATA(
+  P_OWNER_LIST             VARCHAR2 
+, P_OPTIONS                VARCHAR2
+)
+return EXPORT_METADATA_TABLE 
+PIPELINED
+as
+  V_SPATIAL_FORMAT        VARCHAR2(7)    := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')                                                                      then JSON_VALUE(P_OPTIONS, '$.spatialFormat') else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
+  V_TREAT_RAW1_AS_BOOLEAN      RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorageOption') and JSON_VALUE(P_OPTIONS,'$.booleanStorageOption') = 'RAW(1)' then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
+
+  cursor getTableMetadata
+  is
+  select aat.owner 
+        ,aat.table_name
+		,sum(case when ((TYPECODE in ('COLLECTION', 'OBJECT')) and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then 1 else 0 end) OBJECT_COUNT
+        ,json_arrayagg(atc.COLUMN_NAME ORDER BY INTERNAL_COLUMN_ID)  COLUMN_NAME_LIST 
+        ,json_arrayagg(case 
+                         when (jc.FORMAT is not NULL) then
+                           'JSON'
+                         when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and V_TREAT_RAW1_AS_BOOLEAN = '01') then
+                           'BOOLEAN'
+                         when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
+                          'TIMESTAMP'
+                         when (DATA_TYPE_OWNER is null) then
+                           atc.DATA_TYPE
+                         when (atc.DATA_TYPE in ('XMLTYPE','ANYDATA','RAW')) then
+                           atc.DATA_TYPE
+                         else 
+                           '"' || atc.DATA_TYPE_OWNER || '"."' || atc.DATA_TYPE || '"' 
+                       end 
+                       ORDER BY INTERNAL_COLUMN_ID
+					 ) DATA_TYPE_LIST
+        ,json_arrayagg(case 
+ 			     when atc.DATA_TYPE in ('VARCHAR2', 'CHAR') then
+                   json_array(case when (CHAR_LENGTH < DATA_LENGTH) then CHAR_LENGTH else DATA_LENGTH end)
+			     when (atc.DATA_TYPE = 'TIMESTAMP') or (atc.DATA_TYPE LIKE  'TIMESTAMP(%)') or (atc.DATA_TYPE LIKE '%TIME ZONE')  then
+                   json_array(DATA_SCALE)
+                 when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
+                   json_array(CHAR_LENGTH)
+                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and V_TREAT_RAW1_AS_BOOLEAN = '01') then
+				   json_array()
+                 when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then
+                   json_array(DATA_LENGTH)
+                 when atc.DATA_TYPE = 'NUMBER' then
+                   case 
+                     when DATA_SCALE is NOT NULL and DATA_SCALE <> 0 then
+                       json_array(DATA_PRECISION,DATA_SCALE)
+                     when DATA_PRECISION is NOT NULL then
+                       json_array(DATA_PRECISION)
+                     else 
+					   json_array()
+                   end 
+                 when atc.DATA_TYPE = 'FLOAT' then
+                   json_array(DATA_PRECISION)
+                 else
+                   json_array()
+               end
+	           ORDER BY INTERNAL_COLUMN_ID) SIZE_CONSTRAINT_LIST					 
+        ,json_arrayagg(
+               case
+                 -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
+                 when atc.DATA_TYPE = 'RAW' then
+                   '"' || atc.COLUMN_NAME || '"'
+                 /*
+                 ** Quick Fixes for datatypes not natively supported
+                 */
+                 when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
+                   case 
+                     when V_SPATIAL_FORMAT in ('WKB','EWKB') then
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when V_SPATIAL_FORMAT in ('WKT','EWKT') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when V_SPATIAL_FORMAT in ('GeoJSON') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                   end
+                 when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'ROWID' or atc.DATA_TYPE = 'UROWID' then
+                   'ROWIDTOCHAR("' || atc.COLUMN_NAME || '")'
+                 /*
+                 ** Fix for BFILENAME
+                 */
+                 when atc.DATA_TYPE = 'BFILE' then
+                   'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
+                 /*
+                 **
+                 ** Support ANYDATA, OBJECT and COLLECTION types
+                 **
+                 */
+                 when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC 
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
+                 when TYPECODE = 'COLLECTION' then
+				   case
+     				 when JSON_VALUE(P_OPTIONS, '$.objectStorageOption') = 'JSON' then
+					   'JSON_ARRAY("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+					 else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+ 				   end
+                 when TYPECODE = 'OBJECT' then
+				   case
+     				 when JSON_VALUE(P_OPTIONS, '$.objectStorageOption') = 'JSON' then
+                       '"' || atc.COLUMN_NAME || '"'
+					 else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   end
+                 when atc.DATA_TYPE in ('LONG','LONG RAW') then
+                   atc.COLUMN_NAME || '". Unsupported data type ["' || atc.DATA_TYPE || '"]'
+                 else
+                   '"' || atc.COLUMN_NAME || '"'
+			   end
+               order by INTERNAL_COLUMN_ID) EXPORT_SELECT_LIST			   
+        ,json_arrayagg(
+               case
+                 when atc.DATA_TYPE in ('BINARY_FLOAT') then
+                   'TO_CHAR(CAST("' || atc.COLUMN_NAME || '" as BINARY_DOUBLE))'
+                 when atc.DATA_TYPE in ('BINARY_DOUBLE') then
+                   'TO_CHAR("' || atc.COLUMN_NAME || '")'
+                 when atc.DATA_TYPE = 'RAW' then
+                   -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
+                   '"' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
+                   'OBJECT_SERIALIZATION.SERIALIZE_DSINTERVAL_ISO8601("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%' then
+                   'OBJECT_SERIALIZATION.SERIALIZE_YMINTERVAL_ISO8601("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+                 when ((atc.DATA_TYPE = 'TIMESTAMP') or (atc.DATA_TYPE like 'TIMESTAMP(%)')) then
+                   'TO_CHAR("' || atc.COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
+                 when atc.DATA_TYPE like 'TIMESTAMP%TIME ZONE' then
+                   'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
+                 when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
+                   case 
+                     when V_SPATIAL_FORMAT in ('WKB','EWKB') then
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when V_SPATIAL_FORMAT in ('WKT','EWKT') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when V_SPATIAL_FORMAT in ('GeoJSON') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                   end
+                 when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'BFILE' then
+                   'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
+				 when atc.DATA_TYPE = 'JSON' then
+				   case
+				     when DBMS_DB_VERSION.VERSION = 21 then
+					   'YADAMU_EXPORT.DISABLE_VALUE_CLOB(JSON_SERIALIZE("' || atc.COLUMN_NAME || '" returning CLOB)) "' || atc.COLUMN_NAME || '"'
+					 else
+                       '"' || atc.COLUMN_NAME || '"'
+				   end
+                 when TYPECODE = 'COLLECTION' then
+				   case
+    				 when JSON_VALUE(P_OPTIONS, '$.objectStorageOption') = 'JSON' then
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+  				     else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+ 				   end
+                 when TYPECODE = 'OBJECT' then
+				   case
+     				 when JSON_VALUE(P_OPTIONS, '$.objectStorageOption') = 'JSON' then
+  					   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+					 else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   end
+                 else
+                   '"' || atc.COLUMN_NAME || '"'
+               end
+               order by INTERNAL_COLUMN_ID) CLIENT_SELECT_LIST
+      ,(select json_arrayagg(partition_name) from ALL_TAB_PARTITIONS atp where ATP.TABLE_NAME = aat.TABLE_NAME and atp.TABLE_OWNER = aat.OWNER) PARTITION_LIST  
+	  ,OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(aat.OWNER,aat.TABLE_NAME) "WITH_CLAUSE"
+  from ALL_ALL_TABLES aat
+        inner join ALL_TAB_COLS atc
+                on atc.OWNER = aat.OWNER
+               and atc.TABLE_NAME = aat.TABLE_NAME
+    left outer join ALL_TYPES at
+                 on at.TYPE_NAME = atc.DATA_TYPE
+                and at.OWNER = atc.DATA_TYPE_OWNER
+    left outer join ALL_MVIEWS amv
+		         on amv.OWNER = aat.OWNER
+		        and amv.MVIEW_NAME = aat.TABLE_NAME
+    left outer join ALL_JSON_COLUMNS jc
+                 on jc.COLUMN_NAME = atc.COLUMN_NAME
+                AND jc.TABLE_NAME = atc.TABLE_NAME
+                and jc.OWNER = atc.OWNER
+   where aat.STATUS = 'VALID'
+     and aat.DROPPED = 'NO'
+     and aat.TEMPORARY = 'N'
+     and aat.EXTERNAL = 'NO'
+     and aat.NESTED = 'NO'
+     and aat.SECONDARY = 'N'
+     and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
+     and (
+           ((TABLE_TYPE is NULL) and (HIDDEN_COLUMN = 'NO'))
+         or 
+           ((TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
+         )        
+	 and amv.MVIEW_NAME is NULL
+	 -- and aat.OWNER = JSON_VALUE( P_OWNER_LIST,'$[0]')
+	 and aat.OWNER = P_OWNER_LIST
+   group by aat.OWNER, aat.TABLE_NAME;	 
+
+  V_ROW                  EXPORT_METADATA_RECORD;
+
+  V_CLIENT_SELECT_LIST   CLOB := '';
+  V_EXPORT_SELECT_LIST   CLOB := '';
+
+begin
+  for t in getTableMetadata loop  
+  
+    DBMS_LOB.CREATETEMPORARY(V_CLIENT_SELECT_LIST,TRUE,DBMS_LOB.CALL);    
+	for r in (select LIST_ENTRY from JSON_TABLE(t.CLIENT_SELECT_LIST, '$[*]' COLUMNS ("LIST_ENTRY" VARCHAR2(1024) PATH '$'))) loop
+	  DBMS_LOB.WRITEAPPEND(V_CLIENT_SELECT_LIST,LENGTH(r.LIST_ENTRY)+1,r.LIST_ENTRY || ',');
+	end loop;	
+	DBMS_LOB.TRIM(V_CLIENT_SELECT_LIST,DBMS_LOB.GETLENGTH(V_CLIENT_SELECT_LIST)-1);
+
+    DBMS_LOB.CREATETEMPORARY(V_EXPORT_SELECT_LIST,TRUE,DBMS_LOB.CALL);    
+	for r in (select LIST_ENTRY from JSON_TABLE(t.CLIENT_SELECT_LIST, '$[*]' COLUMNS ("LIST_ENTRY" VARCHAR2(1024) PATH '$'))) loop
+	  DBMS_LOB.WRITEAPPEND(V_EXPORT_SELECT_LIST,LENGTH(r.LIST_ENTRY)+1,r.LIST_ENTRY || ',');
+	end loop;
+	DBMS_LOB.TRIM(V_EXPORT_SELECT_LIST,DBMS_LOB.GETLENGTH(V_EXPORT_SELECT_LIST)-1);
+
+    select LISTAGG("LIST_ENTRY",',')
+	  into V_EXPORT_SELECT_LIST
+	  from JSON_TABLE(t.EXPORT_SELECT_LIST, '$[*]' COLUMNS ("LIST_ENTRY" VARCHAR2(1024) PATH '$'));
+
+    V_ROW.TABLE_SCHEMA          := t.OWNER;
+	V_ROW.TABLE_NAME            := t.TABLE_NAME;
+	V_ROW.COLUMN_NAME_ARRAY     := t.COLUMN_NAME_LIST;
+	V_ROW.DATA_TYPE_ARRAY       := t.DATA_TYPE_LIST;
+	V_ROW.SIZE_CONSTRAINT_ARRAY := t.SIZE_CONSTRAINT_LIST;
+	V_ROW.CLIENT_SELECT_LIST    := V_CLIENT_SELECT_LIST;
+	V_ROW.EXPORT_SELECT_LIST    := V_EXPORT_SELECT_LIST;
+	V_ROW.WITH_CLAUSE           := t.WITH_CLAUSE;
+	V_ROW.PARTITiON_LIST        := case when t.PARTITION_LIST is null then '[]' else t.PARTITION_LIST end;
+	pipe row(V_ROW);
+  end loop;
+end;
+--
+$ELSE
+--
 function GET_SCHEMA_METADATA(
   P_OWNER_LIST             VARCHAR2 
 , P_OPTIONS                VARCHAR2
@@ -330,21 +609,21 @@ $END
                    case 
                      when V_SPATIAL_FORMAT in ('WKB','EWKB') then
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
-                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB() ' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
-                            'else t."' || atc.COLUMN_NAME || '".get_WKB()' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
                        'end "' || atc.COLUMN_NAME || '"'
                      when V_SPATIAL_FORMAT in ('WKT','EWKT') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
-                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() ' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
-                            'else t."' || atc.COLUMN_NAME || '".get_WKT()' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
                        'end "' || atc.COLUMN_NAME || '"'
                      when V_SPATIAL_FORMAT in ('GeoJSON') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
-                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON() ' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
-                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON()' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
                        'end "' || atc.COLUMN_NAME || '"'
                    end
                  when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
@@ -368,7 +647,7 @@ $END
                  **
                  */
                  when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC 
-                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end' || atc.COLUMN_NAME || '"'
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
                  when TYPECODE = 'COLLECTION' then
 				   --
 				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
@@ -453,21 +732,21 @@ $END
                    case 
                      when V_SPATIAL_FORMAT in ('WKB','EWKB') then
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
-                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB() ' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
-                            'else t."' || atc.COLUMN_NAME || '".get_WKB()' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
                        'end "' || atc.COLUMN_NAME || '"'
                      when V_SPATIAL_FORMAT in ('WKT','EWKT') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
-                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() ' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
-                            'else t."' || atc.COLUMN_NAME || '".get_WKT()' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
                        'end "' || atc.COLUMN_NAME || '"'
                      when V_SPATIAL_FORMAT in ('GeoJSON') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
-                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON() ' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
-                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON()' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
                        'end "' || atc.COLUMN_NAME || '"'
                    end
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
@@ -722,20 +1001,8 @@ $END
 --
 end;
 --
-$IF DBMS_DB_VERSION.VERSION = 21 $THEN
--- 
-function DISABLE_VALUE_CLOB(P_VALUE_CLOB CLOB) 
-return CLOB
-as
-  NORMAL_CLOB CLOB;
-begin
-  NORMAL_CLOB := P_VALUE_CLOB;
-  return NORMAL_CLOB;
-end;
---
 $END
 --
-
 end;
 /
 --

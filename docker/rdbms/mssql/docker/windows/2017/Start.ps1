@@ -20,7 +20,6 @@ $NOW = Get-Date -Format "o"
 Write-Output "$NOW Start Type $STATUS"
 
 if ($STATUS -eq "Manual") {
-  Start-Sleep -Seconds $ENV:DELAY
   $NOW = Get-Date -Format "o"
   Write-Output "$NOW MSSQLSERVER: Enabling Database Service ""MSSQLSERVER""."
   Expand-Archive -Path "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA.zip" -DestinationPath "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\"  

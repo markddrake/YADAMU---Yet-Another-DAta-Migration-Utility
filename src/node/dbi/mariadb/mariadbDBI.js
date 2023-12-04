@@ -545,24 +545,25 @@ class MariadbDBI extends YadamuDBI {
   }  
 
   inputStreamError(cause,sqlStatement) {
-	 return this.trackExceptions(((cause instanceof MariadbError) || (cause instanceof CopyOperationAborted)) ? cause : new MariadbError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+	 return this.trackExceptions(((cause instanceof MariadbError) || (cause instanceof CopyOperationAborted)) ? cause : new MariadbError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
     
   async getInputStream(queryInfo) {
     
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     
     while (true) {
       // Exit with result or exception.  
+	  let stack
       try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
         const sqlStartTime = performance.now()
-		this.streamingStackTrace = new Error().stack
 		const is = this.connection.queryStream(queryInfo.SQL_STATEMENT)
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,this.streamingStackTrace,sqlStatement))
+		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

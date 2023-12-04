@@ -6,7 +6,6 @@ import {
 
 import { 
   pipeline 
-
 }                               from 'stream/promises';
 
 import { 
@@ -52,7 +51,7 @@ class AzureStorageService {
   constructor(dbi,parameters) {
 	this.dbi = dbi
 	this.blobServiceClient = dbi.cloudConnection
-	this.LOGGER = dbi.yadamuLogger
+	this.LOGGER = dbi.LOGGER
 	this.parameters = parameters || {}
 
 	this.containerClient = this.blobServiceClient.getContainerClient(this.dbi.CONTAINER);
@@ -152,6 +151,12 @@ class AzureStorageService {
 	 await pipeline(is,sw)
 	 return sw.toString();
   }
+  
+  async getContentAsString(key,params) {
+	const object = await this.getObject(key,params)
+	return object.toString()
+  }
+  
 
   async createReadStream(key,params) {
 	  

@@ -76,11 +76,8 @@ const _SQL_SCHEMA_METADATA      = `select trim(trailing ' ' from t."TABSCHEMA") 
                                                 'SYSTOOLS.BSON2JSON("' || c."COLNAME" || '") "' || c."COLNAME" || '"'
                                               when (c.TYPENAME in ('BIGINT','DECFLOAT','NUMERIC','DECIMAL')) then
                                                 'cast("' || c."COLNAME" || '" as VARCHAR) "' || c."COLNAME" || '"'
-											  -- Blob returned as BUFFER stating with idbmdb v3.0.0
-                                              -- when (c.TYPENAME in ('BLOB')) then
-                                              --   'YADAMU.BLOBTOHEX("' || c."COLNAME" || '") "' || c."COLNAME" || '"'
                                               when (c.TYPENAME in ('XML')) then
-                                                'XMLSERIALIZE("' || c."COLNAME" || '"  AS CLOB(2G) EXCLUDING XMLDECLARATION) "' || c."COLNAME" || '"'
+                                                'XMLSERIALIZE("' || c."COLNAME" || '"  AS BLOB(2G) EXCLUDING XMLDECLARATION) "' || c."COLNAME" || '"'
                                               else
                                                 '"' || c."COLNAME" || '"'
                                             end

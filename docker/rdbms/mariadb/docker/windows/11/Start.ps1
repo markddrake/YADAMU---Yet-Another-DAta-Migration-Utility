@@ -1,6 +1,5 @@
 $service = Get-Service -Name MariaDB -ErrorAction SilentlyContinue
 if($service -eq $null) {
-  Start-Sleep -Seconds $ENV:DELAY
   $NOW = Get-Date -Format "o"
   Write-Output "$NOW MariaDB: Initializing MySQL service"
   # Push the utf-8 configuration file into the newly mounted Conf.d folder.

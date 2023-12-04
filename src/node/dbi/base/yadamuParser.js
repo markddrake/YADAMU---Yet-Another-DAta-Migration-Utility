@@ -109,7 +109,7 @@ class YadamuParser extends Transform {
 
     this.COPY_METRICS.parsed++
 
-    this.doTransform(data).then((row) => { 
+    this.doTransform(data).then((row) => {
 	  this.push({data:row})
       // this.timings.push(['DATA',performance.now()])
 	  callback() 

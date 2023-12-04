@@ -132,5 +132,5 @@ echo.exit
 echo on
 call installCosts.bat
 sqlplus system/oracle@localhost:1521/%ORACLE_PDB% @%STAGE%\sql\COMPILE_ALL.sql %STAGE%\log
-sqlplus system/oracle@localhost:1521/%ORACLE_PDB% @%STAGE%\sql\YADAMU_TEST.sql %STAGE%\log OFF
+sqlplus system/oracle@localhost:1521/%ORACLE_PDB% @%STAGE%\sql\YADAMU_COMPARE.sql %STAGE%\log OFF
  

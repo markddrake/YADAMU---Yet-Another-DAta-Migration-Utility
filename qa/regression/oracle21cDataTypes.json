@@ -1,101 +1,124 @@
 {
-  "operation"         : "dbRoundTrip"
-, "connections"       : "connections.json"
-, "tasks"             : "tasks.json"
-, "recreateSchema"    : true
-, "parameters"        : {
-    "INFINITY_MANAGEMENT" : "NULLIFY"
-  , "CIRCLE_FORMAT"  : "CIRCLE"
-  , "BATCH_SIZE"      : 250
-  , "COMMIT_RATIO"    : 200
-  }
-, "tests"             : [{
-    "operation"       : "import"
-  , "source"          : "file-staging"
-  , "target"          : "oracle21c"
-  , "verifyOperation" : true
-  , "parameters"      : {
-      "DIRECTORY"     : "export/json/%location%"
-    }                    
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "oracle21c"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "oracle#1"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "oracle18c"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "oracle12c"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "oracle11g"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "mssql#1"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "mssql19"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "postgres#1"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "mysql#1"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "mariadb#1"
-  , "target"          : "oracle21c"
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "mongodb#1",
-  , "target"          : "oracle21c"
-	"parameters"      : {
-	   "MONGO_STRIP_ID" : false
-	}
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "oracle21c"
-  , "targets"         : [
-       "oracle#1","oracle18c","oracle12c","oracel11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
-	]
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  }]
+    "operation": "dbRoundTrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "parameters": {
+        "INFINITY_MANAGEMENT": "NULLIFY",
+        "CIRCLE_FORMAT": "CIRCLE",
+        "BATCH_SIZE": 250,
+        "COMMIT_RATIO": 200
+    },
+    "tests": [
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "oracle21c",
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "export/json/%location%"
+            },
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle21c",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle18c",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle12c",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle11g",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mssql19",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "target": "oracle21c",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "oracle21c",
+            "parameters": {
+                "MONGO_STRIP_ID": false
+            },
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "oracle21c",
+            "targets": [
+                "oracle#1",
+                "oracle18c",
+                "oracle12c",
+                "oracle11g",
+                "mssql#1",
+                "mssql19",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        }
+    ]
 }

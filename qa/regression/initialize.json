@@ -14,8 +14,9 @@
     ]
   , "recreateSchema"    : false
   , "parameters" : {
-	    "MODE"   : "DATA_ONLY"
-	,	"TABLES" : [ "ONLINE_MEDIA" ]
+	    "MODE"             : "DATA_ONLY"
+	,   "TRUNCATE_ON_LOAD" : true
+	,	"TABLES"           : [ "ONLINE_MEDIA" ]
 	}
   , "tasks": [ 
       "PM"

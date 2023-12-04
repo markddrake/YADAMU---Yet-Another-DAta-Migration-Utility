@@ -1,21 +1,74 @@
 {
-	"operation": "dbRoundTrip",
-	"connections": "connections.json",
-	"tasks": "tasks.json",
-	"recreateSchema": true,
-	"parameters": {},
-	"tests": [{
-			"source": "oracle11g",
-			"target": "oracle11g",
-			"stagingArea": "loader-staging",
-			"reloadStagingArea" : false,
-			"parameters": {
-				"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-				"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
-				"COMMIT_RATIO"            : 0
-			},			
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		}]
+    "operation": "dbRoundTrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "stagingArea": "loader-staging",
+    "reloadStagingArea" : false,
+    "parameters": {
+      "REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
+      "DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+      "COMMIT_RATIO"            : 0
+    },          
+    "tests": [{
+            "source": "oracle11g",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+            "source": "oracle#1",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle18c",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle12c",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql#1",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql19",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "postgres#1",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mysql#1",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mariadb#1",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mongodb#1",
+            "target": "oracle11g",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    }]
 }

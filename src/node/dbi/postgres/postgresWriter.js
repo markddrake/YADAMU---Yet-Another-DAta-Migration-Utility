@@ -11,7 +11,7 @@ class PostgresWriter extends YadamuWriter {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
-  reportBatchError(batch,operation,cause) {
+  reportBatchError(operation,cause,batch) {
     // Use Slice to add first and last row, rather than first and last value.
 	super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
   }
@@ -34,7 +34,7 @@ class PostgresWriter extends YadamuWriter {
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-		this.reportBatchError(batch,`INSERT MANY`,cause)
+		this.reportBatchError(`INSERT MANY`,cause,batch)
         await this.dbi.restoreSavePoint(cause);
 		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 

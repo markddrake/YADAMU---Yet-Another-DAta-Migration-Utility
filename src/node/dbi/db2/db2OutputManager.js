@@ -17,6 +17,8 @@ class DB2OutputManager extends YadamuOutputManager {
 
   generateTransformations(targetDataTypes) {
 
+    // console.log(targetDataTypes)
+
     // Set up Transformation functions to be applied to the incoming rows
     this.tableInfo.paramsTemplate = []
 	
@@ -46,6 +48,16 @@ class DB2OutputManager extends YadamuOutputManager {
 			    val = JSON.stringify({yadamu: col})
 			}
 			return val
+		  }
+		case this.dbi.DATA_TYPES.SMALLINT_TYPE:
+          paramDefinition.SQLType = this.dbi.DATA_TYPES.SMALLINT_TYPE
+		  return (col, idx) => {
+			  return typeof col === "string" ? parseInt(col) : col
+		  }
+		case this.dbi.DATA_TYPES.INTEGER_TYPE:
+          paramDefinition.SQLType = this.dbi.DATA_TYPES.INTEGER_TYPE
+		  return (col, idx) => {
+			  return typeof col === "string" ? parseInt(col) : col
 		  }
 		case this.dbi.DATA_TYPES.BIGINT_TYPE:
 		  paramDefinition.Length = 25
@@ -117,6 +129,7 @@ class DB2OutputManager extends YadamuOutputManager {
 			return typeof col === 'string' ? Buffer.from(col,'hex') : col
 		  }
 		case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
+          paramDefinition.SQLType = this.dbi.DATA_TYPES.BOOLEAN_TYPE
           return (col,idx) => {
             return typeof col === 'boolean' ? col : YadamuLibrary.toBoolean(col)
 	      }
@@ -144,7 +157,11 @@ class DB2OutputManager extends YadamuOutputManager {
 			return typeof col === 'string' ? col.substring(0,10) : col.toISOString().substring(0,10)
 		  }
 		case this.dbi.DATA_TYPES.XML_TYPE:
-		  paramDefinition.SQLType = this.dbi.DATA_TYPES.NCLOB_TYPE
+		  // Avoid use of CLOBs due to issues related to client and server attempting to negotiate character set Conversion
+		  paramDefinition.SQLType = this.dbi.DATA_TYPES.BLOB_TYPE
+		  return (col,idx) => {
+			 return Buffer.from(typeof col === 'object' ? JSON.stringify(col) : col)
+		  }
 		case this.dbi.DATA_TYPES.CHAR_TYPE:
 		case this.dbi.DATA_TYPES.NCHAR_TYPE:
 		case this.dbi.DATA_TYPES.VARCHAR_TYPE:

@@ -37,7 +37,7 @@ class MongoOutputManager extends YadamuOutputManager {
   ** 
   **    OBJECT: The row is inserted an object. The document contains one key for each column in the table
   **
-  **    ARRAY:  The row is inserted as object. The array containing the values from the table will be wrapped in an object containing a single key "row". 
+  **    ARRAY:  The row is insertypted as object. The array containing the values from the table will be wrapped in an object containing a single key "row". 
   **            A document containing the table's metadata will be inserted into the YadamuMetadata collection.
   **
   **    BSON:   A BOSN object is contructed based on the relational metadata. 
@@ -51,7 +51,11 @@ class MongoOutputManager extends YadamuOutputManager {
   generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-	
+
+	if (this.dbi.PASS_THROUGH_ENABLED) {
+	  return new Array(dataTypes.length).fill(null)
+	}
+
 	const transformations = dataTypes.map((dataType,idx) => {      
 	
 	   switch(dataType.toLowerCase()){
@@ -175,6 +179,7 @@ class MongoOutputManager extends YadamuOutputManager {
   }
 
   async setTableInfo(tableName) {
+	  
 	await super.setTableInfo(tableName)
 	    
 	// Set up the batchRow() function used by cacheRow...
@@ -231,7 +236,10 @@ class MongoOutputManager extends YadamuOutputManager {
 
   cacheRow(row) {
       
-    // Apply the row transformation and add row to the current batch.
+	// Apply the row transformation and add row to the current batch.
+
+    // console.log(row)
+	
 	this.rowTransformation(row)
 	this.batchRow(row)
     this.COPY_METRICS.cached++

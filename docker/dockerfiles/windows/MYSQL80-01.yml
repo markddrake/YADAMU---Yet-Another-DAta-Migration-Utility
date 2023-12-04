@@ -11,7 +11,7 @@ services:
     networks:
       - YADAMU-NET
     environment:
-      DELAY: 7200
+      MYSQL_VERSION: 8.0
     volumes:
       - YADAMU_01-SHARED:c:\shared
       - MYSQL80-01-VOLUME:C:\ProgramData\MySQL\8.0

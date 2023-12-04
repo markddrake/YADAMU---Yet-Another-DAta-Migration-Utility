@@ -1,6 +1,5 @@
 $service = Get-Service -Name MySQL -ErrorAction SilentlyContinue
 if($service -eq $null) {
-  Start-Sleep -Seconds $ENV:DELAY
   $NOW = Get-Date -Format "o"
   Write-Output "$NOW MySQL: Creating Database Service ""MySQL""."
   mysqld --initialize-insecure --log-error="C:\ProgramData\MySQL\8.1\data\MySQL.log"

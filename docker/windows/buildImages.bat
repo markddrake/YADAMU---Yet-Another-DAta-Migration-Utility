@@ -6,6 +6,7 @@ docker build -t yadamu/svr-2016:vs22             --file=..\Windows\dockerfile.20
 docker tag yadamu/svr-2022:vs22   yadamu/svr:vs22   
 docker tag yadamu/svr-2022:vs13   yadamu/svr:vs13   
 
+docker build -t yadamu/mssql:2022                --file=..\MsSQL\Windows\2022\dockerfile        ..\MsSQL\Windows\2022
 docker build -t yadamu/mssql:2019                --file=..\MsSQL\Windows\2019\dockerfile        ..\MsSQL\Windows\2019
 docker build -t yadamu/mssql:2019-CU13           --file=..\MsSQL\Windows\2019\dockerfile.CU13   ..\MsSQL\Windows\2019
 docker build -t yadamu/mssql:2017                --file=..\MsSQL\Windows\2017\dockerfile        ..\MsSQL\Windows\2017

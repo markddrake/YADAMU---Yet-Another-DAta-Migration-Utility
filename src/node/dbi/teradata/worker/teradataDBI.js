@@ -164,16 +164,37 @@ class TeradataDBI extends _TeradataDBI {
   inputStreamError(e,sqlStatement) {
     return this.trackExceptions(new TeradataError(this.DRIVER_ID,e,sqlStatement))
   }
+
   
   async getInputStream(tableInfo) {
+
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
-    this.streamingStackTrace = new Error().stack;
-	try {
-	  const is = new TeradataReader(this.worker,this.vendorProperties,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)
-	  return is
-	} catch (e) {
-	  throw this.trackExceptions(new TeradataError(this.DRIVER_ID,e,tableInfo.SQL_STATEMENT))
-	}
+
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
+
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+		const is = new TeradataReader(this.worker,this.vendorProperties,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return is;
+      } catch (e) {
+		const cause = this.trackExceptions(new TeradataError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
   }  
   
   async setWorkerConnection() {    

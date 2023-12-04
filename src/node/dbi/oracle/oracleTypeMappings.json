@@ -13,6 +13,8 @@
   , "MEDIUMINT_TYPE"                                       : "NUMBER(7,0)"
   , "SMALLINT_TYPE"                                        : "NUMBER(5,0)"    
   , "TINYINT_TYPE"                                         : "NUMBER(3,0)"
+
+  , "BOOLEAN_TYPE"                                         : "BOOLEAN"                                                          
   
   , "DATETIME_TYPE"                                        : "DATE"                                                            
   , "TIMESTAMP_TYPE"                                       : "TIMESTAMP"                                                       
@@ -50,7 +52,7 @@
   }
 , "storageOptions": {
 	"SPATIAL_FORMAT"                                       : "WKB"
-  , "BOOLEAN_TYPE"                                         : "RAW(1)"
+  , "BOOLEAN_TYPE"                                         : "BOOLEAN"
   , "ORACLE_OBJECT_TYPE"                                   : "NATIVE"
   , "XML_TYPE"                                             : "XML"
   , "JSON_TYPE"                                            : "JSON"

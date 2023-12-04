@@ -38,8 +38,8 @@
             "verifyOperation": true
         },
         {
-            "source": "db#1",
-            "target": "db#1",
+            "source": "db2#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -48,7 +48,7 @@
         },
         {
             "source": "oracle#1",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -57,7 +57,7 @@
         },
         {
             "source": "oracle18c",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -66,7 +66,7 @@
         },
         {
             "source": "oracle12c",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -75,7 +75,7 @@
         },
         {
             "source": "oracle11g",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -84,7 +84,7 @@
         },
         {
             "source": "mssql#1",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -93,7 +93,7 @@
         },
         {
             "source": "mssql19",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -102,7 +102,7 @@
         },
         {
             "source": "postgres#1",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -111,7 +111,7 @@
         },
         {
             "source": "mysql#1",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -120,7 +120,7 @@
         },
         {
             "source": "mariadb#1",
-            "target": "db#1",
+            "target": "db2#1",
             "tasks": [
                 "oracle",
                 "mysql",
@@ -129,7 +129,7 @@
         },
         {
             "source": "mongodb#1",
-            "target": "db#1",
+            "target": "db2#1",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
@@ -143,7 +143,7 @@
             "parameters": {
                 "IDENTIFIER_MAPPING_FILE": ""
             },
-            "source": "db#1",
+            "source": "db2#1",
             "targets": [
                 "oracle#1",
                 "oracle18c",

@@ -3,24 +3,39 @@
     "connections": "connections.json",
     "tasks": "tasks.json",
     "recreateSchema": true,
-    "parameters": {},
-    "tests": [{
+    "parameters": {
+    },
+    "tests": [
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "oracle#1",
+            "recreateSchema": false,
+            "parameters": {
+                "DIRECTORY": "export/json/%vendor%",
+                "TABLES": [
+                    "ONLINE_MEDIA"
+                ]
+            },
+            "tasks":  [
+                "PM"
+            ]
+        },
+        {
             "operation": "export",
+            "source": "oracle#1",
+            "target": "file-staging",
             "recreateSchema": true,
             "createDirectory": true,
             "verifyOperation": true,
             "parameters": {
-                "DIRECTORY": "%operation%/%mode%/%connection%"
-            },
-            "source": "oracle#1",
-            "target": "file-staging",
-            "parameters": {
-                "DIRECTORY": "%operation%/json/%vendor%"
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
             },
             "tasks": [
                 "oracle"
             ]
-        },{
+        },
+        {
             "operation": "import",
             "source": "file-staging",
             "target": "oracle#1",
@@ -32,7 +47,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle#1",
             "target": "oracle#1",
             "tasks": [
@@ -40,7 +56,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle18c",
             "target": "oracle#1",
             "tasks": [
@@ -48,7 +65,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle12c",
             "target": "oracle#1",
             "tasks": [
@@ -56,7 +74,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle11g",
             "target": "oracle#1",
             "tasks": [
@@ -64,7 +83,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mssql#1",
             "target": "oracle#1",
             "tasks": [
@@ -72,7 +92,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mssql19",
             "target": "oracle#1",
             "tasks": [
@@ -80,7 +101,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "postgres#1",
             "target": "oracle#1",
             "tasks": [
@@ -88,7 +110,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mysql#1",
             "target": "oracle#1",
             "tasks": [
@@ -96,7 +119,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mariadb#1",
             "target": "oracle#1",
             "tasks": [
@@ -104,7 +128,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mongodb#1",
             "target": "oracle#1",
             "parameters": {
@@ -115,7 +140,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle#1",
             "targets": [
                 "oracle18c",

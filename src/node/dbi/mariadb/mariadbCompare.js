@@ -26,6 +26,9 @@ class MariadbCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NAME
     async getRowCounts(target) {
 
       const results = await this.dbi.executeSQL(MariadbCompare.SQL_SCHEMA_TABLE_ROWS,[target]);
+	  results.forEach((row,idx) => {          
+        row[2] = parseInt(row[2])
+      })
       return results
       
     }

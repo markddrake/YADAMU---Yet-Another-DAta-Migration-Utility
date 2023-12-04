@@ -23,8 +23,8 @@ class MsSQLStatementLibrary {
                                           ,',') within group (order by "ORDINAL_POSITION"),']') "DATA_TYPE_ARRAY"
                    ,concat('[',string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION"),']') "COLLATION_NAME_ARRAY"
                    ,concat('[',string_agg(
-				                concat('[',
-				                  case
+                                concat('[',
+                                  case
                                     when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) then
                                       concat(cast("NUMERIC_PRECISION" as VARCHAR(16)),',',cast("NUMERIC_SCALE" as VARCHAR(16)))
                                     when ("NUMERIC_PRECISION" is not null) then
@@ -35,8 +35,8 @@ class MsSQLStatementLibrary {
                                       cast("CHARACTER_MAXIMUM_LENGTH" as VARCHAR(16))
                                   end
                                   ,']'
-								)
-							   ,','
+                                )
+                               ,','
                               )
                      within group (order by "ORDINAL_POSITION"),']') "SIZE_CONSTRAINT_ARRAY"
                     ,string_agg(case 

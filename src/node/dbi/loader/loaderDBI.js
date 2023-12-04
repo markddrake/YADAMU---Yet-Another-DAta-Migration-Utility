@@ -100,8 +100,8 @@ class CloudService {
   constructor() {
   }
   
-  async getObject(objectPath) {
-	return await fsp.readFile(objectPath,{encoding: 'utf8'})
+  async getContentAsString(key) {
+	return await fsp.readFile(key,{encoding: 'utf8'})
   }
   
   async createReadStream(path) {

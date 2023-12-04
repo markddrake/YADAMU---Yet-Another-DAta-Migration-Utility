@@ -6,7 +6,8 @@
 	"createDirectory": true,
 	"verifyOperation": true,
 	"parameters": {
-		"DIRECTORY": "%operation%/%mode%/%connection%"
+		"DIRECTORY": "%operation%/%mode%/%connection%",
+		"MODE"     : "DDL_AND_DATA"
 	},
 	"tests": [{
 			"operation": "export",

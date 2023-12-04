@@ -28,6 +28,8 @@ class DBReader extends Readable {
   ** When the DBReader has finished processing all the tables it resumes the DBWriter by invoking the cached callback.
   **
   */
+  
+  get PIPELINE_MODE()               { return 'SEQUENTIAL' }
 
   constructor(dbi,yadamuLogger,options) {
 
@@ -122,7 +124,7 @@ class DBReader extends Readable {
   }
   
   async pipelineTable(task,readerDBI,writerDBI,retryOnError) {
-	  
+	 
 	retryOnError = retryOnError && (readerDBI.ON_ERROR === 'RETRY')
 
     let queryInfo
@@ -134,6 +136,7 @@ class DBReader extends Readable {
     try {
       queryInfo = readerDBI.generateSQLQuery(task)
 	  queryInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[queryInfo.TABLE_NAME]?.dataTypes ?? []  
+	  queryInfo.TARGET_COLUMN_NAMES = writerDBI.metadata?.[queryInfo.TABLE_NAME]?.columnNames ?? [] 
 	  const inputStreams = await readerDBI.getInputStreams(queryInfo,writerDBI.PARSE_DELAY)
 	  pipelineMetrics = inputStreams[0].COPY_METRICS
       yadamuPipeline.push(...inputStreams)
@@ -155,15 +158,17 @@ class DBReader extends Readable {
 	  // Pass the Reader to the YadamuWriter instance so it can calculate lost rows correctly in the event of an error
 	  this.setReader(yadamuPipeline)
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
-      pipelineMetrics.pipeStartTime = performance.now();
-	  // this.traceStreamEvents(yadamuPipeline,queryInfo.TABLE_NAME)
+
+      // this.traceStreamEvents(yadamuPipeline,queryInfo.TABLE_NAME)	
+
+	  pipelineMetrics.pipeStartTime = performance.now();
 	  await pipeline(...yadamuPipeline)
 	  pipelineMetrics.pipeEndTime = performance.now();
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
 	  
 	  
 	} catch (err) {
-	  
+		
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME,readerDBI.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
 	  
 	  // Wait for any outstanding DDL operations to complete. Throw DDL errors. If the DDL phase was successful this becomes a no-op.
@@ -188,8 +193,6 @@ class DBReader extends Readable {
 	  // Determine the underlying cause of the error.
 	  const cause = pipelineMetrics.readerError || pipelineMetrics.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error})?.underlyingError || err
  
-	  
- 
 	  // Verify all components of the pipeline have been destroyed. 
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
       // yadamuPipeline.map((s) => { if (!s.destroyed){ s.destroy(cause)})	    
@@ -198,7 +201,7 @@ class DBReader extends Readable {
   	    // Throw the underlying cause if ON_ERROR handling is ABORT
         throw cause;
       }
-
+	  
       if (YadamuError.lostConnection(pipelineMetrics.readerError) || YadamuError.lostConnection(pipelineMetrics.parserError)) {
         // If the reader or parser failed with a lost connection error re-establish the input stream connection 
   	    await readerDBI.reconnect(cause,'READER')
@@ -237,13 +240,14 @@ class DBReader extends Readable {
 	** Retry the operation. If the operation up to RETRY_COUNT times. If the operation fails with a similar exception ABORT.
 	**
 	*/
-		
+	
 	let retryCount = 0	
 	let retryMetrics = originalMetrics
     do {
 	  const errorType = readerDBI.raisedError(retryMetrics.readerError) ? 'READER ERROR' : writerDBI.raisedError(retryMetrics.readerError) ? 'WRITER ERROR' : 'TRANSFORM ERROR'
       this.yadamuLogger.info(['PIPELINE',errorType,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME,readerDBI.ON_ERROR],`Retrying Operation.`)
 	  await writerDBI.truncateTable(writerDBI.CURRENT_SCHEMA,task.TABLE_NAME)
+	  readerDBI.adjustQuery(task)
 	  retryCount++
 	  retryMetrics = await this.pipelineTable(task,readerDBI,writerDBI,false)
     } while (!this.pipelineSucceeded(retryMetrics) && !this.duplicateCause(originalMetrics,retryMetrics) && (retryCount < 6))
@@ -252,24 +256,20 @@ class DBReader extends Readable {
 
   async pipelineTables(taskList,readerDBI,writerDBI) {
 	 
-	this.activeWorkers = new Set();
-    this.yadamuLogger.info(['PIPELINE','SEQUENTIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
-	  
-	while (taskList.length > 0) {
-	  const task = taskList.shift()
-      // this.yadamuLogger.trace(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
+	this.yadamuLogger.info(['PIPELINE',this.PIPELINE_MODE,this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
+	 
+    const tasks = taskList.entries()
+	for (let [tidx, task] of tasks) {
+			 
+      // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
       try {
 	    await this.pipelineTable(task,readerDBI,writerDBI,true)
 	  } catch (cause) {
-		  // this.yadamuLogger.trace(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],cause)
-		this.yadamuLogger.handleException(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME,readerDBI.ON_ERROR],cause)
-		if (taskList.length > 0) {
-		  this.yadamuLogger.error(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR],`Operation failed: Skipping ${taskList.length} Tables`);
-	    }
-		else {
-		  this.yadamuLogger.warning(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR],`Operation failed.`);
-		}				
-	    // Throwing here raises 'ERR_STREAM_PREMATURE_CLOSE' on the Writer. Cache the cause 
+		  // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],cause)
+		this.yadamuLogger.handleException(['PIPELINE',this.PIPELINE_MODE,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME,readerDBI.ON_ERROR],cause)
+    	const remainingTasks = Array.from(tasks)
+	  	this.yadamuLogger.error(['PIPELINE',this.PIPELINE_MODE,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR],`Operation failed${remainingTasks.length > 0 ?`: Skipping ${remainingTasks.length} Tables` : `.`}`);
+		// Throwing here raises 'ERR_STREAM_PREMATURE_CLOSE' on the Writer. Cache the cause 
 		this.underlyingError = cause;
         throw cause
 	  }
@@ -347,7 +347,7 @@ class DBReader extends Readable {
 		 this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaMetadata.length === 0)) ? 'exportComplete' : 'copyData';
 	     break;
        case 'copyData':	   
-    	 await this.pipelineTables(this.schemaMetadata,this.dbi,this.dbWriter.dbi);
+    	 await this.pipelineTables(this.schemaMetadata,this.dbi,this.dbWriter.dbi,'SEQUENTIAL');
 		 // No 'break' - fall through to 'exportComplete'.
        case 'exportComplete':
 	     // this.yadamuLogger.trace([this.constructor.name,this.nextPhase],'DDL COMPLETE: WAITING')

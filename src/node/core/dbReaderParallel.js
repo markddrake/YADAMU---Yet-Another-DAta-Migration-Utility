@@ -18,100 +18,88 @@ import DBReader                   from './dbReader.js';
 
 class DBReaderParallel extends DBReader {  
 
+  get PIPELINE_MODE()               { return 'PARALLEL' }
+
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
   }
-  
-  async doCopyOperations(taskList,worker,idx) {
-
-	let operationAborted = false;
-	
-    const writerDBI = worker.writerDBI
-    const readerDBI = worker.readerDBI
-	
-	// this.yadamuLogger.trace([this.constructor.name,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),'WORKERS READY'],'WAITING')
-    await Promise.all([readerDBI.workerReady,writerDBI.workerReady])
-	// this.yadamuLogger.trace([this.constructor.name,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),'WORKERS READY'],'PROCESSING')
-	
-	let status = undefined
-	let task
-    try {
-      while (taskList.length > 0) {
-	    task = taskList.shift();
-		// this.yadamuLogger.trace(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],'Allocated')
-		await this.pipelineTable(task,readerDBI,writerDBI,true)
-		// this.yadamuLogger.trace(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],'Completed')
-      }
-	} catch (cause) {
-	  // this.yadamuLogger.trace(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],'Failed')
-      if (!(cause instanceof CopyOperationAborted)) {
-   	    status = cause
-	    this.yadamuLogger.handleException(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],cause)
-	    if ((this.dbi.ON_ERROR === 'ABORT') && !operationAborted) {
-          operationAborted = true
-	  	  if (taskList.length > 0) {
-	        this.yadamuLogger.error(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR],`Operation failed: Skipping ${taskList.length} Tables`);
-		  }
-		  else {
-	        this.yadamuLogger.warning(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR],`Operation failed.`);
-		  }		
-          taskList.length = 0;
-		  // Destroy any active readers.
-		  this.activeReaders.forEach((reader) => {
-		    try {
-		      reader.destroy(new CopyOperationAborted())
-		    } catch(e) { 
-			  if (!(cause instanceof CopyOperationAborted)) {
-			    this.yadamuLogger.handleWarning(['PIPELINE','PARALLEL','ABORT READER',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,],e) 			
-			  }
-			}
-		  })
-		}
-      }
-      else {
-        // this.yadamuLogger.trace([this.constructor.name,'COPY_OPERATIONS',idx],'Sibling Aborted')
-	  }
-	}	
-    readerDBI.destroyWorker()
-	writerDBI.destroyWorker()
-	return status
-  }
-  
+    
   async pipelineTables(taskList,readerDBI,writerDBI) {
 
-    this.activeWorkers = new Set()
-	
-    if (readerDBI.PARTITION_LEVEL_OPERATIONS) {	
+    // Treat each partition as aseperat task in parallel mode.
+
+	if (readerDBI.PARTITION_LEVEL_OPERATIONS) {	
 	  taskList = readerDBI.expandTaskList(taskList) 
 	}
+    const tasks = taskList.entries()
 	
-    const maxWorkerCount = parseInt(this.dbi.yadamu.PARALLEL)
+    const maxWorkerCount = parseInt(this.dbi.yadamu.PARALLEL) || 1
     const workerCount = taskList.length < maxWorkerCount ? taskList.length : maxWorkerCount
 
-	// this.yadamuLogger.trace([this.constructor.name,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'MANAGER READY'],'WAITING')
+    // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'MANAGER READY'],'WAITING')
     await Promise.all([readerDBI.dbConnected,writerDBI.cacheLoaded])
-	// this.yadamuLogger.trace([this.constructor.name,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'MANAGER READY'],'PROCESSING')
+	// this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'MANAGER READY'],'PROCESSING')
+
+	this.yadamuLogger.info(['PIPELINE',this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
 	
-	const workers = new Array(workerCount).fill(0).map((x,idx) => { 
-	  const worker = {
-		readerDBI : readerDBI.workerDBI(idx)
-      , writerDBI : writerDBI.workerDBI(idx)			
+	let operationAborted = false;
+	const results = []
+	
+	const workerPool = Array(workerCount).fill(tasks).map(async (tasks,idx) => {
+	  try {
+	    const reader = readerDBI.workerDBI(idx)
+        const writer = writerDBI.workerDBI(idx)			
+	  
+	    // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,reader.DATABASE_VENDOR,writer.DATABASE_VENDOR,idx,reader.getWorkerNumber(),'WORKERS READY'],'WAITING')
+        await Promise.all([reader.workerReady,writer.workerReady])
+	    // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,reader.DATABASE_VENDOR,writer.DATABASE_VENDOR,idx,reader.getWorkerNumber(),'WORKERS READY'],'PROCESSING')
+	
+	    for (let [tidx, task] of tasks) {
+		  if (operationAborted) break;
+		  try {
+  	        results.push(await this.pipelineTable(task,reader,writer,true))
+	   	  } catch (cause) {
+	        results.push(cause)
+		    // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,workerCount,reader.DATABASE_VENDOR,writer.DATABASE_VENDOR,idx,reader.getWorkerNumber(),task.TABLE_NAME],'Failed')
+            if (!(cause instanceof CopyOperationAborted)) {
+              this.yadamuLogger.handleException(['PIPELINE',this.PIPELINE_MODE,workerCount,reader.DATABASE_VENDOR,writer.DATABASE_VENDOR,idx,reader.getWorkerNumber(),task.TABLE_NAME],cause)
+	          if ((this.dbi.ON_ERROR === 'ABORT') && !operationAborted) {
+                operationAborted = true
+				const remainingTasks = Array.from(tasks)
+	  	        this.yadamuLogger.error(['PIPELINE',this.PIPELINE_MODE,workerCount,reader.DATABASE_VENDOR,writer.DATABASE_VENDOR,reader.ON_ERROR],`Operation failed${remainingTasks.length > 0 ?`: Skipping ${remainingTasks.length} Tables` : `.`}`);
+		        // Destroy any active readers.
+		        this.activeReaders.forEach((reader) => {
+		          try {
+		            reader.destroy(new CopyOperationAborted())
+		          } catch(e) { 
+			        if (!(cause instanceof CopyOperationAborted)) {
+			          this.yadamuLogger.handleWarning(['PIPELINE',this.PIPELINE_MODE,workerCount,'ABORT READER',reader.DATABASE_VENDOR,writer.DATABASE_VENDOR,reader.ON_ERROR,],e) 			
+			        }
+			      }
+		        })
+		      }
+            }
+	      }
+	    }
+	    reader.destroyWorker();
+  	    writer.destroyWorker();
+	    return operationAborted
+	  } catch (e) { 
+        this.yadamuLogger.handleException(['PIPELINE',this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR],e);
+		results.push(e)
+	    return e
 	  }
-      return worker
 	})
-	   
-	const copyOperations = workers.map((worker,idx) => { 
-	  return this.doCopyOperations(taskList,worker,idx)
-    })
+
+    // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'COPY_OPERATIONS',workerPool.length],'WAITING')
+	await Promise.allSettled(workerPool)
+    // this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'COPY_OPERATIONS',workerPool.length],'PROCESSING')
 	
-    this.yadamuLogger.info(['PIPELINE','PARALLEL',workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
-    // this.yadamuLogger.trace([this.constructor.name,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'COPY_OPERATIONS',copyOperations.length],'WAITING')
-	const results = await Promise.allSettled(copyOperations)
-	// this.yadamuLogger.trace([this.constructor.name,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'COPY_OPERATIONS',copyOperations.length],'PROCESSING')
-	const fatalError = results.find((result) => { return result.value instanceof Error })?.value
+	const fatalError = results.find((result) => { return result instanceof Error })
 	if (fatalError) throw fatalError
-	// this.yadamuLogger.trace(['PIPELINE','PARALLEL',workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,taskList.length],`Processing Complete`);
+	// this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,taskList.length],`Processing Complete`);
   }       
+  
 }
 
 export { DBReaderParallel as default}

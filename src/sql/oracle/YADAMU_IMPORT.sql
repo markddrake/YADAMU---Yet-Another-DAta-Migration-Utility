@@ -7,9 +7,20 @@ as
   C_SPATIAL_FORMAT         constant VARCHAR2(7)  := 'WKB';
   C_CIRCLE_FORMAT          constant VARCHAR2(7)  := 'POLYGON';
   C_XMLTYPE_STORAGE_CLAUSE constant VARCHAR2(17) := 'BINARY XML';
-  C_BOOLEAN_DATA_TYPE      constant VARCHAR2(6)  := 'RAW(1)';
   C_OBJECT_DATA_TYPE       constant VARCHAR2(6)  := 'NATIVE';
 
+--  
+  $IF YADAMU_FEATURE_DETECTION.BOOLEAN_DATA_TYPE_SUPPORTED $THEN
+--
+  C_BOOLEAN_DATA_TYPE      constant VARCHAR2(7)  := 'BOOLEAN';
+--
+  $ELSE
+--
+  C_BOOLEAN_DATA_TYPE      constant VARCHAR2(7)  := 'RAW(1)';
+--
+  $END
+--
+--
 --  
   $IF YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED $THEN
 --
@@ -1637,6 +1648,14 @@ begin
             LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
         end;
       end if;
+      begin
+	    V_STATEMENT := 'ALTER TABLE "' || P_TARGET_SCHEMA || '"."' || o.TABLE_NAME || '" DISABLE ALL TRIGGERS';
+        execute immediate V_STATEMENT;
+        LOG_DDL_OPERATION(o.TABLE_NAME,V_STATEMENT);
+      exception
+        when others then
+          LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+      end;
       if (V_VALID_JSON) then
         begin
           V_STATEMENT := V_TABLE_INFO.DML;
@@ -1675,6 +1694,14 @@ begin
       else 
         LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,'JSON_TABLE() operation skipped.',V_SQLCODE,V_SQLERRM,'Possible corrupt or truncated import file.');
       end if;
+      begin
+	    V_STATEMENT := 'ALTER TABLE "' || P_TARGET_SCHEMA || '"."' || o.TABLE_NAME || '" ENABLE ALL TRIGGERS';
+        execute immediate V_STATEMENT;
+        LOG_DDL_OPERATION(o.TABLE_NAME,V_STATEMENT);
+      exception
+        when others then
+          LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+      end;
     end loop;
     
     if (V_NOTHING_DONE) then

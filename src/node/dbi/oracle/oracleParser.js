@@ -6,6 +6,7 @@ import oracledb from 'oracledb';
 import YadamuParser from '../base/yadamuParser.js'
 import StringWriter from '../../util/stringWriter.js';
 import BufferWriter from '../../util/bufferWriter.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js'
 
 import {OracleError} from './oracleException.js';
 
@@ -17,26 +18,35 @@ class OracleParser extends YadamuParser {
   }
 
   setColumnMetadata(resultSetMetadata) { 
- 
+  
     if (this.COPY_METRICS.failed && resultSetMetadata === undefined) {
 	  // Oracle appears to raise the metadatata event appears to raised and supply undefined metadata if an error (such as A DDL error) terminates the pipeline
 	  return
 	}
     
-	this.jsonTransformations = new Array(resultSetMetadata.length).fill(null)
+	this.deferredTransformations = new Array(resultSetMetadata.length).fill(null)
     
     this.transformations = resultSetMetadata.map((column,idx) => {
+	  const dataType = this.queryInfo.DATA_TYPE_ARRAY[idx].toUpperCase()
 	  switch (column.fetchType) {
 		case oracledb.DB_TYPE_NCLOB:
 		case oracledb.DB_TYPE_CLOB:
-		  return (row,idx)  => {
-            // row[idx] = this.clobToString(row[idx])
+		  switch (dataType) {
+		    case this.dbi.DATA_TYPES.SPATIAL_TYPE:
+			  if ((this.dbi.latestError instanceof OracleError) && this.dbi.latestError.knownBug(33561708)) {
+		        this.deferredTransformations[idx] = (row,idx)  => {
+                  row[idx] = YadamuSpatialLibrary.geoJSONtoWKB(JSON.parse(row[idx]))
+		        }
+			  }
+			default:
+          }
+       	  return (row,idx)  => {
 			row[idx] = row[idx].getData()
-		  }           
+		  }
 	    case oracledb.DB_TYPE_BLOB:	
-          if (this.queryInfo.jsonColumns.includes(idx)) {
+	      if (this.queryInfo.jsonColumns.includes(idx)) {
             // Convert JSON store as BLOB to string
-		    this.jsonTransformations[idx] = (row,idx)  => {
+		    this.deferredTransformations[idx] = (row,idx)  => {
               row[idx] = row[idx].toString('utf8')
 		    }
           }
@@ -45,7 +55,7 @@ class OracleParser extends YadamuParser {
 			row[idx] = row[idx].getData()
 		  }
         default:
- 		  switch (this.queryInfo.DATA_TYPE_ARRAY[idx].toUpperCase()) {
+ 		  switch (dataType) {
 		    case 'BINARY_FLOAT':
 			case 'BINARY_DOUBLE':
 		      return (row,idx)  => {
@@ -78,8 +88,8 @@ class OracleParser extends YadamuParser {
       }) 
     }
 	
-    this.jsonTransformation = this.jsonTransformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
-      this.jsonTransformations.forEach((transformation,idx) => {
+    this.deferredTransformation = this.deferredTransformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
+      this.deferredTransformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           transformation(row,idx)
         }
@@ -89,9 +99,11 @@ class OracleParser extends YadamuParser {
   }
   	  
   async doTransform(data) {  
+    // if (this.COPY_METRICS.parsed == 1) console.log(data)
     data = await super.doTransform(data)
 	const row = await Promise.all(data)
-	this.jsonTransformation(row)
+    this.deferredTransformation(row)
+	// if (this.COPY_METRICS.parsed == 1) console.log(row)
 	return row
   }
 }

@@ -19,6 +19,7 @@
     },{
             "source": "oracle#1",
             "target": "oracle19c",
+            "homogeneousOperation" : true,
             "tasks": [
                 "oracle","mssql","mysql"
             ]
@@ -71,7 +72,7 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "monggo#1",
+		    "source": "mongodb#1",
             "target": "oracle19c",
             "tasks": [
                 "oracle","mssql","mysql"

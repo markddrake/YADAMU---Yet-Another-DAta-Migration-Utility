@@ -3,17 +3,21 @@ import {DatabaseError} from '../../core/yadamuException.js'
 
 class AWSS3Error extends DatabaseError {
   
-  constructor(driverId,cause,stack,url) {
-	if ((cause.message === null) && (cause.code === 'NotFound')) {
-	  cause.message = `Resource "${url}" Not Found`;
+  constructor(driverId,cause,stack,operation) {
+	if (cause.Code && (cause.Code === 'NoSuchKey')) {
+	cause.message = `${cause.message} [${operation}] [${cause.$metadata.httpStatusCode}] `;
 	}
-    super(driverId,cause,stack,url);
+    super(driverId,cause,stack,operation);
 	this.path = this.sql
 	delete this.sql
   }
 
-  urlNotFound() {
-	return this.cause.code === 'NotFound'
+  notFound() {
+	return this.cause.$metadata.httpStatusCode === 404
+  }
+
+  unauthorized() {
+	return this.cause.$metadata.httpStatusCode === 403
   }
 
   possibleConsistencyError() {

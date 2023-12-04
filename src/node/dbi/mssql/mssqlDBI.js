@@ -749,7 +749,7 @@ class MsSQLDBI extends YadamuDBI {
         case this.DATA_TYPES.DATETIME_TYPE:
           // Binding as sql.DateTime2 must supply values as type Date. 
           // sql.DateTime2 ([scale]
-          // table.columns.add(columnList[idx],sql.DateTime2(), {nullable: true});
+          // table.columns.add(columnList[idx],sql.DateTime2(7), {nullable: true});
           // Use String to avoid possible loss of precision
           table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
@@ -1467,20 +1467,44 @@ class MsSQLDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-     return this.trackExceptions(((cause instanceof MsSQLError) || (cause instanceof CopyOperationAborted)) ? cause : new MsSQLError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+     return this.trackExceptions(((cause instanceof MsSQLError) || (cause instanceof CopyOperationAborted)) ? cause : new MsSQLError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   async getInputStream(queryInfo) {
+
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
-    this.streamingStackTrace = new Error().stack;
-    const request = this.getRequest()
-	this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
-	if (typeof request.toReadableStream === 'function') {
-  	  const stream = request.toReadableStream()
-      request.query(queryInfo.SQL_STATEMENT)
-      return stream
-	}
-    return new MsSQLReader(request,queryInfo.SQL_STATEMENT,queryInfo.TABLE_NAME,this.LOGGER)
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+        const request = this.getRequest()
+	    let is
+		if (typeof request.toReadableStream === 'function') {
+          request.query(queryInfo.SQL_STATEMENT)
+  	      is = request.toReadableStream()
+	    }
+		else {
+		  is = new MsSQLReader(request,queryInfo.SQL_STATEMENT,queryInfo.TABLE_NAME,this.LOGGER)
+		}
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        return is;
+      } catch (e) {
+		const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
+
   }      
 
   /*

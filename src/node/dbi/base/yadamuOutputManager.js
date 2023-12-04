@@ -198,7 +198,7 @@ class YadamuOutputManager extends Transform {
   }
   
   checkColumnCount(row) {
-    try {
+	try {
       if (!this.skipTable) {
         assert.strictEqual(row.length,this.tableInfo.columnCount,`Table ${this.tableName}. Incorrect number of columns supplied.`)
       }

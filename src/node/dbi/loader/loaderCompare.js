@@ -76,7 +76,7 @@ class LoaderCompare extends YadamuCompare {
       this.dbi.DIRECTORY = this.dbi.TARGET_DIRECTORY
       this.dbi.setFolderPaths(this.dbi.IMPORT_FOLDER,target)
       
-      const fileContents =  await this.dbi.cloudService.getObject(this.dbi.CONTROL_FILE_PATH)     
+      const fileContents =  await this.dbi.cloudService.getContentAsString(this.dbi.CONTROL_FILE_PATH)     
       const controlFile = this.dbi.parseJSON(fileContents)
       let counts 
       switch (controlFile.settings.contentType) {
@@ -170,7 +170,7 @@ class LoaderCompare extends YadamuCompare {
       let fileContents    
 	  
       try {
-        fileContents = await this.dbi.cloudService.getObject(sourceFilePath)            
+        fileContents = await this.dbi.cloudService.getContentAsString(sourceFilePath)            
       } catch(err) {
         report.failed.push([source,target,'*',0,0,0,0,err.message])
         return report  
@@ -179,7 +179,7 @@ class LoaderCompare extends YadamuCompare {
       const sourceControlFile = this.dbi.parseJSON(fileContents)
       
       try {
-        fileContents = await this.dbi.cloudService.getObject(targetFilePath)            
+        fileContents = await this.dbi.cloudService.getContentAsString(targetFilePath)            
       } catch(err) {
         report.failed.push([source,target,'*',0,0,0,0,err.message])
         return report  

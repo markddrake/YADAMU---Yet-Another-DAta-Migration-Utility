@@ -27,14 +27,6 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle19c",
-			"targets": [
-			   "vertica09"
-		    ],
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
 			"source": "oracle18c",
 			"targets": [
 			   "vertica09"

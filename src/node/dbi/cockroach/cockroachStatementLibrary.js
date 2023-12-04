@@ -59,11 +59,11 @@ const _SQL_SCHEMA_INFORMATION   =
                           ) "SIZE_CONSTRAINT_ARRAY"
                  ,string_agg(case 
                                when c.data_type in ('timestamp without time zone','timestamp with time zone') then
-                                 'replace(replace(("' || COLUMN_NAME ||'" at time zone ''UTC'')::character varying,'' '',''T''),''+00:00'',''Z'')  "' || COLUMN_NAME || '"'
+                                 'replace(replace(replace(("' || COLUMN_NAME ||'" at time zone ''UTC'')::character varying,'' '',''T''),''+00:00'',''Z''),''+00'',''Z'')  "' || COLUMN_NAME || '"'
                                when c.data_type in ('date') then
-                                 'replace(replace(("' || COLUMN_NAME ||'"::timestamp at time zone ''UTC'')::character varying,'' '',''T''),''+00:00'',''Z'')  "' || COLUMN_NAME || '"'
+                                 'replace(replace(replace(("' || COLUMN_NAME ||'"::timestamp at time zone ''UTC'')::character varying,'' '',''T''),''+00:00'',''Z''),''+00'',''Z'')  "' || COLUMN_NAME || '"'
                                when c.data_type in ('time without time zone','time with time zone') then
-                                 'replace(replace(((''epoch''::date + "' || COLUMN_NAME || '")::timestamp at time zone ''UTC'')::character varying,'' '',''T''),''+00:00'',''Z'')  "' || COLUMN_NAME || '"'
+                                 'replace(replace(replace(((''epoch''::date + "' || COLUMN_NAME || '")::timestamp at time zone ''UTC'')::character varying,'' '',''T''),''+00:00'',''Z''),''+00'',''Z'')  "' || COLUMN_NAME || '"'
                                when c.data_type like 'interval%' then
                                  '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
                                when (c.data_type in ('real')) then 

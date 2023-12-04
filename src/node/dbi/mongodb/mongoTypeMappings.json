@@ -1,6 +1,6 @@
 {
   "mappings": {
-    "CHAR_TYPE"                                            :  "string"                               
+     "CHAR_TYPE"                                            :  "string"                               
   ,  "INTEGER_TYPE"                                         :  "int"                                  
   ,  "BIGINT_TYPE"                                          :  "long"                                 
   ,  "DOUBLE_TYPE"                                          :  "double"                               

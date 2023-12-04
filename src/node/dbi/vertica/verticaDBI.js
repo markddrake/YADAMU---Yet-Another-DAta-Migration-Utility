@@ -26,6 +26,7 @@ const CopyFrom = pgCopyStreams.from
 
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+import ArrayReadable                  from '../../util/arrayReadable.js'
 
 import {
   YadamuError,
@@ -93,8 +94,11 @@ class VerticaDBI extends YadamuDBI {
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+  
+  get CSV_NUMBER_PARSING_ISSUE()  { return this._CSV_NUMBER_PARSING_ISSUE || false   }
+  set CSV_NUMBER_PARSING_ISSUE(v) { this._CSV_NUMBER_PARSING_ISSUE = v}
 
- constructor(yadamu,manager,connectionSettings,parameters) {
+  constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
 	this.DATA_TYPES = VerticaDataTypes
        
@@ -144,7 +148,7 @@ class VerticaDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const verticaError = this.trackExceptions(new VerticaError(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],verticaError)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],verticaError)
       // throw verticaError
     })
 
@@ -152,7 +156,7 @@ class VerticaDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
 	  
 	let stack
     this.SQL_TRACE.comment(`Getting Connection From Pool.`)
@@ -190,6 +194,26 @@ class VerticaDBI extends YadamuDBI {
 	}
   }
 
+  async csvNumberParsingIssue() {
+	  
+	// Test is the database has trouble parsing numbers in CSV files.
+	 
+	try {
+	  let result = await this.executeSQL('create temporary table if not exists "CSV_NUMBER_PARSING_ISSUE"("COL1" number(1024,512),"COL2" number(1024,512))');
+	  const copyTarget = await this.connection.query(CopyFrom(`copy "CSV_NUMBER_PARSING_ISSUE" ("COL1",NUMBER_AS_VARCHAR FILLER VARCHAR(1026), "COL2" as CAST("NUMBER_AS_VARCHAR" as number(1024,512))) from STDIN PARSER fcsvparser(type='rfc4180', header=false, trim=false) NULL '' NO COMMIT`))
+	  const copySource = new ArrayReadable()
+	  copySource.addContent(['"1.0","1.0"'])
+	  copySource.addContent([null])
+	  await pipeline(copySource,copyTarget)
+	  result = await this.executeSQL('select count(*) from "CSV_NUMBER_PARSING_ISSUE" where COL1 = COL2');
+	  // console.log(this.DATABASE_VERSION,result.rows[0][0])
+	  return result.rows[0][0] !== '1'
+	} catch (e) {
+	  this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`TEST_NUMBER_PARSING`],e)
+	  return true
+	}
+  }
+  
   async configureConnection() {
      
     this.connection.on('notice',(n) => { 
@@ -200,27 +224,29 @@ class VerticaDBI extends YadamuDBI {
         case '00000': // Table not found on Drop Table if exists
 	      break;
         default:
-          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
+          this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
       }
     })  
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const verticaError = this.trackExceptions(new VerticaError(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],verticaError)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],verticaError)
       // throw verticaError
     })
    
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DATABASE_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = results.rows[0][3].substring('Vertica Analytic Database '.length)
+	
+	this.CSV_NUMBER_PARSING_ISSUE = await this.csvNumberParsingIssue()
 	
   }
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -238,7 +264,7 @@ class VerticaDBI extends YadamuDBI {
   
   async closePool(options) {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
 
     if (this.pool !== undefined && this.pool.end) {
       let stack
@@ -350,7 +376,7 @@ class VerticaDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+     // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
      // ### ANSI-92 Transaction model - Transaction is always in progress 
      // await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
@@ -367,7 +393,7 @@ class VerticaDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],new Error().stack)
+    // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],new Error().stack)
 
 	super.commitTransaction()
     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
@@ -382,7 +408,7 @@ class VerticaDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
+    // this.LOGGER.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
 
     this.checkConnectionState(cause)
 
@@ -399,7 +425,7 @@ class VerticaDBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
@@ -407,7 +433,7 @@ class VerticaDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
     this.checkConnectionState(cause)
 	 
@@ -425,7 +451,7 @@ class VerticaDBI extends YadamuDBI {
 
   async releaseSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
     super.releaseSavePoint()
@@ -433,7 +459,7 @@ class VerticaDBI extends YadamuDBI {
   } 
   
   processLog(log,operation) {
-    super.processLog(log, operation, this.status, this.yadamuLogger)
+    super.processLog(log, operation, this.status, this.LOGGER)
     return log
   }
 
@@ -444,7 +470,7 @@ class VerticaDBI extends YadamuDBI {
       return this.processLog(results.rows[0][0],'JSON_EACH')  
     }
     else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from CALL_YADAMU_IMPORT_JSON(). Please ensure file is valid JSON and NOT pretty printed.`)
+      this.LOGGER.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from CALL_YADAMU_IMPORT_JSON(). Please ensure file is valid JSON and NOT pretty printed.`)
       // Return value will be parsed....
       return [];
     }
@@ -503,16 +529,17 @@ class VerticaDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new VerticaParser(this,queryInfo,this.yadamuLogger,parseDelay)
+    return new VerticaParser(this,queryInfo,this.LOGGER,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof VerticaError) || (cause instanceof CopyOperationAborted)) ? cause : new VerticaError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof VerticaError) || (cause instanceof CopyOperationAborted)) ? cause : new VerticaError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   generateSelectListEntry(columnInfo) {
 	const dataType = VerticaDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
+	  case this.DATA_TYPES.INTERVAL_TYPE:
 	  case this.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
 	  case this.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
@@ -543,15 +570,14 @@ class VerticaDBI extends YadamuDBI {
 
   async getInputStream(queryInfo) {        
   
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
+    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
 	if (this.failedPrematureClose) {
 	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
-	
+    
 	/*
 	**
 	** pg-query-stream loops repeatidly returning all the rows in the table with Vertica.
@@ -564,13 +590,15 @@ class VerticaDBI extends YadamuDBI {
 	
     while (true) {
       // Exit with result or exception.  
+	  let stack
       try {
-        const sqlStartTime = performance.now()
-		this.streamingStackTrace = new Error().stack
-		const inputStream = new VerticaInputStream(this.connection,queryInfo.SQL_STATEMENT,this.yadamuLogger)
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+	    const sqlStartTime = performance.now()
+		const inputStream = new VerticaInputStream(this.connection,queryInfo.SQL_STATEMENT,this.LOGGER)
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -604,7 +632,7 @@ class VerticaDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement)
       }))
     } catch (e) {
-	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
+	 this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	 results = e;
     }
 	return results;
@@ -661,7 +689,7 @@ class VerticaDBI extends YadamuDBI {
 	 } 
      err.cause = causes;	 
 	 err.sql = metrics.sql;
-	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
+	 this.LOGGER.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
 
   async copyOperation(tableName,copyOperation,metrics) {
@@ -684,7 +712,7 @@ class VerticaDBI extends YadamuDBI {
   	} catch(e) {
 	  metrics.writerError = e
 	  try {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
+  	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

@@ -7,6 +7,6 @@ REM
 docker stop                             %CONTAINER_NAME%
 docker cp docker/rdbms/mssql/setup      %CONTAINER_NAME%:c:\stage
 docker cp docker/rdbms/mssql/testdata   %CONTAINER_NAME%:c:\stage
-docker cp src/sql/mssql                 %CONTAINER_NAME%:c:\stage
+docker cp src/sql/mssql/.                 %CONTAINER_NAME%:c:\stage\sql
 docker start                            %CONTAINER_NAME%
 docker exec -it                         %CONTAINER_NAME% cmd /c c:\stage\setup\configure.bat

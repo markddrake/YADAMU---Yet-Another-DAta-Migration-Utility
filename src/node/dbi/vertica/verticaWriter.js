@@ -42,7 +42,7 @@ class VerticaWriter extends YadamuWriter {
     this.STAGING_FILE = `${this.STAGING_FILE}-${partitionId}`
   }
   
-  reportBatchError(batch,operation,cause) {
+  reportBatchError(operation,cause,batch) {
     // Use Slice to add first and last row, rather than first and last value.
     super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
@@ -206,7 +206,7 @@ class VerticaWriter extends YadamuWriter {
           cause = new StagingAreaMisMatch(this.dbi.DRIVER_ID,batchStagingFileName,this.dbi.LOCAL_STAGING_AREA, this.dbi.REMOTE_STAGING_AREA,cause)
         } 
         this.cleanupStagingFile(stagingFilePath,false);
-        await this.reportBatchError(batch[key],`COPY`,cause)
+        await this.reportBatchError(`COPY`,cause,batch[key])
         await this.dbi.restoreSavePoint(cause);
         this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);  
         for (const key of Object.keys(copyOperations)) {     

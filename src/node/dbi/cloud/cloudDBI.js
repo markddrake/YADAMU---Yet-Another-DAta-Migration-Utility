@@ -109,7 +109,7 @@ class CloudDBI extends LoaderDBI {
  	const metadata = {}
     if (this.controlFile.metadata) {
       const metdataRecords = await Promise.all(Object.keys(this.controlFile.metadata).map((tableName) => {
-		return this.cloudService.getObject(this.makeAbsolute(this.controlFile.metadata[tableName].file))
+		return this.cloudService.getContentAsString(this.makeAbsolute(this.controlFile.metadata[tableName].file))
       }))
 	  metdataRecords.forEach((content) =>  {
         const json = this.parseJSON(content)
@@ -185,7 +185,7 @@ class CloudDBI extends LoaderDBI {
   ** Remember: Export is Reading data from an S3 Object Store - load.
   **
   */
-
+  
   async loadControlFile() {
 
 	// this.LOGGER.trace([this.constructor.name],`initializeExport()`)
@@ -196,10 +196,10 @@ class CloudDBI extends LoaderDBI {
     let stack
     try {
 	  stack = new Error().stack
-	  const fileContents = await this.cloudService.getObject(this.CONTROL_FILE_PATH)
+	  const fileContents = await this.cloudService.getContentAsString(this.CONTROL_FILE_PATH)
   	  this.controlFile = this.parseJSON(fileContents)
 	} catch (err) {
-     throw (err.urlNotFound && err.urlNotFound()) ? new FileNotFound(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH) : new FileError(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH)
+      throw (err.notFound && err.notFound()) ? new FileNotFound(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH) : new FileError(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH)
 	}
   }
 

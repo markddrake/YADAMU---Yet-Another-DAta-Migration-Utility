@@ -1,0 +1,96 @@
+{
+  "operation"         : "dbRoundTrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "createFolders"     : true
+, "parameters": {
+	"INFINITY_MANAGEMENT"      : "NULLIFY"
+  , "CIRCLE_FORMAT"            : "CIRCLE"
+  }
+, "tests"             : [{
+    "operation"       : "import"
+  , "source"          : "file-staging"
+  , "targets"         : [
+       "mariadb#1
+	]
+  , "verifyOperation" : true
+  , "parameters"      : {
+      "DIRECTORY"     : "export/json/%location%"
+    }                    
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mariadb#1"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle#1"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle18c"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle12c"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle11g"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mssql#1"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mssql19"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "postgres#1"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mysql#1"
+  , "target"          : "mariadb#1"
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mongodb#1",
+	"target"          : "mariadb#1"
+  , "parameters"      : {
+	   "MONGO_STRIP_ID" : false
+	}
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mariadb#1"
+  , "targets"         : [
+ 	  "oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mongodb#1"
+ 	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  }]
+}

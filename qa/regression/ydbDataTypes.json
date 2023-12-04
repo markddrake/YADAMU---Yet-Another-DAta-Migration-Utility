@@ -23,9 +23,9 @@
             ]
         },
         {
-            "source": "yuguabyte#1",
+            "source": "yugabyte#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -34,7 +34,7 @@
         {
             "source": "oracle#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -43,7 +43,7 @@
         {
             "source": "oracle18c",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -52,7 +52,7 @@
         {
             "source": "oracle12c",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -61,7 +61,7 @@
         {
             "source": "oracle11g",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -70,7 +70,7 @@
         {
             "source": "mssql#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -79,7 +79,7 @@
         {
             "source": "mssql19",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -88,7 +88,7 @@
         {
             "source": "postgres#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -97,7 +97,7 @@
         {
             "source": "mysql#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -106,7 +106,7 @@
         {
             "source": "mariadb#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "tasks": [
                 "postgresDataTypes"
@@ -115,7 +115,7 @@
         {
             "source": "mongodb#1",
             "targets": [
-                "yuguabyte#1"
+                "yugabyte#1"
             ],
             "parameters": {
                 "MONGO_STRIP_ID": false
@@ -125,7 +125,7 @@
             ]
         },
         {
-            "source": "yuguabyte#1",
+            "source": "yugabyte#1",
             "targets": [
                 "oracle#1",
                 "oracle18c",

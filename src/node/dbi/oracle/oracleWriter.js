@@ -1,13 +1,23 @@
 
-import { performance } from 'perf_hooks';
-import { Writable} from "stream";
+import { 
+  performance 
+}                              from 'perf_hooks';
 
-import oracledb from 'oracledb';
+import 
+  { Writable
+}                              from "stream";
 
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
-import YadamuWriter from '../base/yadamuWriter.js';
-import {DatabaseError} from '../../core/yadamuException.js';
+import oracledb                from 'oracledb';
+
+import YadamuLibrary           from '../../lib/yadamuLibrary.js';
+import YadamuSpatialLibrary    from '../../lib/yadamuSpatialLibrary.js';
+
+import {
+  DatabaseError
+}                              from '../../core/yadamuException.js';
+
+import YadamuDataTypes         from '../base/yadamuDataTypes.js'
+import YadamuWriter            from '../base/yadamuWriter.js';
 
 class OracleWriter extends YadamuWriter {
 
@@ -126,6 +136,22 @@ class OracleWriter extends YadamuWriter {
 	  // Create a bound row by cloning the current set of binds and adding the column value.
 	  const boundRow = batch[0].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
 	  sqlStatement = sqlStatement.replace(/DESERIALIZE_GEOJSON/g,'DESERIALIZE_WKTGEOMETRY')
+      const results = await this.dbi.executeSQL(sqlStatement,boundRow)
+      this.adjustRowCounts(1)
+    } catch (cause) {
+	  this.handleIterativeError('INSERT ONE',cause,rowNumber,batch[0]);
+    }
+  }
+  
+  async retryWKBAsWKT(sqlStatement,binds,batchSize,rowNumber,row) {
+    const batch = [await this.serializeLobColumns(row)]
+	YadamuSpatialLibrary.recodeSpatialColumns('WKB','WKT',this.tableInfo.targetDataTypes,batch,true)
+    try {
+	  // Create a bound row by cloning the current set of binds and adding the column value.
+	  const boundRow = batch[0].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
+      const spatialColumnList = this.tableInfo.targetDataTypes.reduce((columnList,dataType,idx) => { if (YadamuDataTypes.isSpatial(dataType)) columnList.push(idx); return columnList},[])        
+      spatialColumnList.forEach((colIdx) => {boundRow[colIdx] = {type : oracledb.DB_TYPE_CLOB, maxSize : boundRow[colIdx].val.length, val:boundRow[colIdx].val}})
+	  sqlStatement = sqlStatement.replace(/DESERIALIZE_WKBGEOMETRY/g,'DESERIALIZE_WKTGEOMETRY')
       const results = await this.dbi.executeSQL(sqlStatement,boundRow)
       this.adjustRowCounts(1)
     } catch (cause) {
@@ -292,11 +318,15 @@ end;`
           const results = await this.dbi.executeSQL(this.dml,boundRow)
 		  this.adjustRowCounts(1)
         } catch (cause) {
-		  if ((cause instanceof DatabaseError) && cause.jsonParsingFailed() && cause.includesSpatialOperation()) {
-			await this.retryGeoJSONAsWKT(this.dml,binds,allRows.length,row,rows[row])
-		  }
-		  else {
-            await this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
+		  switch (true) {
+		    case ((cause instanceof DatabaseError) && cause.jsonParsingFailed() && cause.includesSpatialOperation()):
+			  await this.retryGeoJSONAsWKT(this.dml,binds,allRows.length,row,rows[row])
+			  break;
+		    case ((cause instanceof DatabaseError) && cause.includesSpatialOperation() && cause.spatialErrorWKB()):
+			  await this.retryWKBAsWKT(this.dml,binds,allRows.length,row,rows[row])
+			  break;
+			default:
+		      await this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
 		  }
           if (this.skipTable) {
   		    // Truncate the allRows array to terminate the outer loop as well

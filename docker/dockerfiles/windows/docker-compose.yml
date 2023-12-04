@@ -1,7 +1,24 @@
 version: "2.4"
 services:
 
-  # YADAMU-SVR:
+  YADAMU-SVR:
+    container_name: YADAMU-SVC
+    image:  yadamu/service
+    command: [ "c:/YADAMU/bin/service.bat",
+               "CONFIG=c:/yadamu/src/node/cfg/serviceConfiguration.json",
+               "ENCRYPTION=false"]
+    isolation: hyperv
+    mem_limit: 8192M
+    environment:
+      TNS_ADMIN: /usr/src/YADAMU
+      YADAMU_PASSPHRASE: yabasc
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "3000:3000"
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+    restart: always
 
   # ORA2303-01: 1521
 
@@ -106,6 +123,7 @@ services:
       - "3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: oracle
+      MARIADB_VERSION: 11
     volumes:
       - YADAMU_01-SHARED:c:\shared
       - MARIA11-01-CONF:C:\ProgramData\MariaDB\11\Conf.d
@@ -132,23 +150,24 @@ services:
   # MONGO70-01: 27019
   # MONGO60-01: 27020
 
-  MSSQL17-01:
-    container_name: MSSQL17-01
-    image:  yadamu/svr-2016/mssql:2017-CU26
+  # MSSQL17-01: "14332:1433"
+
+  MSSQL22-01:
+    container_name: MSSQL22-01
+    image:  yadamu/mssql:2022
     isolation: hyperv
     mem_limit: 6144M
     networks:
       - YADAMU-NET
     ports:
-      - "14332:1433"
+      - "1433:1433"
     environment:
-      DELAY: 0
       ACCEPT_EULA: Y
       SA_PASSWORD: oracle#1
     volumes:
       - YADAMU_01-SHARED:c:\mount
-      - MSSQL17-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA
-      - MSSQL17-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\LOG
+      - MSSQL22-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA
+      - MSSQL22-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\LOG
     restart: always
 
   MSSQL19-01:
@@ -161,7 +180,6 @@ services:
       ports:
         - "14333:1433"
       environment:
-        DELAY: 0
         ACCEPT_EULA: Y
         SA_PASSWORD: oracle#1
       volumes:
@@ -170,9 +188,25 @@ services:
         - MSSQL19-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\LOG
       restart: always
 
-  # MSSQL22-01:
-
+  MSSQL14-01: 
+      container_name: MSSQL14-01
+      image:  yadamu/svr-2016/mssql:2014
+      isolation: hyperv
+      mem_limit: 6144M
+      networks:
+        - YADAMU-NET
+      ports: 
+        - "14331:1433"
+      environment:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: oracle#1
+      volumes:
+        - YADAMU_01-SHARED:c:\mount
+        - MSSQL14-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA
+        - MSSQL14-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\LOG
+      restart: always
   MYSQL81-01:
+  
     container_name: MYSQL81-01
     image:  yadamu/mysql:8.1
     isolation: hyperv
@@ -181,6 +215,8 @@ services:
       - YADAMU-NET
     ports: 
       - "3306:3306"
+    environment:
+      MYSQL_VERSION: 8.1
     volumes:
       - YADAMU_01-SHARED:c:\shared
       - MYSQL81-01-VOLUME:C:\ProgramData\MySQL\8.1
@@ -199,6 +235,7 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_PASSWORD: oracle
+      PGSQL_VERSION: 16
     volumes:
       - YADAMU_01-SHARED:c:\mount
       - PGSQL16-01-VOLUME:C:\ProgramData\PostgreSQL\16\data\
@@ -229,10 +266,12 @@ volumes:
   ORA1120-01-ADMIN:
   ORA1120-01-DATA:
   ORA1120-01-DIAG:
+  MSSQL22-01-DATA:
+  MSSQL22-01-LOG:
   MSSQL19-01-DATA:
   MSSQL19-01-LOG:
-  MSSQL17-01-DATA:
-  MSSQL17-01-LOG:
+  MSSQL14-01-DATA:
+  MSSQL14-01-LOG:
   PGSQL16-01-VOLUME:
   MARIA11-01-CONF:
   MARIA11-01-DATA:

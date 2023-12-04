@@ -661,7 +661,7 @@ class MySQLDBI extends YadamuDBI {
   }
   
   inputStreamError(cause,sqlStatement) {
-     return this.trackExceptions(((cause instanceof MySQLError) || (cause instanceof CopyOperationAborted)) ? cause : new MySQLError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+     return this.trackExceptions(((cause instanceof MySQLError) || (cause instanceof CopyOperationAborted)) ? cause : new MySQLError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   async getInputStream(queryInfo) {
@@ -693,13 +693,14 @@ class MySQLDBI extends YadamuDBI {
     }
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     while (true) {
       // Exit with result or exception.  
+	  let stack
       try {
-        const sqlStartTime = performance.now()
-        this.streamingStackTrace = new Error().stack
         this.activeInputStream = true;
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+        stack = new Error().stack
+        const sqlStartTime = performance.now()
         const is = this.connection.query(queryInfo.SQL_STATEMENT).stream()
         is.on('end',() => {
 		  this.activeInputStream = false;
@@ -711,7 +712,7 @@ class MySQLDBI extends YadamuDBI {
         })
         return is;
       } catch (e) {
-        const cause = this.trackExceptions(new MySQLError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
+        const cause = this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...

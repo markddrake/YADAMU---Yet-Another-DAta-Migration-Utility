@@ -179,6 +179,10 @@ class DB2DBI extends YadamuDBI {
 
     this._DATABASE_VERSION = result[0].DATABASE_VERSION.substring(5)
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
+	
+	const SQL_XML_PARSING = "SET CURRENT IMPLICIT XMLPARSE OPTION = 'PRESERVE WHITESPACE'";
+    result = await this.executeSQL(SQL_XML_PARSING)
+	
   }
 
   async closeConnection(options) {
@@ -570,7 +574,7 @@ class DB2DBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof DB2Error) || (cause instanceof CopyOperationAborted)) ? cause : new DB2Error(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof DB2Error) || (cause instanceof CopyOperationAborted)) ? cause : new DB2Error(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
   
   async getInputStream(queryInfo) {
@@ -579,9 +583,30 @@ class DB2DBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
 
-    this.streamingStackTrace = new Error().stack;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
-	return this.connection.queryStream(queryInfo.SQL_STATEMENT)
+
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+    	this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+		const is = this.connection.queryStream(queryInfo.SQL_STATEMENT)
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return is;
+      } catch (e) {
+		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
 	
   }  
     

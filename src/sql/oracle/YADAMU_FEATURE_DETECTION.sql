@@ -22,6 +22,9 @@ declare
   JSON_DATA_TYPE_UNSUPPORTED EXCEPTION;
   PRAGMA EXCEPTION_INIT( JSON_DATA_TYPE_UNSUPPORTED , -40449);
 
+  BOOLEAN_DATA_TYPE_UNSUPPORTED EXCEPTION;
+  PRAGMA EXCEPTION_INIT( BOOLEAN_DATA_TYPE_UNSUPPORTED , -902);
+
   EXTENDED_STRING_UNSUPPORTED EXCEPTION;
   PRAGMA EXCEPTION_INIT( EXTENDED_STRING_UNSUPPORTED , -1489);
 
@@ -212,11 +215,10 @@ begin
 	    RAISE;
     end;
   end;
-	
-
+--
 $END
 --  
-  -- 
+ 
   begin
     -- XML Schema Support not avaialble in ATP and ADW
     execute immediate 'begin :1 := dbms_xmlschema.DELETE_CASCADE_FORCE; end;' using out V_DUMMY;
@@ -313,7 +315,19 @@ $END
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                   || '  XML_STORAGE_MODEL CONSTANT VARCHAR2(20) := ''' || V_XML_STORAGE_MODEL || ''';'|| C_NEWLINE;
 
-
+  begin
+	-- Test for Native BOOLEAN Data Type
+    execute immediate 'select cast(1 as BOOLEAN) from dual';
+    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                     || '  BOOLEAN_DATA_TYPE_SUPPORTED      CONSTANT BOOLEAN      := TRUE;'     || C_NEWLINE;
+  exception
+    when BOOLEAN_DATA_TYPE_UNSUPPORTED then
+	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  BOOLEAN_DATA_TYPE_SUPPORTED      CONSTANT BOOLEAN      := FALSE;'     || C_NEWLINE;
+    when OTHERS then
+	  RAISE;
+  end;
+  
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                        || 'END;';
 --				      

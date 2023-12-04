@@ -14,7 +14,7 @@ ALTER SESSION SET NLS_LENGTH_SEMANTICS = 'CHAR' PLSQL_CCFLAGS = 'DEBUG:FALSE'
 /
 set serveroutput on
 --
-spool &LOGDIR/YADAMU_TEST.log
+spool &LOGDIR/YADAMU_COMPARE.log
 --
 declare
   TABLE_NOT_FOUND EXCEPTION;
@@ -40,7 +40,7 @@ create global temporary table SCHEMA_COMPARE_RESULTS (
 ) 
 ON COMMIT PRESERVE  ROWS
 /
-create or replace package YADAMU_TEST
+create or replace package YADAMU_COMPARE
 AUTHID CURRENT_USER
 as
   procedure COMPARE_SCHEMAS(
@@ -49,7 +49,21 @@ as
     P_RULES               VARCHAR2
   );
   function JSON_COMPACT(P_JSON_INPUT CLOB) return CLOB;
-  function APPLY_XML_RULE(P_XML_RULE VARCHAR2, P_XML XMLTYPE) return XMLTYPE;
+  function SNOWFLAKE_TRANSFORMATION(P_XML XMLTYPE) return XMLTYPE;
+  
+  function STRIP_XML_DECLATION_XSL return XMLTYPE;    
+ 
+  C_STRIP_XML_DECLARATION_XSL  XMLTYPE := XMLTYPE(
+'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output method="xml" omit-xml-declaration="yes" />
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+</xsl:stylesheet>'
+);
+  
 end;
 /
 --
@@ -61,8 +75,15 @@ set TERMOUT &TERMOUT
 --
 set define off
 --
-create or replace package body YADAMU_TEST
+create or replace package body YADAMU_COMPARE
 as
+--
+function STRIP_XML_DECLATION_XSL 
+return XMLTYPE
+as
+begin
+  return C_STRIP_XML_DECLARATION_XSL;
+end;
 --
 function JSON_COMPACT(P_JSON_INPUT CLOB)
 return CLOB
@@ -112,7 +133,7 @@ begin
 
 end;
 --
-function APPLY_XML_RULE(P_XML_RULE VARCHAR2,P_XML XMLTYPE)
+function SNOWFLAKE_TRANSFORMATION(P_XML XMLTYPE)
 return XMLTYPE
 as
   V_ORDERED_ATTRIBUTES   VARCHAR2(4000);
@@ -125,8 +146,8 @@ as
 
   V_FIRST_SPACE          PLS_INTEGER;
   V_END_OPEN_TAG         PLS_INTEGER;
-  
-  XSL_SNOWFLAKE_VARIANT    XMLTYPE := XMLTYPE(
+
+  SNOWFLAKE_TRANSFORMATION XMLTYPE := XMLTYPE(
 '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 	<xsl:template match="node()">
 		<xsl:copy>
@@ -191,90 +212,62 @@ as
 </xsl:stylesheet>'
 );
 
-  XSL_STRIP_XML_DECLARATION   XMLTYPE := XMLTYPE(
-'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-  <xsl:output method="xml" omit-xml-declaration="no" />
-  <xsl:template match="@*|node()">
-    <xsl:copy>
-      <xsl:apply-templates select="@*|node()"/>
-    </xsl:copy>
-  </xsl:template>
-</xsl:stylesheet>'
-);
-
 begin
   V_XML := P_XML;
-  case 
-    when (P_XML_RULE = 'SNOWFLAKE_VARIANT') then
 
-      -- Compensate for Snowflake's XML Fidelity issues including:
-	  --   alphabetical ordering of attributes, including namespace definitions
-	  --   removal of XML declaration
-	  --   removal of leading & trailing whitespace from text() nodes
-	  --   removal of trailing zeroes in from text() nodes
-      --   removal of comments
-      --   removal processing instructions. 
-	  --   addition of trailing zeroes in numeric fractional attribute values
-	  --   addition of xml:space="preserve" attributes
-	  --   strips all insignificant whitespace
+  -- Compensate for Snowflake's XML Fidelity issues including:
+  --   alphabetical ordering of attributes, including namespace definitions
+  --   removal of XML declaration
+  --   removal of leading & trailing whitespace from text() nodes
+  --   removal of trailing zeroes in from text() nodes
+  --   removal of comments
+  --   removal processing instructions. 
+  --   addition of trailing zeroes in numeric fractional attribute values
+  --   addition of xml:space="preserve" attributes
+  --   strips all insignificant whitespace
 
-	  begin
-  		select ROOT_NAME, ROOT_NMSPC, ' ' || LISTAGG(ATTR_NAME || '="' || ATTR_VALUE || '"',' ')  WITHIN GROUP (ORDER BY ATTR_NAME) 
-	      into V_ROOT_NAME, V_ROOT_NMSPC, V_ORDERED_ATTRIBUTES
-	      from XMLTABLE(
-		         '/*' passing V_XML
-		  	     columns
-			       ROOT_NAME   VARCHAR2(128) path 'fn:name(.)'
-			      ,ROOT_NMSPC VARCHAR2(4000) path 'fn:namespace-uri(.)'
-				  ,DOCUMENT          XMLTYPE path '.'
-			   ) x,
-		       XMLTABLE(
-				 '/*/@*' passing x.DOCUMENT
-		         columns 
-				   ATTR_NAME  VARCHAR2(128)  path 'fn:name(.)',
-				   ATTR_VALUE VARCHAR2(4000) path '.'
-		       )
-		 group by ROOT_NAME, ROOT_NMSPC;
+  begin
+	select ROOT_NAME, ROOT_NMSPC, ' ' || LISTAGG(ATTR_NAME || '="' || ATTR_VALUE || '"',' ')  WITHIN GROUP (ORDER BY ATTR_NAME) 
+      into V_ROOT_NAME, V_ROOT_NMSPC, V_ORDERED_ATTRIBUTES
+      from XMLTABLE(
+             '/*' passing V_XML
+	  	     columns
+		       ROOT_NAME   VARCHAR2(128) path 'fn:name(.)'
+		      ,ROOT_NMSPC VARCHAR2(4000) path 'fn:namespace-uri(.)'
+			  ,DOCUMENT          XMLTYPE path '.'
+		   ) x,
+	       XMLTABLE(
+			 '/*/@*' passing x.DOCUMENT
+	         columns 
+			   ATTR_NAME  VARCHAR2(128)  path 'fn:name(.)',
+			   ATTR_VALUE VARCHAR2(4000) path '.'
+	       )
+	 group by ROOT_NAME, ROOT_NMSPC;
 
-        select XMLSERIALIZE(DOCUMENT V_XML as CLOB)
-		  into V_SERIALIZED_XML 
-		  from dual;
+    select XMLSERIALIZE(DOCUMENT V_XML as CLOB)
+	  into V_SERIALIZED_XML 
+	  from dual;
 
-		V_FIRST_SPACE :=  INSTR(V_SERIALIZED_XML,' ');
-		V_END_OPEN_TAG := INSTR(V_SERIALIZED_XML,'>');
-		V_UNORDERED_ATTRIBUTES := SUBSTR(V_SERIALIZED_XML,V_FIRST_SPACE,V_END_OPEN_TAG-V_FIRST_SPACE);
+    V_FIRST_SPACE :=  INSTR(V_SERIALIZED_XML,' ');
+	V_END_OPEN_TAG := INSTR(V_SERIALIZED_XML,'>');
+	V_UNORDERED_ATTRIBUTES := SUBSTR(V_SERIALIZED_XML,V_FIRST_SPACE,V_END_OPEN_TAG-V_FIRST_SPACE);
 
-		if (SUBSTR(V_UNORDERED_ATTRIBUTES,LENGTH(V_UNORDERED_ATTRIBUTES),1) = '/') then           
-		  V_ORDERED_ATTRIBUTES := V_ORDERED_ATTRIBUTES + '/';
-		end if;
+ 	if (SUBSTR(V_UNORDERED_ATTRIBUTES,LENGTH(V_UNORDERED_ATTRIBUTES),1) = '/') then           
+	  V_ORDERED_ATTRIBUTES := V_ORDERED_ATTRIBUTES + '/';
+	end if;
 		
-		V_SERIALIZED_XML := REPLACE(V_SERIALIZED_XML,V_UNORDERED_ATTRIBUTES,V_ORDERED_ATTRIBUTES);
-		V_XML := XMLTYPE(V_SERIALIZED_XML);
+	V_SERIALIZED_XML := REPLACE(V_SERIALIZED_XML,V_UNORDERED_ATTRIBUTES,V_ORDERED_ATTRIBUTES);
+	V_XML := XMLTYPE(V_SERIALIZED_XML);
 	    
-      exception
-		when NO_DATA_FOUND then
-		  -- No attributes to normalize
-		  NULL;
-	    when OTHERS then 
-		  DBMS_OUTPUT.PUT_LINE(V_SERIALIZED_XML);
-		  RAISE;
-	  end;
-	  V_XML := P_XML.transform(XSL_SNOWFLAKE_VARIANT);		
-	when (P_XML_RULE = 'STRIP_XML_DECLARATION') then
-	  V_XML := P_XML.transform(XSL_SNOWFLAKE_VARIANT);		
-	when (P_XML_RULE = 'SERIALIZE_AS_BLOB') then
-	  --
-	  -- Serialize the XML as a BLOB and generate a new XML from the result.
-	  -- This will add an XML Declaration if the document does not alreay have one. 
-	  -- It may also change the value of any existing XML declaration in the source document
-	  -- Used in 11.2 in place of STRIP_XML_DECLARATION to avoid ORA-03113
-	  --
-	  select XMLTYPE(XMLSERIALIZE(CONTENT P_XML AS BLOB ENCODING 'UTF-8'),NLS_CHARSET_ID('AL32UTF8'))
-	    into V_XML 
-		from dual;
-	  --
-  end case;		  
-  return V_XML;
+   exception
+	 when NO_DATA_FOUND then
+	   -- No attributes to normalize
+	  NULL;
+	 when OTHERS then 
+	   DBMS_OUTPUT.PUT_LINE(V_SERIALIZED_XML);
+	   RAISE;
+   end;
+  V_XML := P_XML.transform(SNOWFLAKE_TRANSFORMATION);		
 end;
 --  
 procedure COMPARE_SCHEMAS(
@@ -288,7 +281,7 @@ as
 
   ORACLE_21C_SPATIAL_ISSUE EXCEPTION;
   PRAGMA EXCEPTION_INIT( ORACLE_21C_SPATIAL_ISSUE , -13199 );
-      
+  
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
   V_DOUBLE_PRECISION    NUMBER         := case when JSON_EXISTS(P_RULES, '$.doublePrecision')    then JSON_VALUE(P_RULES, '$.doublePrecision')       else NULL end;
@@ -383,10 +376,20 @@ $END
     		   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT '  ||
 			   case 
-			     when (V_XML_RULE is NULL) then
-				   't."' || atc.COLUMN_NAME || '"'
+			     when (V_XML_RULE = 'SNOWFLAKE_VARIANT') then
+				   'YADAMU_COMPARE.SNOWFLAKE_TRANSFORMATION(t."' || atc.COLUMN_NAME || '")'
+				 when (V_XML_RULE = 'STRIP_XML_DECLARATION') then
+				   't."' || atc.COLUMN_NAME || '".transform(YADAMU_COMPARE.STRIP_XML_DECLATION_XSL)'
+				 when (V_XML_RULE = 'SERIALIZE_AS_BLOB') then
+	               --
+	               -- Serialize the XML as a BLOB and generate a new XML from the result.
+	               -- This will add an XML Declaration if the document does not alreay have one. 
+	               -- It may also change the value of any existing XML declaration in the source document
+	               -- Used in 11.2 in place of STRIP_XML_DECLARATION to avoid ORA-03113
+	               --
+	               'XMLTYPE(XMLSERIALIZE(CONTENT t."'|| atc.COLUMN_NAME || '" AS BLOB ENCODING ''UTF-8''),NLS_CHARSET_ID(''AL32UTF8''))'
 				 else 
-				   'YADAMU_TEST.APPLY_XML_RULE(''' || V_XML_RULE || ''',t."' || atc.COLUMN_NAME || '")'
+				   't."' || atc.COLUMN_NAME || '"'
 			   end
 			   || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			 
@@ -423,12 +426,12 @@ $END
 			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_UTILITIES.ORDER_JSON_OBJECTS(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C ORDERING */'
 				 else 
 				  --
-				  -- Whitespace formatting in other databases may change the size of the source and target documents. 12.2 cannot use JSON_QUERY to normalize JSON as it does not support CLOB. Use YADAMU_TEST.JSON_COMPACT to remove insignifcant whitespace and compare results.				  --
+				  -- Whitespace formatting in other databases may change the size of the source and target documents. 12.2 cannot use JSON_QUERY to normalize JSON as it does not support CLOB. Use YADAMU_COMPARE.JSON_COMPACT to remove insignifcant whitespace and compare results.				  --
 			      case
 				     when atc.DATA_TYPE = 'BLOB' then
-		               'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(TO_CLOB(t."' || atc.COLUMN_NAME || '")),' || V_HASH_METHOD || ') end /* JSON 12C BLOB NO ORDERING */'
+		               'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_COMPARE.JSON_COMPACT(TO_CLOB(t."' || atc.COLUMN_NAME || '")),' || V_HASH_METHOD || ') end /* JSON 12C BLOB NO ORDERING */'
 			         else 
-				       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C CLOB/VARCHAR2 NO ORDERING */'
+				       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_COMPARE.JSON_COMPACT(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C CLOB/VARCHAR2 NO ORDERING */'
 		           end  
 			   end || '"' || atc.COLUMN_NAME || '"'
                $ELSIF DBMS_DB_VERSION.VER_LE_18 $THEN
@@ -543,7 +546,6 @@ $END
   P_TARGET_COUNT      NUMBER := 0;
   V_SQLERRM           CLOB;
   
-  V_STYLESHEET        XMLTYPE;
   V_WITH_CLAUSE       VARCHAR2(256);
   V_XSL_TABLE_CLAUSE  VARCHAR(256);
   
@@ -662,11 +664,11 @@ show errors
 --
 set TERMOUT &TERMOUT
 --
-create or replace public synonym YADAMU_TEST for YADAMU_TEST
+create or replace public synonym YADAMU_COMPARE for YADAMU_COMPARE
 /
 spool &LOGDIR/install/COMPILE_ALL.log APPEND
 --
-desc YADAMU_TEST
+desc YADAMU_COMPARE
 --
 spool off
 --

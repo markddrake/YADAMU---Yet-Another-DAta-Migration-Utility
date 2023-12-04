@@ -1,0 +1,4 @@
+FROM yadamu/secure:latest
+WORKDIR /usr/src/YADAMU
+RUN npm install wtfnode
+ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

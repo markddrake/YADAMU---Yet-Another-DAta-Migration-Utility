@@ -60,13 +60,13 @@ class Yadamu {
 
   static get YADAMU_PARAMETERS()      { return YadamuConstants.YADAMU_PARAMETERS }  
 
-  static get DBI_PARAMETERS()  { return DBIConstants.DBI_PARAMETERS }  
+  static get DBI_PARAMETERS()         { return DBIConstants.DBI_PARAMETERS }  
 
   get QA_TEST()                       { return false }
 
   get YADAMU_PARAMETERS()             { return Yadamu.YADAMU_PARAMETERS }
 
-  get DBI_PARAMETERS()         { return Yadamu.DBI_PARAMETERS }
+  get DBI_PARAMETERS()                { return Yadamu.DBI_PARAMETERS }
   
   get FILE()                          { return this.parameters.FILE                      || YadamuConstants.FILE }
   get CONFIG()                        { return this.parameters.CONFIG                    || YadamuConstants.CONFIG }
@@ -123,6 +123,9 @@ class Yadamu {
   set OPERATION(value)                { this._OPERATION = value }
   get OPERATION()                     { return this._OPERATION }
   
+  set HOMOGENEOUS_OPERATION(value)    { this._HOMOGENEOUS_OPERATION = value }
+  get HOMOGENEOUS_OPERATION()         { return this._HOMOGENEOUS_OPERATION }
+
   get YADAMU_QA()                     { return false }
   
   get LOG_FILE()                      { return this.parameters.LOG_FILE }
@@ -208,7 +211,8 @@ class Yadamu {
       } 
 	  else {
 	    this.commandPrompt.output.write(charsToWrite.length > 1 ? charsToWrite : "*")
-      }
+     
+	 }
     }
 	
   }
@@ -244,12 +248,12 @@ class Yadamu {
   }
   
   yadamuAbort(err,promise) {
-	 
-    if (err.ignoreUnhandledRejection === true) {
-	  // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
+	  
+	if (err.ignoreUnhandledRejection === true) {
+	  // this.LOGGER.trace(['UNHANDLED REJECTION','IGNORED','YADAMU',this.STATUS.operation],err);
 	  return;
 	}
-
+    
 	this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
     this.LOGGER.handleException(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
 	this.STATUS.errorRaised = true;
@@ -787,6 +791,9 @@ class Yadamu {
               parameters.TABLES = parameterValue
 			}
             break;
+	      case 'TRUNCATE_ON_LOAD':		  
+	        parameters.TRUNCATE_ON_LOAD = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+		    break;
           case 'IDENTIFIER_MAPPING_FILE':
             parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);
             break;
@@ -973,6 +980,8 @@ class Yadamu {
   async doPumpOperation(source,target) {
 	     
 	let results;
+	
+	this.HOMOGENEOUS_OPERATION = source.DATABASE_KEY === target.DATABASE_KEY
       
 	try {
 	  let failed = false;

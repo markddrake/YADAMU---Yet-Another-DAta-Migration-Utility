@@ -74,7 +74,7 @@ VAR INSTALL_ACTION VARCHAR2(1024)
 declare 
   DB_VERSION NUMBER(3) := DBMS_DB_VERSION.VERSION;
 begin
-  select 'imp system/oracle@$ORACLE_PDB file=$STAGE/testdata/pm_online_media.exp fromuser=PM touser=PM DATA_ONLY=y' 
+  select 'imp system/oracle@localhost:1521/$ORACLE_PDB  file=$STAGE/testdata/pm_online_media.exp fromuser=PM touser=PM DATA_ONLY=y' 
 	into :INSTALL_ACTION
     from (
 	  select count(*) CNT
@@ -95,5 +95,5 @@ exit
 EOF
 source installOnlineMedia.sh
 sqlplus system/oracle@localhost:1521/$ORACLE_PDB @$STAGE/sql/COMPILE_ALL.sql $STAGE/log
-sqlplus system/oracle@localhost:1521/$ORACLE_PDB @$STAGE/sql/YADAMU_TEST.sql $STAGE/log OFF
+sqlplus system/oracle@localhost:1521/$ORACLE_PDB @$STAGE/sql/YADAMU_COMPARE.sql $STAGE/log OFF
  

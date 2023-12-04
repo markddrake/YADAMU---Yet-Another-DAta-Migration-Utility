@@ -91,7 +91,11 @@ class OracleDBI extends YadamuDBI {
   get NATIVE_JSON_TYPE()           { return this._NATIVE_JSON_TYPE }
   // Does the database support JSON operations at some level 
   get JSON_PARSING_SUPPORTED()     { return this._JSON_PARSING_SUPPORTED }
-
+  // Does the database support a Native BOOLEAN data type.
+  get NATIVE_BOOLEAN_TYPE()        { return this._NATIVE_BOOLEAN_TYPE }
+  // Does the database support a Native BOOLEAN data type.
+  get BOOLEAN_DB_STORAGE_MODEL()   { return this._BOOLEAN_DB_STORAGE_MODEL }
+  
   // Override YadamuDBI
 
   get DATABASE_KEY()               { return OracleConstants.DATABASE_KEY};
@@ -159,7 +163,8 @@ class OracleDBI extends YadamuDBI {
   **
   ** Set to JSON to allow driver to pick storage model based on Database Version. Choices are shown below:
   **
-  **  20c : Native JSON data type
+  **  23c : Native JSON data type
+  **  21c : Native JSON data type
   **  19c : BLOB with IS JSON constraint
   **  18c : BLOB with IS JSON constraint
   **  12c : CLOB with IS JSON constraint
@@ -188,6 +193,18 @@ class OracleDBI extends YadamuDBI {
     return this._JSON_DATA_TYPE
   }
 
+  get BOOLEAN_DATA_TYPE() {
+	this._BOOLEAN_DATA_TYPE = this._BOOLEAN_DATA_TYPE || (() => {
+	  switch (true) {
+        case this.NATIVE_BOOLEAN_TYPE:
+          return this.DATA_TYPES.storageOptions.BOOLEAN_TYPE;
+        default:
+          return this.BOOLEAN_DB_STORAGE_MODEL
+      }
+    })()
+    return this._BOOLEAN_DATA_TYPE
+  }
+  
   get CACHELOB_MAX_SIZE ()         { return this.EXTENDED_STRING ? OracleConstants.VARCHAR_MAX_SIZE_EXTENDED : OracleConstants.VARCHAR_MAX_SIZE_STANDARD}
 
   get VARCHAR_MAX_SIZE() {
@@ -310,6 +327,8 @@ class OracleDBI extends YadamuDBI {
 	this.vendorProperties.poolMax = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 3
 	try {
       stack = new Error().stack
+      oracledb.initOracleClient()
+      stack = new Error().stack
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
 	  this.pool = await oracledb.createPool(this.vendorProperties)
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Pool Created')
@@ -388,7 +407,7 @@ class OracleDBI extends YadamuDBI {
       }
     
 	}
-	
+
   }
   
   async createLob(lobType) {
@@ -524,13 +543,15 @@ class OracleDBI extends YadamuDBI {
     let result = await this.executeSQL(SQL_SET_TIMESTAMP_FORMAT,{})
 
     let args = {
-		DATABASE_VERSION:                {dir: oracledb.BIND_OUT, type: oracledb.STRING},
+		DATABASE_VERSION:          {dir: oracledb.BIND_OUT, type: oracledb.STRING},
 		MAX_STRING_SIZE:           {dir: oracledb.BIND_OUT, type: oracledb.NUMBER},
 		JSON_DB_STORAGE_MODEL:     {dir: oracledb.BIND_OUT, type: oracledb.STRING},
     	XMLTYPE_DB_STORAGE_CLAUSE: {dir: oracledb.BIND_OUT, type: oracledb.STRING},
 		EXTENDED_STRING_SUPPORTED: {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW},
 		JSON_PARSING_SUPPORTED:    {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW},
-		NATIVE_JSON_TYPE:          {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW}
+		NATIVE_JSON_TYPE:          {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW},
+		BOOLEAN_DB_STORAGE_MODEL:  {dir: oracledb.BIND_OUT, type: oracledb.STRING},
+		NATIVE_BOOLEAN_TYPE:       {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW}
 	}
 
     result = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION,args)
@@ -542,23 +563,12 @@ class OracleDBI extends YadamuDBI {
     this._EXTENDED_STRING           = YadamuLibrary.toBoolean(result.outBinds.EXTENDED_STRING_SUPPORTED)
 	this._JSON_PARSING_SUPPORTED    = YadamuLibrary.toBoolean(result.outBinds.JSON_PARSING_SUPPORTED)
 	this._NATIVE_JSON_TYPE          = YadamuLibrary.toBoolean(result.outBinds.NATIVE_JSON_TYPE)
-
-    this.DATA_TYPES.storageOptions.JSON_TYPE = this.JSON_DATA_TYPE
+    this._NATIVE_BOOLEAN_TYPE       = YadamuLibrary.toBoolean(result.outBinds.NATIVE_BOOLEAN_TYPE) 
+    this._BOOLEAN_DB_STORAGE_MODEL  = result.outBinds.BOOLEAN_DB_STORAGE_MODEL
 	
-	if (this.isManager()) {
-      if (this.MAX_STRING_SIZE <= OracleConstants.VARCHAR_MAX_SIZE_EXTENDED) {
-        this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Maximum VARCHAR2 size for JSON operations is ${this.MAX_STRING_SIZE}.`)
-      }
-
-      if (!this.EXTENDED_STRING) {
-        this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`VARCHAR MAX_SIZE set to ${this.VARCHAR_MAX_SIZE}.`)
-      }
-
-      if (this.XMLTYPE_STORAGE_CLAUSE !== this.XMLTYPE_STORAGE_MODEL ) {
-        this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.XMLTYPE_STORAGE_CLAUSE}.`)
-      }
-	  this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`JSON storage model is ${this.DATA_TYPES.storageOptions.JSON_TYPE}.`)
-    }
+    this.DATA_TYPES.storageOptions.JSON_TYPE = this.JSON_DATA_TYPE
+	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.BOOLEAN_DATA_TYPE
+	
   }
 
   processLog(results,operation) {
@@ -889,6 +899,14 @@ class OracleDBI extends YadamuDBI {
 	return ddlStatements
   }
 
+  async truncateTable(schema,tableName) {
+	 
+	// Truncate Table is Non-Transactional DDL in Oracle.
+	 
+	const sqlStatement = `${this.SQL_TRUNCATE_TABLE_OPERATION} "${schema}"."${tableName}"`
+	await this.executeSQL(sqlStatement)
+  }
+	    
 
   async _executeDDL(ddl) {
 
@@ -971,8 +989,15 @@ class OracleDBI extends YadamuDBI {
   }
 
   async initializeData() {
-    await this.disableConstraints()
-    await this.setDateFormatMask(this.systemInformation.vendor)
+	this.readyForData = new Promise(async (resolve,reject) => {
+	  try {
+        await this.disableConstraints()
+        await this.setDateFormatMask(this.systemInformation.vendor)
+		resolve(true)
+      } catch (e) {
+		reject(e)
+	  }
+	})
   }
 
   async finalizeData() {
@@ -1277,7 +1302,7 @@ class OracleDBI extends YadamuDBI {
     )
                                 
     const schemaInformation = results.rows
-
+	
 	schemaInformation.forEach((tableInfo) => {
       const partitionList = JSON.parse(tableInfo.PARTITION_LIST)
 	  if (partitionList.length > 0) {
@@ -1394,8 +1419,15 @@ class OracleDBI extends YadamuDBI {
     return queryInfo
   }
 
+  adjustQuery(queryInfo) {
+	if (this.latestError instanceof OracleError && this.latestError.knownBug(33561708)) {
+	  queryInfo.CLIENT_SELECT_LIST = queryInfo.CLIENT_SELECT_LIST.replace(/get_WKB\(\)/g,'get_GeoJSON()')
+	  queryInfo.EXPORT_SELECT_LIST = queryInfo.EXPORT_SELECT_LIST.replace(/get_WKB\(\)/g,'get_GeoJSON()')
+	}
+  }
+
   inputStreamError(cause,sqlStatement) {
-	return this.trackExceptions(((cause instanceof OracleError) || (cause instanceof CopyOperationAborted)) ? cause : new OracleError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+	return this.trackExceptions(((cause instanceof OracleError) || (cause instanceof CopyOperationAborted)) ? cause : new OracleError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   async getInputStream(queryInfo) {
@@ -1406,20 +1438,28 @@ class OracleDBI extends YadamuDBI {
 	}
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
 
     while (true) {
       // Exit with result or exception.
+      let stack
       try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
         const sqlStartTime = performance.now()
-		this.streamingStackTrace = new Error().stack
         this.inputStream = await this.connection.queryStream(queryInfo.SQL_STATEMENT,[],{extendedMetaData: true})
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		this.inputStream.on('end',() => {
+		}).on('error',(err) => {
+		  // Nasty Hack to stop "ORA-13199: wk buffer merge failure error" surfacing as an Unhandled Exception
+		  const cause = new OracleError(this.DRIVER_ID,err,stack ,queryInfo.SQL_STATEMENT,{},{})
+		  if (cause.knownBug(33561708)) {
+			err.ignoreUnhandledRejection = true
+			err.stack = err.stack || cause.stack
+		  }
 		})
 	    return this.inputStream
 	  } catch (e) {
-		const cause = new OracleError(this.DRIVER_ID,e,this.streamingStackTrace ,queryInfo.SQL_STATEMENT,{},{})
+		const cause = new OracleError(this.DRIVER_ID,e,stack ,queryInfo.SQL_STATEMENT,{},{})
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -1610,18 +1650,40 @@ class OracleDBI extends YadamuDBI {
 	  }
 	  await this.enableTriggers(this.CURRENT_SCHEMA,tableName)
 	} catch(e) {
-	  metrics.writerError = e
+	  this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
+	  // Try Row By Row
 	  try {
-        await this.enableTriggers(this.CURRENT_SCHEMA,tableName)
-	    if (e.copyFileNotFoundError && e.copyFileNotFoundError()) {
-		  e = new StagingFileError(this.DRIVER_ID,this.LOCAL_DIRECTORY_PATH,this.SQL_DIRECTORY_PATH,e)
+		let results = await this.rollbackTransaction()
+	    results = await this.executeSQL(copyOperation.dml2,[{dir: oracledb.BIND_IN, type: oracledb.NUMBER, val: this.TABLE_MAX_ERRORS},{dir: oracledb.BIND_OUT, type: oracledb.STRING}])
+	    results = JSON.parse(results.outBinds[0])
+		metrics.read = results.rowsAffected
+	    metrics.written = results.rowsAffected
+		metrics.rejected = results.rowsRejected
+	    results = await this.commitTransaction()
+	    metrics.committed = metrics.written 
+	    metrics.written = 0
+	    metrics.writerEndTime = performance.now()
+	    results = await this.executeSQL(copyOperation.drop)
+	    if (copyOperation.hasOwnProperty("dropFunctions")) {
+		  const results = await Promise.all(copyOperation.dropFunctions.map((func) => {
+		    return this.executeSQL(func)
+		  }))
 	    }
-	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
-	    let results = await this.rollbackTransaction()
+	    await this.enableTriggers(this.CURRENT_SCHEMA,tableName)
 	  } catch (e) {
-		e.cause = metrics.writerError
-		metrics.writerError = e
-	  }
+	    metrics.writerError = e
+	    try {
+          await this.enableTriggers(this.CURRENT_SCHEMA,tableName)
+	      if (e.copyFileNotFoundError && e.copyFileNotFoundError()) {
+  		    e = new StagingFileError(this.DRIVER_ID,this.LOCAL_DIRECTORY_PATH,this.SQL_DIRECTORY_PATH,e)
+	      }
+	      this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
+	      let results = await this.rollbackTransaction()
+	    } catch (e) {
+		  e.cause = metrics.writerError
+		  metrics.writerError = e
+	    }
+	  } 
 	}
 	return metrics
   }

@@ -1,0 +1,472 @@
+{
+    "oracle#1": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA1903"
+        }
+    },
+    "oracle23c": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA2303"
+        }
+    },
+    "oracle21c": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA2103"
+        }
+    },
+    "oracle19c": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA1903"
+        }
+    },
+    "oracle18c": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA1803"
+        }
+    },
+    "oracle12c": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA1220"
+        }
+    },
+    "oracle11g": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORA1120"
+        }
+    },
+    "mssql#1": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL22-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql14": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL14-01",
+            "database": "master",
+            "password": "Oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql17": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL17-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql19": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL19-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql22": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL22-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "postgres#1": {
+        "postgres": {
+            "user": "postgres",
+            "host": "PGSQL16-01",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 5432
+        }
+    },
+    "postgres16": {
+        "postgres": {
+            "user": "postgres",
+            "host": "PGSQL16-01",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 5432
+        }
+    },
+    "postgres15": {
+        "postgres": {
+            "user": "postgres",
+            "host": "PGSQL15-01",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 5432
+        }
+    },
+    "postgres14": {
+        "postgres": {
+            "user": "postgres",
+            "host": "PGSQL14-01",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 5432
+        }
+    },
+    "postgres13": {
+        "postgres": {
+            "user": "postgres",
+            "host": "PGSQL13-01",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 5432
+        }
+    },
+    "mysql#1": {
+        "mysql": {
+            "user": "root",
+            "host": "MYSQL81-01",
+            "database": "sys",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mysql80": {
+        "mysql": {
+            "user": "root",
+            "host": "MYSQL80-01",
+            "database": "sys",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mysql81": {
+        "mysql": {
+            "user": "root",
+            "host": "MYSQL81-01",
+            "database": "sys",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mariadb#1": {
+        "mariadb": {
+            "user": "root",
+            "host": "MARIA11-01",
+            "database": "mysql",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mariadb10": {
+        "mariadb": {
+            "user": "root",
+            "host": "MARIA10-01",
+            "database": "mysql",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mariadb11": {
+        "mariadb": {
+            "user": "root",
+            "host": "MARIA11-01",
+            "database": "mysql",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mongodb#1": {
+        "mongodb": {
+            "host": "MONGO70-01",
+            "port": 27017,
+            "options": {
+                "socketTimeoutMS": 900000
+            }
+        }
+    },
+    "mongodb40": {
+        "mongodb": {
+            "host": "MONGO40-01",
+            "port": 27017,
+            "options": {
+                "socketTimeoutMS": 900000
+            }
+        }
+    },
+    "mongodb50": {
+        "mongodb": {
+            "host": "MONGO50-01",
+            "port": 27017,
+            "options": {
+                "socketTimeoutMS": 900000
+            }
+        }
+    },
+    "mongodb60": {
+        "mongodb": {
+            "host": "MONGO60-01",
+            "port": 27017,
+            "options": {
+                "socketTimeoutMS": 900000
+            }
+        }
+    },
+    "mongodb70": {
+        "mongodb": {
+            "host": "MONGO70-01",
+            "port": 27017,
+            "options": {
+                "socketTimeoutMS": 900000
+            }
+        }
+    },
+    "vertica#1": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VRTCA23-01",
+            "database": "VMart",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "vertica09": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VRTCA09-01",
+            "database": "docker",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "vertica10": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VRTCA10-01",
+            "database": "VMart",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "vertica11": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VRTCA11-01",
+            "database": "VMart",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "vertica12": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VRTCA12-01",
+            "database": "VMart",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "vertica23": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VRTCA23-01",
+            "database": "VMart",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "db2#1": {
+        "db2": {
+            "user": "DB2INST1",
+            "host": "IBMDB2-01",
+            "database": "YADAMU",
+            "password": "oracle",
+            "port": 50000
+        }
+    },
+    "yugabyte#1": {
+        "yugabyte": {
+            "user": "postgres",
+            "host": "yb-tserver-n1",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 5433
+        }
+    },
+    "croach#1": {
+        "cockroach": {
+            "user": "root",
+            "host": "ROACH01-01",
+            "database": "yadamu",
+            "password": "oracle",
+            "port": 26257
+        }
+    },
+    "tera#1": {
+        "teradata": {
+            "host": "TDATA17-01",
+            "user": "dbc",
+            "password": "dbc",
+            "log": "0"
+        }
+    },
+    "minio#1": {
+        "awsS3": {
+            "accessKeyId": "AKIAIOSFODNN7EXAMPLE",
+            "secretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "region": "us-east-1",
+            "endpoint": "http://MINIO-01:9000",
+            "s3ForcePathStyle": true,
+            "signatureVersion": "v4"
+        },
+        "settings": {
+            "directory": "aws"
+        }
+    },
+    "azurite#1": {
+        "azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1",
+        "settings": {
+            "directory": "azure"
+        }
+    },
+    "file-YADAMU_HOME": {
+        "file": {
+            "directory": ""
+        }
+    },
+    "file-ROOT": {
+        "file": {
+            "directory": "/"
+        }
+    },
+    "file-staging": {
+        "file": {
+            "directory": "stagingArea"
+        }
+    },
+    "file-lRegress": {
+        "file": {
+            "directory": "longRegress"
+        }
+    },
+    "file-sRegress": {
+        "file": {
+            "directory": "shortRegress"
+        }
+    },
+    "loader-YADAMU_HOME": {
+        "loader": {
+            "directory": ""
+        }
+    },
+    "loader-ROOT": {
+        "loader": {
+            "directory": "/"
+        }
+    },
+    "loader-staging": {
+        "loader": {
+            "directory": "stagingArea"
+        }
+    },
+    "loader-lRegress": {
+        "loader": {
+            "directory": "longRegress/loader"
+        }
+    },
+    "loader-sRegress": {
+        "loader": {
+            "directory": "shortRegress/loader"
+        }
+    }
+}

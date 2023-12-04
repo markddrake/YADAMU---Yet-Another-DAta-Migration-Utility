@@ -1,6 +1,5 @@
 $service = Get-Service -Name postgresql-x64-14 -ErrorAction SilentlyContinue
 if($service -eq $null) {
-  Start-Sleep -Seconds $ENV:DELAY
   $NOW = Get-Date -Format "o"
   Write-Output "$NOW Postgres: Creating Service ""postgresql-x64-14""."
   Set-TimeZone  -Id UTC

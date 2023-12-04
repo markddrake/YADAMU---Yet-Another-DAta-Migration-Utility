@@ -12,40 +12,70 @@
 	},
 	
 	"tests": [{
-			"source": "oracle#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "mssql19",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "postgres#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "mysql#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "mongodb#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "yugabyte#1",
-			"target": "yugabyte#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		}]
+            "source": "yugabyte#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+            "source": "oracle#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle18c",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle12c",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle11g",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql19",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "postgres#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mysql#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mariadb#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mongodb#1",
+            "target": "yugabyte#1",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    }]
 }

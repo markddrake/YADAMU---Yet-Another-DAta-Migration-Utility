@@ -25,5 +25,5 @@ type log\WorldWideImportersDW.log
 REM Install Wide World Importers Data Warehouse
 sqlcmd -U%DB_USER% -P%DB_PWD% -dmaster -I -e -i sql/YADAMU_IMPORT.sql > log/YADAMU_IMPORT.log
 type log\YADAMU_IMPORT.log 
-REM Install YADAMU_TEST
-sqlcmd -U%DB_USER% -P%DB_PWD% -dmaster -I -e -i sql/YADAMU_TEST.sql   > log/YADAMU_TEST.log
+REM Install YADAMU_COMPARE
+sqlcmd -U%DB_USER% -P%DB_PWD% -dmaster -I -e -i sql/YADAMU_COMPARE.sql   > log/YADAMU_COMPARE.log

@@ -134,10 +134,6 @@ class AzureDBI extends CloudDBI {
 	this.cloudService = new AzureStorageService(this,{})
   }
   
-  parseJSON(fileContents) {
-    return JSON.parse(fileContents.toString())
-  }
-  
   getContentLength(props) {
     return props.contentLength
   }

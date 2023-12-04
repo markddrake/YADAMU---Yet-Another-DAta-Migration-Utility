@@ -13,6 +13,8 @@ class DBReaderFile extends DBReader {
 
   // Use when writing to an Export File... 
 
+  get PIPELINE_MODE()               { return 'SERIAL' }
+
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
   }
@@ -24,9 +26,9 @@ class DBReaderFile extends DBReader {
 	
   } 	  
 	
-  async pipelineTable(readerDBI,writerDBI,task) {
+  async pipelineTable(task,readerDBI,writerDBI) {
       
-    // this.yadamuLogger.trace(['PIPELINE','SERIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
+    // this.yadamuLogger.trace(['PIPELINE',this.CONTROLLER_MODE,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
 	
 	const queryInfo = readerDBI.generateSQLQuery(task)
 	 
@@ -58,23 +60,6 @@ class DBReaderFile extends DBReader {
 	
   }
 
-  async pipelineTables(taskList,readerDBI,writerDBI) {
-	
-  	  await this.dbWriter.dbi.ddlComplete
-      this.yadamuLogger.info(['PIPELINE','SERIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
-	  
-	  while (taskList.length > 0) {
-	    const task = taskList.shift()
-		try {
-  	      await this.pipelineTable(readerDBI,writerDBI,task)
-		} catch (cause) {
-		  this.yadamuLogger.handleException(['PIPELINE','SERIAL',task.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
-		  taskList.length = 0
-		}
-	  }
-  }
-
-  
 }
 
 export { DBReaderFile as default}

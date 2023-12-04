@@ -3,13 +3,13 @@ echo "Using Docker"
 # MariaDB Connection Information
 unset MARIADB_USER
 unset MARIADB_PWD
-export MARIADB_HOST=MARIA10-01
+export MARIADB_HOST=MARIA11-01
 unset MARIADB_PORT
 unset MARIADB_DBNAME
 # Generic SQL Server Connection Information
 unset MSSQL_USER
 unset MSSQL_PWD
-export MSSQL_HOST=MSSQL19-01
+export MSSQL_HOST=MSSQL22-01
 unset MSSQL_PORT
 unset MSSQL_DBNAME
 # SQL Server 2017 Connection Information
@@ -33,7 +33,7 @@ unset MSSQL22_DBNAME
 # MySQL Connection Information
 unset MYSQL_USER
 unset MYSQL_PWD
-export MYSQL_HOST=MYSQL80-01
+export MYSQL_HOST=MYSQL81-01
 unset MYSQL_PORT
 unset MYSQL_DBNAME
 # Oracle 19c Connection Information
@@ -55,11 +55,11 @@ unset ORACLE11G_PWD
 # Postgres Connection Information
 unset POSTGRES_USER
 unset POSTGRES_PWD
-export POSTGRES_HOST=PGSQL14-01
+export POSTGRES_HOST=PGSQL16-01
 unset POSTGRES_PORT
 unset POSTGRES_DBNAME
 # Relative location of export files to be used for testing
 export YADAMU_ORACLE_PATH=oracle19c
-export YADAMU_MSSQL_PATH=mssql19
+export YADAMU_MSSQL_PATH=mssql22
 export YADAMU_MYSQL_PATH=mysql
 export YADAMU_TEST_FOLDER=cmdLine

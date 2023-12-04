@@ -658,7 +658,7 @@ class PostgresDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof PostgresError) || (cause instanceof CopyOperationAborted)) ? cause : new PostgresError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof PostgresError) || (cause instanceof CopyOperationAborted)) ? cause : new PostgresError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   async getInputStream(queryInfo) {        
@@ -676,13 +676,14 @@ class PostgresDBI extends YadamuDBI {
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     while (true) {
       // Exit with result or exception.  
+	  let stack
       try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+        stack = new Error().stack
         const sqlStartTime = performance.now()
-		this.streamingStackTrace = new Error().stack
-        const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
+		const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
 		
@@ -700,7 +701,7 @@ class PostgresDBI extends YadamuDBI {
 		**
 		*/
 		
-        const inputStreamError = (err) => {
+        const destroyStream = (err) => {
 		  try {
 		    // console.log('onError',this.connection.constructor.name,inputStream.constructor.name,err.message)
 	        inputStream.destroy(err) 
@@ -708,17 +709,17 @@ class PostgresDBI extends YadamuDBI {
 		  } catch (e) {console.log(e) }
 		}
 		
-	    this.connection.on('error',inputStreamError)
+	    this.connection.on('error',destroyStream)
 		
         inputStream.on('end',() => { 
-		  this.connection?.removeListener('error',inputStreamError)
+		  this.connection?.removeListener('error',destroyStream)
 		}).on('error',() => { 
-		  this.connection?.removeListener('error',inputStreamError)
+		  this.connection?.removeListener('error',destroyStream)
 		})    		
 		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

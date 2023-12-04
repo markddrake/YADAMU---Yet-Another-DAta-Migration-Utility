@@ -21,7 +21,7 @@ class OracleConstants {
     , "VARCHAR_MAX_SIZE_STANDARD"  : 4000
     , "XML_STORAGE_OPTION"         : "XML"     // Optimize based on Database Version
     , "JSON_STORAGE_OPTION"        : "JSON"    // Optimize based on Database Version
-    , "BOOLEAN_STORAGE_OPTION"     : "RAW(1)"  // Recommended Default in lieu of native support - 0x1: True, 0x0: False
+    , "BOOLEAN_STORAGE_OPTION"     : "BOOLEAN"  // Recommended Default in lieu of native support - 0x1: True, 0x0: False
 	, "OBJECT_STORAGE_OPTION"      : "NATIVE"  // Recommended Default, objects are stored as database objects
     , "MIGRATE_JSON_STORAGE"       : false
     , "PARTITION_LEVEL_OPERATIONS" : true
@@ -155,6 +155,8 @@ class OracleConstants {
 
   static get NJS_INVALID_POOL()                { return 'NJS-002' }
   
+  static get NJS_BROKEN_CONNECTION()           { return 'NJS-500' }
+
   static get KUP_FILE_NOT_FOUND()              { return 'KUP-0404' }
 
   static get MISSING_TABLE_ERROR() {
@@ -168,7 +170,7 @@ class OracleConstants {
   }
 
   static get ORACLEDB_LOST_CONNECTION() {
-    this._ORACLEDB_LOST_CONNECTION = this._ORACLEDB_LOST_CONNECTION || Object.freeze([this.DPI_NOT_CONNECTED,this.DPI_CLOSED_CONNECTION,this.NJS_INVALID_CONNECTION])
+    this._ORACLEDB_LOST_CONNECTION = this._ORACLEDB_LOST_CONNECTION || Object.freeze([this.DPI_NOT_CONNECTED,this.DPI_CLOSED_CONNECTION,this.NJS_INVALID_CONNECTION,this.NJS_BROKEN_CONNECTION])
     return this._ORACLEDB_LOST_CONNECTION
   }
 
@@ -179,7 +181,7 @@ class OracleConstants {
   }
 
   static get SPATIAL_ERROR() {
-    this._SPATIAL_ERROR = this._SPATIAL_ERROR || Object.freeze([29532])
+    this._SPATIAL_ERROR = this._SPATIAL_ERROR || Object.freeze([13198,29532]) 
     return this._SPATIAL_ERROR
   }
 

@@ -147,9 +147,16 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
          case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
            return { type :oracledb.DB_TYPE_VARCHAR, maxSize : this.BIND_LENGTH.BFILE }
          case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
-		   switch (true) {
-             case this.dbi.DATA_TYPES.BOOLEAN_AS_RAW1:
+		   switch (this.dbi.BOOLEAN_DATA_TYPE) {
+			  case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
+                return { type: oracledb.DB_TYPE_VARCHAR, maxSize : 6}
+			  case this.dbi.DATA_TYPES.BINARY_TYPE:
+                return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+			  default:
                return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+		   }
+           switch (true) {
+			 case this.dbi.DATA_TYPES.storageOptions.BOOLEAN_AS_RAW1:
       			 // ### TODO: Map other Boolean Storage Options here
                  // case this.dbi.DATA_TYPES.BOOLEAN_AS_NUMBER1:
                  //   return { type: oracledb.NUMBER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
@@ -301,19 +308,55 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
   }
   
   generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
-	return `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName}`
+	return `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName} r`
   }
 
-  generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) {
+  generateCopyStatement2(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql,externalInsertOperations) {
+	return `
+declare 
+  V_INSERT_COUNT PLS_INTEGER := 0;
+  V_REJECT_COUNT PLS_INTEGER := 0;
+  V_REJECT_LIMIT PLS_INTEGER := 0;
+  cursor fetchData is ${plsql ? `WITH\n${plsql}\n` : ''}select ${externalColumnNames.join(",")} from ${externalTableName};
+begin
+  V_REJECT_LIMIT := :1;
+  for r in fetchData loop
+  	exit when (V_REJECT_COUNT > V_REJECT_LIMIT);
+    begin
+      insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})
+      values (${externalInsertOperations.join(",")});
+	  V_INSERT_COUNT := V_INSERT_COUNT + 1;
+    exception
+      when others then 
+	    V_REJECT_COUNT := V_REJECT_COUNT + 1;		
+    end;
+  end loop;
+  ${this.generateCopyResult()}
+end;
+`
+	   
+  }
+
+  generateCopyResult() {
+	 return `select JSON_SERIALIZE(JSON_OBJECT(key 'rowsAffected' value V_INSERT_COUNT,key 'rowsRejected' value V_REJECT_COUNT)) into :2 from dual;`
+  }
+
+  generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions,externalInsertOperations) {
 		  
    	this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
     const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`;
+	const plsql = this.getPLSQL(tableInfo.dml)
+	
+	// TODO - Add Error Handling - limit errors to ERROR COUNT and return bad records ?
 
+    const rowByRowOperation = 
     tableInfo.copy = {
       ddl          : this.generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions)
-    , dml          : this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,externalTableName,externalColumnNames,externalSelectList,this.getPLSQL(tableInfo.dml)) 
+    , dml          : this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,externalTableName,externalColumnNames,externalSelectList,plsql) 
+    , dml2         : this.generateCopyStatement2(this.targetSchema,tableMetadata.tableName,externalTableName,externalColumnNames,externalSelectList,plsql,externalInsertOperations ) 
 	, drop         : `drop table ${externalTableName}`
 	}
+   
   }
   
   async getSourceTypeMappings() {
@@ -437,6 +480,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	  const externalSelectList = []
 	  const copyColumnDefinitions = []
       const externalColumnDefinitions = []
+	  const externalInsertOperations = []
 	  const externalColumnNames = []
 	  
 	  const declarations = tableInfo.columnNames.map((column,idx) => {
@@ -447,7 +491,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
         let externalDataType = undefined
 		let copyColumnDefinition = `"${column}"`
 		let value = `:${(idx+1)}`
-	    let externalSelect = copyColumnDefinition
+	    let externalSelect =  `r."${column}"`
 
         switch (targetDataType) {
           case this.dbi.DATA_TYPES.SPATIAL_TYPE:
@@ -457,16 +501,16 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
                case "WKB":
                case "EWKB":
                  value = `OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(:${(idx+1)})`;
-		         externalSelect = `case when LENGTH("${column}") > 0 then  OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}")) else NULL end`
+		         externalSelect = `case when LENGTH(${externalSelect}) > 0 then  OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB(${externalSelect})) else NULL end`
                  break;
                case "WKT":
                case "EWKT":
                  value = `OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(:${(idx+1)})`;
-		         externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY("${column}")`
+		         externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(${externalSelect})`
                  break;
                case "GeoJSON":
                  value = `OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}(:${(idx+1)})`;
-		         externalSelect = `OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}("${column}")`
+		         externalSelect = `OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}(${externalSelect})`
                  break;
                default:
             }
@@ -477,19 +521,19 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 			  case (length > 32767):
 		        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
 			 copyColumnDefinition = `${copyColumnDefinition}  ${this.LOADER_CLOB_TYPE}`
-	            externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}")`
+	            externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB(${externalSelect})`
 				break;
 			  default:
 		        externalDataType = `VARCHAR2(${length})`			    
 		        copyColumnDefinition = `${copyColumnDefinition}  CHAR(${length})`
-	            externalSelect = `HEXTORAW(TRIM("${column}"))`
+	            externalSelect = `HEXTORAW(TRIM(${externalSelect}))`
 		    }
 			break;
           case this.dbi.DATA_TYPES.XML_TYPE:
 		    externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
 		    value = `OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`;
-	        externalSelect = `case when LENGTH("${column}") > 0 then OBJECT_SERIALIZATION.DESERIALIZE_XML("${column}") else NULL end`
+	        externalSelect = `case when LENGTH(${externalSelect}) > 0 then OBJECT_SERIALIZATION.DESERIALIZE_XML(${externalSelect}) else NULL end`
             break
           case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
 		    if (this.OBJECTS_AS_JSON) {
@@ -500,19 +544,19 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
             }
   	        externalDataType = 'VARCHAR2(2048)'
   		    copyColumnDefinition = `"${column}" CHAR(2048)`
-            externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
+            externalSelect = value.replace(`:${idx+1}`,`${externalSelect}`)
             break;
           case this.dbi.DATA_TYPES.JSON_TYPE:
             // value = this.dbi.DATABASE_VERSION > 19  ? `JSON(:${(idx+1)})` : value
-  	        externalDataType = this.dbi.DATA_TYPES.BLOB_TYPE
+  	        externalDataType = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
-            externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`
+            externalSelect = `case when LENGTH(${externalSelect}) > 0 then ${externalSelect} else NULL end`
 			break
           case this.dbi.DATA_TYPES.ORACLE_ANYDATA_TYPE:
   	        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
   		    copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
             value = `ANYDATA.convertVARCHAR2(:${(idx+1)})`;
-  		    externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
+  		    externalSelect = value.replace(`:${idx+1}`,`${externalSelect}`)
             break;
 		  case this.dbi.DATA_TYPES.NCHAR_TYPE:
           case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
@@ -523,30 +567,37 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 		  case this.dbi.DATA_TYPES.BLOB_TYPE:
   	        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
   		    copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}`
-            externalSelect = `case when LENGTH("${column}") > 0 then OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}") else NULL end`
+            externalSelect = `case when LENGTH(${externalSelect}) > 0 then OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB(${externalSelect}) else NULL end`
 		    break; 		  
 		  case this.dbi.DATA_TYPES.NCLOB_TYPE:
 		  case this.dbi.DATA_TYPES.CLOB_TYPE:
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}`
-            externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`
+            externalSelect = `case when LENGTH(${externalSelect}) > 0 then ${externalSelect} else NULL end`
             break;
           case this.dbi.DATA_TYPES.DATE_TYPE:
   	        externalDataType = 'CHAR(32)'
   		    copyColumnDefinition = `"${column}" ${externalDataType}`
-            externalSelect = `to_date(substr("${column}",1,19),'YYYY-MM-DD"T"HH24:MI:SS')` 
+            externalSelect = `to_date(substr(${externalSelect},1,19),'YYYY-MM-DD"T"HH24:MI:SS')` 
             // copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT DATE 'YYYY-MM_DD"T"HH24:MI:SS#########"Z"'`
 		    break;
           case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
   	        externalDataType = 'CHAR(5)'
-  		    copyColumnDefinition = `"${column}" ${externalDataType}`
-            externalSelect = `case when "${column}" is NULL then NULL when LENGTH("${column}") = 0 then NULL when "${column}" = 'true' then HEXTORAW('01') else HEXTORAW('00') end` 
+			switch (this.dbi.BOOLEAN_DATA_TYPE) {
+			  case 'RAW(1)':
+                externalSelect = `case when ${externalSelect} is NULL then NULL when LENGTH(${externalSelect}) = 0 then NULL when ${externalSelect} = 'true' then HEXTORAW('01') else HEXTORAW('00') end` 
+			    break;
+			  case 'BOOLEAN' :
+			    externalSelect = `cast(${externalSelect} as BOOLEAN)`
+			  default:
+			}
+			copyColumnDefinition = `"${column}" ${externalDataType}`
 		    break;
           case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
   	      case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
   	      case this.dbi.DATA_TYPES.TIMESTAMP_LTZ_TYPE:
 		    externalDataType = 'CHAR(36)'
 			copyColumnDefinition = `"${column}" ${externalDataType}`
-		    externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
+		    externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz(${externalSelect},'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp(${externalSelect},'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
 			/*
 			switch (true) {
 			  case (targetDataType.indexOf('LOCAL') > 0):
@@ -572,7 +623,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
  		      externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
 			  copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
               value = `"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`;
-			  externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
+			  externalSelect = value.replace(`:${idx+1}`,`${externalSelect}`)
 			  break;
 		    }	
         } 
@@ -581,13 +632,14 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 		values.push(value)
 		copyColumnDefinitions[tableInfo.bindOrdering[idx]]     = copyColumnDefinition
 		externalColumnDefinitions[tableInfo.bindOrdering[idx]] = `"${column}" ${externalDataType || targetDataType}`
-		externalSelectList[tableInfo.bindOrdering[idx]]        = externalSelect
+		externalSelectList[tableInfo.bindOrdering[idx]]        = `${externalSelect} "${column}"`
+		externalInsertOperations[tableInfo.bindOrdering[idx]]   = externalSelect
 	    externalColumnNames[tableInfo.bindOrdering[idx]]       = `"${column}"`
         return `${variables[idx]} ${targetDataType}`;
       })
 	  
 	  if (tableMetadata.dataFile) {
-		this.generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) 
+		this.generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions,externalInsertOperations) 
 
       } 
 	  

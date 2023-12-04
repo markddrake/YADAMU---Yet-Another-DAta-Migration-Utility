@@ -81,11 +81,41 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
   }
  
   generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
-	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName}`
+	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName} r`
   }
 
-  generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) {
-    super.generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) 
+  generateCopyStatement2(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql,externalInsertOperations) {
+	return `
+declare 
+  V_INSERT_COUNT PLS_INTEGER := 0;
+  V_REJECT_COUNT PLS_INTEGER := 0;
+  V_REJECT_LIMIT PLS_INTEGER := 0;
+  cursor fetchData is select ${externalColumnNames.join(",")} from ${externalTableName};
+begin
+  V_REJECT_LIMIT := :1;
+  for r in fetchData loop
+  	exit when (V_REJECT_COUNT > V_REJECT_LIMIT);
+    begin
+      insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})
+      values (${externalInsertOperations.join(",")});
+	  V_INSERT_COUNT := V_INSERT_COUNT + 1;
+    exception
+      when others then 
+	    V_REJECT_COUNT := V_REJECT_COUNT + 1;		
+    end;
+  end loop;
+  ${this.generateCopyResult()}
+end;
+`
+	   
+  }
+  generateCopyResult() {
+	 return `:2 := YADAMU_UTILITIES.JSON_OBJECT_CLOB(YADAMU_UTILITIES.KVP_TABLE(YADAMU_UTILITIES.KVN('rowsAffected',V_INSERT_COUNT),YADAMU_UTILITIES.KVN('rowsRejected',V_REJECT_COUNT)));`
+  }
+
+
+  generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions,externalInsertOperations) {
+    super.generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions,externalInsertOperations) 
 	const plsql = this.getPLSQL(tableInfo.dml)
 	if (plsql) {
 	  const functionList  = plsql.split('\rfunction')

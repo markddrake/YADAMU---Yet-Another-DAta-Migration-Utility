@@ -23,12 +23,6 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle19c",
-            "target": "oracle12c",
-            "tasks": [
-                "oracle","mssql","mysql"
-            ]
-    },{
 		    "source": "oracle18c",
             "target": "oracle12c",
             "tasks": [

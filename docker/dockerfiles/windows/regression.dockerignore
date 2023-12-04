@@ -3,8 +3,10 @@
 !docker\regression\hosts
 !docker\regression\bin\*.ps1
 !qa\bin\*.bat
+!qa/connections/connections.json
 !qa\mappings
 !qa\regression
+!qa\service
 !qa\sql
 !src\qa
 !utilities\bin\*.bat

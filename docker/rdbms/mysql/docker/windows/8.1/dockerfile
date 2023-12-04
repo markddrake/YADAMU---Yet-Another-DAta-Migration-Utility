@@ -7,7 +7,7 @@ RUN Expand-Archive -Path C:\mysql-8.1.0-winx64.zip -destinationPath """C:\Progra
     Expand-Archive -Path C:\mysql-shell-8.1.1-windows-x86-64bit.zip  -destinationPath """C:\Program Files\MySQL"""; ` 
     Remove-Item mysql-8.1.0-winx64.zip; `
     Remove-Item mysql-shell-8.1.1-windows-x86-64bit.zip ; `
-    Move-Item """C:\Program Files\MySQL\mysql-8.1.1-winx64""" """C:\Program Files\MySQL\8.1"""; `
+    Move-Item """C:\Program Files\MySQL\mysql-8.1.0-winx64""" """C:\Program Files\MySQL\8.1"""; `
     Move-Item """C:\Program Files\MySQL\mysql-shell-8.1.1-windows-x86-64bit""" """C:\Program Files\MySQL\8.1\Shell"""; `
     [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\MySQL\8.1\bin;C:\Program Files\MySQL\8.1\Shell\bin;""" +  $env:Path,"""Machine"""); 
 #

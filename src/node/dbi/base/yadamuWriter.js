@@ -40,6 +40,7 @@ class YadamuWriter extends Writable {
   set DEBUGGER(v)          { this._DEBUGGER = v }
 
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
+
 	const options = {
       highWaterMark : dbi.BATCH_LIMIT
 	, objectMode    : true
@@ -64,13 +65,20 @@ class YadamuWriter extends Writable {
 		 resolve()
 		 this.dbi.activeWriters.delete(writeOperation)
 	  })
+	  this.on('error',(e) => {
+		 // Rejecting here will cause unhandled exception....
+		 // reject(e)
+		 resolve(e)
+		 this.dbi.activeWriters.delete(writeOperation)
+	  })
 	})
+	
+    this.dbi.activeWriters.add(writeOperation)	
 	
     this.on('pipe',(src) => {
       this.batchManager = src
     })
 
-    this.dbi.activeWriters.add(writeOperation)	
 	this.setNotWriting()
   }
 
@@ -95,6 +103,12 @@ class YadamuWriter extends Writable {
   
   async initializeTable() {
     this.setTableInfo(this.tableName)	
+
+    // Support TRUNCATE_BEFORE_LOAD
+	  
+	if (this.dbi.yadamu.parameters.TRUNCATE_ON_LOAD === true) {
+	  await this.dbi.truncateTable(this.dbi.CURRENT_SCHEMA,this.tableName)
+    }
   }
    
   isValidPartition(partitionInfo) {
@@ -262,7 +276,7 @@ class YadamuWriter extends Writable {
 	// ### Actually must not push() until DDL_COMPLETE, however if DDL operations are transactional, then we must not start the transaction until DDL Complete.
 	
 	// this.LOGGER.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
-    await this.dbi.ddlComplete
+    await Promise.allSettled([this.dbi.ddlComplete,this.dbi.isReadyForData()])
     // this.LOGGER.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
 
 	await this.beginTransaction()
@@ -429,10 +443,10 @@ class YadamuWriter extends Writable {
 	  this.COPY_METRICS.skipped += (this.COPY_METRICS.parsed - this.COPY_METRICS.received)
     }
 
-	this.COPY_METRICS.sqlTime       = this.dbi.SQL_CUMULATIVE_TIME - this.sqlInitialTime
+	this.COPY_METRICS.sqlTime       = this.dbi.SQL_CUMULATIVE_TIME - this.sqlInitialTime	
     this.COPY_METRICS.insertMode    = this.COPY_METRICS.insertMode || this.tableInfo?.insertMode || 'DDL Error'
     this.COPY_METRICS.skipTable     = this.skipTable
- 	    
+ 	   
 	const readElapsedTime = this.COPY_METRICS.parserEndTime - this.COPY_METRICS.readerStartTime;
     const writerElapsedTime = this.COPY_METRICS.writerEndTime - this.COPY_METRICS.writerStartTime;        
     const pipeElapsedTime = this.COPY_METRICS.writerEndTime - this.COPY_METRICS.pipeStartTime;
@@ -463,7 +477,7 @@ class YadamuWriter extends Writable {
 	}
 	
 	if (this.COPY_METRICS.failed) {
-      rowCountSummary = ((this.tableInfo === undefined) || (this.COPY_METRICS.tableNotFound === true)) ? `Table not found.` : `Read operation failed. ${rowCountSummary} ` 
+      rowCountSummary = this.tableInfo === undefined ? 'Operation Aborted.' : this.COPY_METRICS.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} ` 
       this.LOGGER.error([`${this.displayName}`,`${this.COPY_METRICS.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
     }
     else {
@@ -524,19 +538,24 @@ class YadamuWriter extends Writable {
   }
   
   async doDestroy(err) {
+
+    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.dbi.activeWriters.size],'doDestroy()')
+
     if (err) {
 	  this.COPY_METRICS.failed = true
       this.COPY_METRICS.writerError = err
       this.COPY_METRICS.writerEndTime = performance.now()	  
-	  try {
+
+      try {
         // this.LOGGER.trace([this.constructor.name,'doDestroy()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
-		await this.batchCompleted
+        await this.batchCompleted
         // this.LOGGER.trace([this.constructor.name,'doDestroy()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
 	    await this.endTransaction(err)
         this.reportPerformance(err)
 	  }
 	  catch (e) {
 		e.rootCause = err
+		this.LOGGER.handleException(['PIPELINE',this.displayName,this.COPY_METRICS.SOURCE_DATABASE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e)
         this.reportPerformance(e)
 		throw e
 	  }
@@ -547,7 +566,7 @@ class YadamuWriter extends Writable {
   _destroy(err,callback)  {
 	
     // this.LOGGER.trace([this.constructor.name,this.dbi.ROLE,this.displayName,this.dbi.getWorkerNumber(),this.writableLength],`YadamuWriter._destroy(${err ? err.message : 'Normal'})`)
-    this.doDestroy(err).then(() => { callback(err) }).catch((e) => { e.rootCause = err; callback(e) })
+    this.doDestroy(err).then(() => { callback(err) }).catch((e) => { console.log(1); e.rootCause = err; callback(e) })
 	
   }
 

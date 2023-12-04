@@ -3,24 +3,40 @@
     "connections": "connections.json",
     "tasks": "tasks.json",
     "recreateSchema": true,
-    "parameters": {},
-    "tests": [{
+    "parameters": {
+    },
+    "tests": [
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "oracle21c",
+            "recreateSchema": false,
+            "parameters": {
+                "TRUNCATE_ON_LOAD": true,
+                "DIRECTORY": "export/json/%vendor%",
+                "TABLES": [
+                    "ONLINE_MEDIA"
+                ]
+            },
+            "tasks":  [
+                "PM"
+            ]
+        },
+        {
             "operation": "export",
+            "source": "oracle21c",
+            "target": "file-staging",
             "recreateSchema": true,
             "createDirectory": true,
             "verifyOperation": true,
             "parameters": {
-                "DIRECTORY": "%operation%/%mode%/%connection%"
-            },
-            "source": "oracle21c",
-            "target": "file-staging",
-            "parameters": {
-                "DIRECTORY": "%operation%/json/%vendor%"
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
             },
             "tasks": [
                 "oracle"
             ]
-        },{
+        },
+        {
             "operation": "import",
             "source": "file-staging",
             "target": "oracle21c",
@@ -32,7 +48,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle21c",
             "target": "oracle21c",
             "tasks": [
@@ -40,7 +57,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle#1",
             "target": "oracle21c",
             "tasks": [
@@ -48,7 +66,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle18c",
             "target": "oracle21c",
             "tasks": [
@@ -56,7 +75,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle12c",
             "target": "oracle21c",
             "tasks": [
@@ -64,7 +84,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle11g",
             "target": "oracle21c",
             "tasks": [
@@ -72,7 +93,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mssql#1",
             "target": "oracle21c",
             "tasks": [
@@ -80,7 +102,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mssql19",
             "target": "oracle21c",
             "tasks": [
@@ -88,7 +111,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "postgres#1",
             "target": "oracle21c",
             "tasks": [
@@ -96,7 +120,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mysql#1",
             "target": "oracle21c",
             "tasks": [
@@ -104,7 +129,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mariadb#1",
             "target": "oracle21c",
             "tasks": [
@@ -112,7 +138,8 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "mongodb#1",
             "target": "oracle21c",
             "parameters": {
@@ -123,11 +150,12 @@
                 "mysql",
                 "mssql"
             ]
-        },{
+        },
+        {
             "source": "oracle21c",
             "targets": [
                 "oracle#1",
-				"oracle18c",
+                "oracle18c",
                 "oracle12c",
                 "oracle11g",
                 "mssql#1",

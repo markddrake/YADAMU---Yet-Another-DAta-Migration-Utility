@@ -98,11 +98,13 @@ class MongoDBI extends YadamuDBI {
   get MONGO_SAMPLE_LIMIT()     { return this.parameters.MONGO_SAMPLE_LIMIT    || MongoConstants.MONGO_SAMPLE_LIMIT}
   get MONGO_STORAGE_FORMAT()   { return this.parameters.MONGO_STORAGE_FORMAT  || MongoConstants.MONGO_STORAGE_FORMAT}
   get MONGO_EXPORT_FORMAT()    { return this.parameters.MONGO_EXPORT_FORMAT   || MongoConstants.MONGO_EXPORT_FORMAT}
-  get MONGO_STRIP_ID()         { return this.parameters.MONGO_STRIP_ID        || MongoConstants.MONGO_STRIP_ID}
+  get MONGO_STRIP_ID()         { return this.parameters.MONGO_STRIP_ID       === false ? false : this.parameters.MONGO_STRIP_ID      || MongoConstants.MONGO_STRIP_ID}
   get MONGO_PARSE_STRINGS()    { return this.parameters.MONGO_PARSE_STRINGS  === false ? false : this.parameters.MONGO_PARSE_STRINGS || MongoConstants.MONGO_PARSE_STRINGS}
   get DEFAULT_STRING_LENGTH()  { return this.parameters.DEFAULT_STRING_LENGTH || MongoConstants.DEFAULT_STRING_LENGTH}
   get MAX_STRING_LENGTH()      { return MongoConstants.MAX_STRING_LENGTH}
   get MAX_DOCUMENT_SIZE()      { return MongoConstants.MAX_DOCUMENT_SIZE}
+
+  get PASS_THROUGH_ENABLED()   { return this.yadamu.HOMOGENEOUS_OPERATION}
 
   get ID_TRANSFORMATION() {
     this._ID_TRANSFORMATION = this._ID_TRANSFORMATION || ((this.MONGO_STRIP_ID === true) ? 'STRIP' : 'PRESERVE')
@@ -112,6 +114,9 @@ class MongoDBI extends YadamuDBI {
   get READ_TRANSFORMATION() { 
     this._READ_TRANSFORMATION = this._READ_TRANSFORMATION || (() => { 
       switch (true) {
+		case this.PASS_THROUGH_ENABLED:
+		  this._READ_TRANSFORMATION = 'PASS_THROUGH'
+		  break
         case ((this.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.MONGO_EXPORT_FORMAT === 'ARRAY')):
           this._READ_TRANSFORMATION = 'DOCUMENT_TO_ARRAY'
           break;
@@ -127,10 +132,10 @@ class MongoDBI extends YadamuDBI {
   }
 
   get WRITE_TRANSFORMATION() { 
-    this._WRITE_TRANSFORMATION  = this._WRITE_TRANSFORMATION || 'ARRAY_TO_DOCUMENT';
+    this._WRITE_TRANSFORMATION = this._WRITE_TRANSFORMATION || (this.PASS_THROUGH_ENABLED ? 'PASS_THROUGH' : this._WRITE_TRANSFORMATION || 'ARRAY_TO_DOCUMENT')
     return this._WRITE_TRANSFORMATION 
   }
-    
+      
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
     this.DATA_TYPES = MongoDataTypes
@@ -155,7 +160,7 @@ class MongoDBI extends YadamuDBI {
   }    
   
    async truncateTable(schema,collectionName) {	 
-	await this.deleteMany(collectionName)
+	await this.deleteMany(schema,collectionName)
   }
    
    traceMongo(apiCall) {
@@ -445,7 +450,7 @@ class MongoDBI extends YadamuDBI {
     }
   }
     
-  async deleteMany(schema,collectionName) {
+  async deleteMany(schema,collectionName,options) {
 	 
     // Wrapper for db.collection().deleteMany({})
 
@@ -486,6 +491,8 @@ class MongoDBI extends YadamuDBI {
       this.vendorProperties.options.poolSize = poolSize
     }
     await this.connect(this.vendorProperties.options)
+	// The client object is the source of connections.
+	this.pool = this.client
   }
   
   async getConnectionFromPool() {
@@ -501,7 +508,7 @@ class MongoDBI extends YadamuDBI {
   }
   
   async closeConnection() {
-    // this.db.close() ?
+    // this.db.close() 
   }
   
   async closePool(options) {
@@ -565,10 +572,7 @@ class MongoDBI extends YadamuDBI {
     // TODO : Support for Mongo Authentication ???
 	
 	await super.initialize(false)   
-    
-    this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
-    this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
-    this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
+    this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`"Document ID Tranformation":"${this.ID_TRANSFORMATION}", "Read Tranformation":"${this.READ_TRANSFORMATION}","Write Tranformation":"${this.WRITE_TRANSFORMATION}"`)    
   }
 
   /*
@@ -692,11 +696,15 @@ class MongoDBI extends YadamuDBI {
 	
     const loopStartTime = performance.now()
     const schemaInfo = await Promise.all(collections.map(async (collection,idx) => {    // const dbMetadata = await Promise.all(collections.map(async (collection) => {    
-      const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [[]]}
+      const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["DOCUMENT"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [[]]}
       if ((this.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.MONGO_EXPORT_FORMAT === 'ARRAY')) {       
         let stack
         let operation
         try {
+			
+		  /*
+		  **
+		  
           operation = `${collection.collectionName}.mapReduce()`;
           this.SQL_TRACE.trace(this.traceMongo(operation))    
           let sqlStartTime = performance.now()
@@ -734,13 +742,43 @@ class MongoDBI extends YadamuDBI {
                keys              : {}
             }
           })
+		  
+		  **
+		  */
+         
+		  let sampleSize 
+          switch (this.MONGO_SAMPLE_LIMIT) {
+            case 0:
+	    	  break;
+		    case undefined:
+		      sampleSize = 1000
+		      break;
+		    default:
+		      sampleSize : this.MONGO_SAMPLE_LIMIT
+	      }
+
+          const keyNameAggregation = [
+            {"$project":{"arrayofkeyvalue":{"$objectToArray":"$$ROOT"}}},
+            {"$unwind":"$arrayofkeyvalue"},
+            {"$group":{"_id":collection.collectionName,"columnNames":{"$addToSet":"$arrayofkeyvalue.k"}}}
+		  ]
+
+          if (this.MONGO_SAMPLE_LIMIT !== 0) {
+		    keyNameAggregation.push( {"$sample" : { "size" : this.MONGO_SAMPLE_LIMIT || 1000 }})
+		  }
+		  
+		  operation = `${collection.collectionName}.aggregate()`;
+          this.SQL_TRACE.trace(this.traceMongo(operation))    
+          let sqlStartTime = performance.now()
+    	  stack =  new Error().stack
+          const columnNames = await collection.aggregate(keyNameAggregation).toArray()
           this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		  
-          if (collectionMetadata.length === 1) {
+          if (columnNames.length === 1 ) {
             // Uncomnent to debug MapReduce results
             // console.log(collection.collectionName,util.inspect(collectionMetadata,{depth:null}))
-            Object.assign(tableInfo,collectionMetadata[0].value)
-            
+            tableInfo.COLUMN_NAME_ARRAY = columnNames[0].columnNames
+			
 			const dataTypePipeline = [{ 
               $group : {
               "_id": null
@@ -775,27 +813,18 @@ class MongoDBI extends YadamuDBI {
               }           
             }
 
-            /*
-            switch (this.MONGO_SAMPLE_LIMIT) {
-      		  case 0:
-	    	    break;
-		      case undefined:
-		        dataTypePipeline.unshift({ "$sample" : { size: 1000}})
-		        break;
-		      default:
-		        dataTypePipeline.unshift({ "$sample" : { size : this.MONGO_SAMPLE_LIMIT}})
-	        }
-			*/
-
   			operation = `${collection.collectionName}.aggregate(${JSON.stringify(dataTypePipeline," ",2)})`
             this.SQL_TRACE.trace(this.traceMongo(operation))    
             let sqlStartTime = performance.now()
     	    stack =  new Error().stack
    	        const typeInformation = await collection.aggregate(dataTypePipeline).toArray()
 			// console.dir(typeInformation,{depth:null})
-			if (typeInformation.length > 0) {
+			if (typeInformation.length > 0) { 
+			  tableInfo.DATA_TYPE_ARRAY.length = 0
+			  tableInfo.SIZE_CONSTRAINT_ARRAY.length = 0 
 			  tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
-			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.coalesceTypeInfo(typeInformation[0][col].type)
+				const colTypeInformation = typeInformation[0][col]
+			    let dataType = colTypeInformation.type.length == 1 ? colTypeInformation.type[0] : this.coalesceTypeInfo(colTypeInformation.type)
 				switch (dataType) {
 				   case 'null':
 			         dataType = 'string' 
@@ -803,7 +832,7 @@ class MongoDBI extends YadamuDBI {
 					 break
 				   case 'string':
 				   case 'binData':
-				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([this.roundP2(typeInformation[0][col].size)])
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([this.roundP2(colTypeInformation.size)])
 					 break
 				   case 'objectId':
 				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([12]) 
@@ -818,7 +847,7 @@ class MongoDBI extends YadamuDBI {
 				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([]) 
 					 break
 				   default:
-				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([typeInformation[0][col].size])
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([colTypeInformation.size])
 				}
 			    tableInfo.DATA_TYPE_ARRAY.push(dataType)
 			  })
@@ -831,6 +860,9 @@ class MongoDBI extends YadamuDBI {
           throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
         }
       }
+	  
+	  // console.dir(tableInfo,{depth:null})
+	  
       if (this.ID_TRANSFORMATION === 'STRIP') {
         const idx = tableInfo.COLUMN_NAME_ARRAY.indexOf('_id')
         if (idx > -1) {
@@ -839,10 +871,11 @@ class MongoDBI extends YadamuDBI {
           tableInfo.SIZE_CONSTRAINT_ARRAY.splice(idx,1)
         }
       }
-	  tableInfo.JSON_KEY_NAME_ARRAY = [...tableInfo.COLUMN_NAME_ARRAY]
       return tableInfo
     }))
     // this.LOGGER.trace([`${this.constructor.name}.getSchemaMetadata()`,],`Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - loopStartTime)}s.`)
+	
+	// console.dir(schemaInfo,{depth:null})
     return schemaInfo
   }
 
@@ -859,25 +892,38 @@ class MongoDBI extends YadamuDBI {
   }   
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof MongoError) || (cause instanceof CopyOperationAborted)) ? cause : new MongoError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof MongoError) || (cause instanceof CopyOperationAborted)) ? cause : new MongoError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
   
   async getInputStream(collectionInfo,parser) {
             
     const collectionName = collectionInfo.TABLE_NAME
-    let stack
     const operation = `${collectionName}.find().stream()`
-    try {
-      this.SQL_TRACE.trace(this.traceMongo(operation))
-      let sqlStartTime = performance.now()
-      stack =  new Error().stack
-      const mongoStream = await this.connection.collection(collectionName).find().stream()
-      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
-      return mongoStream;      
-    } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
-    }
-  }      
+
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+        this.SQL_TRACE.trace(this.traceMongo(operation))
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+        const mongoStream = await this.connection.collection(collectionName).find().stream()
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return mongoStream;
+      } catch (e) {
+		const cause = this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
+  }       
    
   /*
   **
@@ -885,8 +931,8 @@ class MongoDBI extends YadamuDBI {
   **
   */
     
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(MongoStatementGenerator,schema) 
+  async generateStatementCache(schema) {  
+	return await super.generateStatementCache(MongoStatementGenerator,schema) 
   }
   
   getOutputStream(collectionName,metrics) {

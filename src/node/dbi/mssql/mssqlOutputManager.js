@@ -38,9 +38,9 @@ class MsSQLOutputManager extends YadamuOutputManager {
   generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-
+ 
     let spatialFormat = this.SPATIAL_FORMAT
-	
+		
 	const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(dataTypes)		
     this.tableInfo.dataTypeDefinitions = dataTypeDefinitions
 	return dataTypeDefinitions.map((dataType,idx) => {      
@@ -61,8 +61,7 @@ class MsSQLOutputManager extends YadamuOutputManager {
 		    }
 		  }
 		  return null
-		case "bit":
-        case "boolean":
+		case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
 		  return (col,idx) => {
             return YadamuLibrary.toBoolean(col)
 		  }
@@ -118,6 +117,14 @@ class MsSQLOutputManager extends YadamuOutputManager {
 			default:
 			  return null;
 	      }
+		case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+	      switch (dataTypes[idx]) {
+            case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
+		      return (col,idx) => {
+                return typeof col === "object" ? JSON.stringify(col) : col
+    		  }
+            default:
+	      }  
 		default :
 		  return null
       }

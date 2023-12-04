@@ -11,7 +11,7 @@ services:
     networks:
       - YADAMU-NET
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
+      - YADAMU_01-SHARED:/usr/src/YADAMU/mnt
     restart: always
    
 networks: 

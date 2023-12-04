@@ -1,19 +1,41 @@
 
 import path                   from 'path'
+
 import {
   PassThrough
 }                             from 'stream';
+
 import {
   setTimeout 
 }                             from "timers/promises"
+
+import { 
+  pipeline 
+}                               from 'stream/promises';
+
+import { 
+  HeadBucketCommand
+, CreateBucketCommand
+, DeleteObjectsCommand
+, GetObjectCommand
+, HeadObjectCommand
+, ListObjectsV2Command
+, PutObjectCommand
+}                             from "@aws-sdk/client-s3";
+
+import { 
+  Upload 
+}                             from "@aws-sdk/lib-storage";
+
+import StringWriter           from '../../util/stringWriter.js';
 
 import AWSS3Constants         from './awsS3Constants.js';
 import AWSS3Error             from './awsS3Exception.js';
 
 class ByteCounter extends PassThrough {
 
-  constructor(options) {
-    super(options) 
+  constructor(input) {
+    super(input) 
 	this.byteCount = 0
   }
   
@@ -42,9 +64,9 @@ class AWSS3StorageService {
 
   constructor(dbi,parameters) {
 	this.dbi = dbi
-	this.s3Connection = this.dbi.cloudConnection
+	this.s3Client = this.dbi.cloudConnection
 	this.parameters = parameters || {}
-	this.LOGGER = this.dbi.yadamuLogger
+	this.LOGGER = this.dbi.LOGGER
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
 	this.offset = 0;
   }
@@ -54,50 +76,68 @@ class AWSS3StorageService {
   }
   	   
   createWriteStream(key,contentType,activeWriters) {
-	// this.LOGGER.trace([this.constructor.name],`createWriteStream(${key})`)
+	
+	// this.LOGGER.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD'],key);
   
-    const params = { 
-	  Bucket      : this.dbi.BUCKET
-	, Key         : key
-	, ContentType : contentType
-    , Body        : new PassThrough()
-    }	
-	const writeOperation = new Promise((resolve,reject) => {
-	  this.s3Connection.upload(params).send((err, data) => {
-		if (err) {
-   	      // this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
-          this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
-		  // Destroying Body with err should terminate the current pipeline
-		  params.Body.destroy(err);
-          // reject(err)
-	    } 
-	    else {
-          // this.LOGGER.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,params.Key],`Removing Active Writer`);		
-	    }
-        activeWriters.delete(writeOperation)
-        resolve(params.Key)
-      })
-    })	  
-	activeWriters.add(writeOperation)
-	return params.Body
-  }
+  
+    const input = { 
+	  client     : this.s3Client
+	, params     : { 
+	    Bucket      : this.dbi.BUCKET
+	  , Key         : key
+	  , ContentType : contentType
+	  , queueSize   : this.dbi.parameters.PARALLEL  
+	  , Params      : 'new PassThrough()'
+	  }
+    }
+        
+	const operation = `S3LibStorage.Upload(${JSON.stringify(input.params)})`
+	
+	input.params.Body = new PassThrough()
+	
+    const stack = new Error().stack
 
+	const writeOperation = new Promise((resolve,reject) => {
+      const upload = new Upload(input)	
+      upload.done().then(() => {
+	    // this.LOGGER.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`DONE`],input.params.Key);
+	    input.params.Body.destroy()
+	    resolve(input.params.Key)
+	  }).catch((err) => {
+        const cause = new AWSS3Error(this.dbi.DRIVER_ID,err,stack,operation)
+        this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,input.params.Key],err);
+        input.params.Body.destroy(err)
+	    reject(cause)
+	  }).finally(() => {
+	    // this.LOGGER.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FINAL`],input.params.Key);
+	    activeWriters.delete(writeOperation)
+	  })
+    })
+	
+	activeWriters.add(writeOperation)
+	return input.params.Body
+  }
+  
   async createBucketContainer() {
     let stack;
-	let operation
+	let operation;
+    const input = {Bucket : this.dbi.BUCKET}
     try {
-      stack = new Error().stack
-	  operation = `AWS.S3.headBucket(${this.dbi.BUCKET})`
 	  try {
-	    let results = await this.s3Connection.headBucket({Bucket : this.dbi.BUCKET}).promise();
+        operation = `S3Client.HeadBucketCommand(${JSON.stringify(input)})`
+		const command = new HeadBucketCommand(input)
+	    stack = new Error().stack
+	    let output = await this.s3Client.send(command)
       } catch (e) {
-		if (e.statusCode === AWSS3Constants.HTTP_NAMED_STATUS_CODES.NOT_FOUND) {
+		const cause = new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation) 
+		if (cause.notFound()) {
+	      operation = `S3Client.CreateBucketCommand(${JSON.stringify(input)})`
+		  const command = new CreateBucketCommand (input)
           stack = new Error().stack
-	      operation = `AWS.S3.createBucket(${this.dbi.BUCKET})`
-    	  await this.s3Connection.createBucket({Bucket: this.dbi.BUCKET}).promise()
-		  return
+          let output = await this.s3Client.send(command)
+     	  return output
         } 
-		throw e
+		throw cause
 	  }
 	} catch (e) { 
       throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
@@ -106,19 +146,24 @@ class AWSS3StorageService {
 
   async verifyBucketContainer() {
 	 
-	let stack;
+    let stack;
+    const input = {Bucket : this.dbi.BUCKET}
+	const operation = `S3Client.HeadBucketCommand(${JSON.stringify(input)})`
+
     try {
+      const command = new HeadBucketCommand(input)
       stack = new Error().stack
-      let results = await this.s3Connection.headBucket({Bucket : this.dbi.BUCKET}).promise();
+	  const output = await this.s3Client.send(command)	 
+	  return output
 	} catch (e) { 
-      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.headBucket(${this.dbi.BUCKET})`)
+      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
 	}
   }
   
-  async putObject(key,content,params) {
-	params = params || {}
-	params.Bucket = this.dbi.BUCKET
-	params.Key = key
+  async putObject(key,content,input) {
+	input = input || {}
+	input.Bucket = this.dbi.BUCKET
+	input.Key = key
 	switch (true) {
 	  case Buffer.isBuffer(content):
 	    break;
@@ -129,44 +174,62 @@ class AWSS3StorageService {
        break;
 	 default:
 	}
-	params.Body = content
-    const stack = new Error().stack
+	let stack
+	const operation = `S3Client.PutObjectCommand(${JSON.stringify(input)})`
+	input.Body = content
     try {
-      const results = await this.s3Connection.putObject(params).promise()
-	  return results;
+      const command = new PutObjectCommand(input)
+      stack = new Error().stack
+	  const output = await this.s3Client.send(command)	 
+	  return output;
     } catch (e) {
-      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.putBucket(s3://${this.dbi.BUCKET}/${params.Key})`)
+      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
 	}
+  }
+    
+  async getObject(key,input) {
+	input = input || {}
+	input.Bucket = this.dbi.BUCKET
+	input.Key = key
+	
+	let stack
+	const operation = `S3Client.GetObjectCommand(${JSON.stringify(input)})`
+    try {
+      const command = new GetObjectCommand(input)
+      stack = new Error().stack
+	  const output = await this.s3Client.send(command)	 
+	  return output;
+    } catch (e) {
+      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
+	}
+  }
+
+  
+  async getContentAsString(key,input) {
+	const object = await this.getObject(key,input)
+    const sw = new StringWriter();
+	await pipeline(object.Body,sw)
+	return sw.toString();
   }
   
-  async getObject(key,params) {
-	params = params || {}
-	params.Bucket = this.dbi.BUCKET
-	params.Key = key
-    const stack = new Error().stack
-    try {
-      const results = await this.s3Connection.getObject(params).promise()
-	  return results;
-    } catch (e) {
-      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.getObject(s3://${this.dbi.BUCKET}/${params.Key})`)
-	}
-  }
-
-  async getObjectProps(key,params) {
+  async getObjectProps(key,input) {
 	 
-	params = params || {}
-	params.Bucket = this.dbi.BUCKET
-	params.Key = key
+	input = input || {}
+	input.Bucket = this.dbi.BUCKET
+	input.Key = key
 
 	let retryCount =  0
-    const stack = new Error().stack
-
+	const operation = `S3Client.HeadObjectCommand(${JSON.stringify(input)})`
+    const command = new HeadObjectCommand(input)
+        
 	while (true) {
       try {
-        return await this.s3Connection.headObject(params).promise()
+        const stack = new Error().stack
+	    const output = await this.s3Client.send(command)	 
+  	    return output;
 	  } catch (e) {
-	    const awsError = new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.headObject(s3://${this.dbi.BUCKET}/${params.Key})`)
-        if (awsError.FileNotFound() && this.retryOperation(retryCount)) { 
+	    const awsError = new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
+        if (awsError.notFound() && this.retryOperation(retryCount)) { 
 		  await setTimeout(e.retryDelay)
 		  retryCount++
 		  continue
@@ -176,66 +239,64 @@ class AWSS3StorageService {
 	}
   }
 
-  async createReadStream(key,params) {
+  async createReadStream(key,input) {
 	  
 	// this.LOGGER.trace([this.constructor.name],`createReadStream(${key})`)
 	
-	params = params || {}
-	params.Bucket = this.dbi.BUCKET
-	params.Key = key
-    const stack = new Error().stack
-    try {
-      const stream = await this.s3Connection.getObject(params).createReadStream()
-	  return stream;
-	} catch (e) {
-	  throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.getObject(s3://${this.dbi.BUCKET}/${params.Key})`)
-	}
+	const object = await this.getObject(key,input)
+	return object.Body
+
   }
   
-  async deleteFolder(key,params) {
+  async deleteFolder(key,input) {
 	 
-	params = params || {}
-	params.Bucket = this.dbi.BUCKET
-	params.Prefix = key.split(path.sep).join(path.posix.sep)
+	input = input || {}
+	input.Bucket = this.dbi.BUCKET
+	input.Prefix = key.split(path.sep).join(path.posix.sep)
 	let stack
+	let operation
 	let folder
     do { 
       try {
+   	    operation = `S3Client.ListObjectsV2Command(${JSON.stringify(input)})`
+        const command = new ListObjectsV2Command(input)
 		stack = new Error().stack
-	    folder = await this.s3Connection.listObjectsV2(params).promise();
+	    folder = await this.s3Client.send(command)	 
       } catch (e) {
-        throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.listObjectsV2(s3://${this.dbi.BUCKET}/${params.Key})`)
+        throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
 	  }
-	  if (folder.Contents.length === 0) break;
-	  const deleteParams = {
+	  if (folder.KeyCount === 0) break;
+	  const deleteinput = {
 		Bucket : this.dbi.BUCKET
 	  , Delete : { Objects : folder.Contents.map((c) => { return {Key : c.Key }})}
 	  }
 	  try {
   	    stack = new Error().stack
-	    await this.s3Connection.deleteObjects(deleteParams).promise();
+   	    const operation = `S3Client.ListObjectsV2Command(${JSON.stringify(deleteinput)})`
+        const command = new DeleteObjectsCommand(deleteinput)
+        await this.s3Client.send(command)	 
       } catch (e) {
-        throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.deleteObjects(s3://${this.dbi.BUCKET}/${deleteParams.Delete.Objects.length})`)
+        throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,operation)
 	  }
 	} while (folder.IsTruncated);
   }
 
-  async deleteFile(key,params) {
+  async deleteFile(key,input) {
 	 
 	/* 
-	params = params || {}
-	params.Bucket = this.dbi.BUCKET
-	params.Prefix = key.split(path.sep).join(path.posix.sep)
-    const deleteParams = {
+	input = input || {}
+	input.Bucket = this.dbi.BUCKET
+	input.Prefix = key.split(path.sep).join(path.posix.sep)
+    const deleteinput = {
 	  Bucket : this.dbi.BUCKET
 	, Delete : { Objects : folder.Contents.map((c) => { return {Key : c.Key }})}
 	}
 	let stack
     try {
       stack = new Error().stack
-	  await this.s3Connection.deleteObjects(deleteParams).promise();
+	  await this.s3Client.deleteObjects(deleteinput).promise();
     } catch (e) {
-      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.deleteObjects(s3://${this.dbi.BUCKET}/${deleteParams.Delete.Objects.length})`)
+      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`S3Client.deleteObjects(s3://${this.dbi.BUCKET}/${deleteinput.Delete.Objects.length})`)
 	}
 	*/
   }

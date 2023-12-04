@@ -124,13 +124,13 @@ class ExampleDBI extends YadamuDBI {
       this.SQL_TRACE.traceSQL(sqlStatement)
     }
 
-    let stack
     while (true) {
       // Exit with result or exception.  
+      let stack
       try {
-        const sqlStartTime = performance.now()
 		stack = new Error().stack
-        const results = await this.connection... /* EXECUTE_SQL_STATEMENT */
+        const sqlStartTime = performance.now()
+        const results = await this.connection.executeSQL(sqlStatemeent) /* EXECUTE_SQL_STATEMENT */
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
@@ -422,7 +422,7 @@ class ExampleDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
   
   async getInputStream(queryInfo) {
@@ -430,9 +430,31 @@ class ExampleDBI extends YadamuDBI {
     // Either return the databases native readable stream or use the ExampleReader to create a class that wraps a cursor or event stream in a Readable
 
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
-    this.streamingStackTrace = new Error().stack;
-    return new ExampleReader(this.connection,queryInfo.SQL_STATEMENT)
-	
+
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+		const is = new ExampleReader(this.connection,queryInfo.SQL_STATEMENT)
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return is;
+      } catch (e) {
+		const cause = this.trackExceptions(new ExampleError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
+
   }  
     
   /*

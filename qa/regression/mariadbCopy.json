@@ -14,67 +14,61 @@
 			"source": "mariadb#1",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle#1",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
-			]
-		},{
-			"source": "oracle19c",
-			"target": "mariadb#1",
-			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle18c",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle12c",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle11g",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mssql#1",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mssql19",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "postgres#1",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mysql#1",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mongodb#1",
 			"target": "mariadb#1",
 			"tasks": [
-				"oracle","mssql","postgres"
+				"oracle","mssql","mysql"
 			]
 		}]
 }

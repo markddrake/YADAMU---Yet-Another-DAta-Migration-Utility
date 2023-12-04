@@ -1,0 +1,35 @@
+{
+  "operation"                : "dbRoundTrip"
+, "connections"              : "connections.json"
+, "tasks"                    : "tasks.json"
+, "recreateSchema"           : true
+, "parameters"               : {
+    "CIRCLE_FORMAT"          : "CIRCLE"
+  , "INFINITY_MANAGEMENT"    : "NULLIFY"
+  }
+, "tests"                    : [{
+    "operation"              : "export"
+  , "source"                 : "postgres#1"
+  , "target"                 : "file-staging"
+  , "verifyOperation"        : true
+  , "parameters"             : {
+	  "DIRECTORY"            : "%operation%/json/%vendor%"
+    }
+  , "tasks"                  : [
+      "postgresDataTypes"
+	]
+  },{
+    "operation"              : "import"
+  , "source"                 : "file-staging"
+  , "verifyOperation"        : true
+  , "parameters"             : {
+	  "DIRECTORY"            : "export/json/%location%"
+    }
+  , "targets"                : [
+       "oracle#1", "oracle18c", "oracle12c", "oracle11g","mssql#1","mssql19","mysql#1","mariadb#1","mongodb#1"
+	]
+  , "tasks"                  : [
+      "postgresDataTypes"
+	]
+  }]
+}

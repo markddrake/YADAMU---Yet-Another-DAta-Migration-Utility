@@ -20,8 +20,6 @@ class OracleStorageOptions extends YadamuStorageOptions {
 	
   set BOOLEAN_TYPE(v)                       { YadamuDataTypes.redefineProperty(this,'BOOLEAN_TYPE',v) }
   
-  get RAW1_IS_BOOLEAN()                     { return this.BOOLEAN_TYPE === 'RAW1' }
-  
   get ORACLE_OBJECT_TYPE()                  { return OracleConstants.OBJECT_STORAGE_OPTION }	
 	
   set ORACLE_OBJECT_TYPE(v)                 { YadamuDataTypes.redefineProperty(this,'ORACLE_OBJECT_TYPE',v) }
@@ -89,6 +87,8 @@ class OracleDataTypes extends YadamuDataTypes {
 	    return this.TIME_TZ_TYPE
       case typeList.includes(this.INTERVAL_TYPE):
         return this.INTERVAL_TYPE
+      case typeList.includes(this.BOOLEAN_TYPE):
+        return this.BOOLEAN_TYPE
 	  default:
 	    const dataTypeDefinitions = YadamuDataTypes.decomposeDataTypes(typeList)
 		// Check for common case of NUMBER mapped to different sized integers: return largest

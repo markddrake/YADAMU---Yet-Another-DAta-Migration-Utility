@@ -533,7 +533,7 @@ class RedshiftDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof RedshiftError) || (cause instanceof CopyOperationAborted)) ? cause : new RedshiftError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof RedshiftError) || (cause instanceof CopyOperationAborted)) ? cause : new RedshiftError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   async getInputStream(queryInfo) {       
@@ -551,12 +551,14 @@ class RedshiftDBI extends YadamuDBI {
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+
     while (true) {
       // Exit with result or exception.  
+	  let stack
       try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
         const sqlStartTime = performance.now()
-		this.streamingStackTrace = new Error().stack
         const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
@@ -578,7 +580,7 @@ class RedshiftDBI extends YadamuDBI {
   		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

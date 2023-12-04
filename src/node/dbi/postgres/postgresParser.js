@@ -23,10 +23,14 @@ class PostgresParser extends YadamuParser {
   }
 
   /*
+  **
+  
   async doTransform(data) {
 	console.log(data)
 	return await super.doTransform(data)
   }
+  
+  **
   */
 }
 

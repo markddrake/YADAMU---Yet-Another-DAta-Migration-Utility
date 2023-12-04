@@ -35,7 +35,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle11c",
+			"source": "oracle12c",
 			"targets": [
 			   "vertica11"
 		    ],

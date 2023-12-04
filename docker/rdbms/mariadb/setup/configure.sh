@@ -14,4 +14,4 @@ export DB_PWD=oracle
 export DB_DBNAME=mysql
 mariadb   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f < setup/configure.sql > log/configure.log
 mysqlsh -u$DB_USER -p$DB_PWD -D$DB_DBNAME -hlocalhost -P3306 --js --interactive --file=setup/YADAMU_INSTALL.js
-mariadb   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f <sql/YADAMU_TEST.sql >log/YADAMU_TEST.log
+mariadb   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f <sql/YADAMU_COMPARE.sql >log/YADAMU_COMPARE.log

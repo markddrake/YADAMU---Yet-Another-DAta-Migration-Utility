@@ -378,18 +378,36 @@ class TeradataDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof TeradataError) || (cause instanceof CopyOperationAborted)) ? cause : new TeradataError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof TeradataError) || (cause instanceof CopyOperationAborted)) ? cause : new TeradataError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
 
   async getInputStream(queryInfo) {
+
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
-    this.streamingStackTrace = new Error().stack;
-	try {
-      return new TeradataReader(this.connection.cursor(),queryInfo.SQL_STATEMENT)
-	} catch (e) {
-	  throw this.trackExceptions(new TeradataError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
-	}
+
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
     
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+		const is = new TeradataReader(this.connection.cursor(),queryInfo.SQL_STATEMENT)
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return is;
+      } catch (e) {
+		const cause = this.trackExceptions(new TeradataError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
   }  
   
   /*

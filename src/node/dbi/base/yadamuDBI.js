@@ -1,4 +1,5 @@
 
+
 import fs                 from 'fs';
 import path               from 'path';
 import EventEmitter       from 'events'
@@ -114,8 +115,8 @@ class YadamuDBI extends EventEmitter {
   get SOFTWARE_VENDOR()              { return 'YABASC - Yet Another Bay Area Software Company'};
   get DATATYPE_IDENTITY_MAPPING()    { return true }
   
-  get DESTROYED()                    { return this._DESTORYED }
-  set DESTROYED(v)                   { this._DESTORYED = v }
+  get DESTROYED()                    { return this._DESTROYED }
+  set DESTROYED(v)                   { this._DESTROYED = v }
 
   get DRIVER_ID()                    { return this._DRIVER_ID }
   set DRIVER_ID(v)                   { this._DRIVER_ID = v }
@@ -391,6 +392,8 @@ class YadamuDBI extends EventEmitter {
     this.activeWriters = new Set()
     
     if (manager) {
+	  // Add the Worker to the list of Active Workers here so it synchronous
+      manager.activeWorkers.add(this)
       this.workerReady = new Promise((resolve,reject) => {
         this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { this.LOGGER.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e) })
       })
@@ -441,7 +444,7 @@ class YadamuDBI extends EventEmitter {
           this.LOGGER.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
           if (this.PARTITION_LEVEL_OPERATIONS) {
             // Need target schema metadata to determine if we can perform partition level write operations.
-            this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { reject(e) })
+            this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { console.log(1); reject(e) })
           }
           else {
             resolve(true)
@@ -451,6 +454,13 @@ class YadamuDBI extends EventEmitter {
         resolve(true)
       })
     })
+	
+	this.readyForData = new Promise((resolve,reject) => { resolve(false) })
+	
+  }
+  
+  isReadyForData() {
+	return this.isManager() ? this.readyForData : this.manager.readyForData
   }
 
   initializeDataTypes(DataTypes) {
@@ -459,6 +469,9 @@ class YadamuDBI extends EventEmitter {
   }
 
   async initializeWorker(manager) {
+	  	
+    // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`initializeWorker(${manager.activeWorkers.size})`)
+	
 	try {
       this.manager = manager
       this.workerNumber = -1
@@ -472,7 +485,6 @@ class YadamuDBI extends EventEmitter {
         })
       })
       
-      manager.activeWorkers.add(this)
       
       await this.setWorkerConnection()
       await this.configureConnection()
@@ -1292,34 +1304,37 @@ class YadamuDBI extends EventEmitter {
 
   async destroy(err) {
 	 
-    // this.LOGGER.trace([this.constructor.name,this.ROLE,this.getWorkerNumber(),this.DESTORYED],`doDestroy(${this.activeWorkers.size},${err ? err.message : 'normal'})`)
-    
+    // this.LOGGER.trace([this.constructor.name,this.ROLE,this.getWorkerNumber(),this.DESTROYED],`doDestroy(${this.activeWorkers.size},${err ? err.message : 'normal'})`)
+
     /*
     **
     **  Abort the database connection and pool
     **
     */
 
+    await this.writersFinished() 
+
     if (!this.DESTROYED) {
 
 	  this.DESTROYED = true
-
+	  
       if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
         // Active Workers contains the set of Workers that have not terminated.
         // We need to force them to terminate and release any database connections they own.
-        this.LOGGER.error([this.DATABASE_VENDOR,this.ROLE,'destroy()'],`Aborting ${this.activeWorkers.size} active workers).`)
-        this.activeWorkers.forEach((worker) => {
+        this.LOGGER.error([this.DATABASE_VENDOR,this.ROLE,'destroy()'],`Terminating ${this.activeWorkers.size} active workers.`)
+        await Promise.allSettled(Array.from(this.activeWorkers).map((worker) => {
           try {
-            this.LOGGER.log([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',this.getWorkerNumber()],`Found Active Worker ${worker.getWorkerNumber()}`)
-            worker.destroy()
+            // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',this.getWorkerNumber()],`Terminating Worker ${worker.getWorkerNumber()}`)
+            return worker.destroyWorker()
           } catch(e) {
             this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',worker.getWorkerNumber()],e)
+			
           }
-        })
+        }))
+        this.LOGGER.error([this.DATABASE_VENDOR,this.ROLE,'destroy()'],`Workers terminated.`)
       }
      
       const closeOptions = this.getCloseOptions(err)
-      
       if (this.connection) {      
         try {
           await this.closeConnection(closeOptions)
@@ -1331,7 +1346,7 @@ class YadamuDBI extends EventEmitter {
         }
       }
       
-      if (this.pool) {
+	  if (this.pool) {
         try {
           // Force Termnination of All Current Connections.
           await this.closePool(closeOptions)
@@ -1344,7 +1359,7 @@ class YadamuDBI extends EventEmitter {
       
       this.yadamu.activeConnections.delete(this)
 	}
-	    
+        
   } 
     
   checkConnectionState(cause) {
@@ -1700,6 +1715,7 @@ class YadamuDBI extends EventEmitter {
   }
   
   async initializeData() {
+	
   }
   
   async finalizeData() {
@@ -1750,6 +1766,9 @@ class YadamuDBI extends EventEmitter {
     tableInfo.tableName = mappedTableName
     return tableInfo
   }
+  
+  adjustQuery(queryInfo) {
+  }
 
   generateSQLQuery(tableMetadata) {
     const queryInfo = Object.assign({},tableMetadata)   
@@ -1767,11 +1786,11 @@ class YadamuDBI extends EventEmitter {
   }
  
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(new InputStreamError(cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(new InputStreamError(cause,new Error().stack,sqlStatement))
   }
   
   async getInputStream(queryInfo) {
-    this.streamingStackTrace = new Error().stack;
+    stack = new Error().stack;
     throw new UnimplementedMethod('getInputStream()',`YadamuDBI`,this.constructor.name)
     return inputStream;
   }      
@@ -1882,10 +1901,10 @@ class YadamuDBI extends EventEmitter {
   }
 
   cloneSettings() {
-    this.dbConnected = this.manager.dbConnected
-    this.cacheLoaded = this.manager.cacheLoaded
-    this.ddlComplete = this.manager.ddlComplete
-          
+    this.dbConnected  = this.manager.dbConnected
+    this.cacheLoaded  = this.manager.cacheLoaded
+    this.ddlComplete  = this.manager.ddlComplete
+	
     this.StatementLibrary   = this.manager.StatementLibrary
     this.StatementGenerator = this.manager.StatementGenerator
 

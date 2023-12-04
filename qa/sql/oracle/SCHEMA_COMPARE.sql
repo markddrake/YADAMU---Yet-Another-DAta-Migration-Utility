@@ -15,7 +15,7 @@ select to_char(SYS_EXTRACT_UTC(SYSTIMESTAMP),'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ':
   from DUAL
 /
 begin
-  YADAMU_TEST.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2',$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED  $THEN '{objectsRule:"SKIP"}' $ELSE '<rules><objectsRule>SKIP</objectsRule></rules>' $END );
+  YADAMU_COMPARE.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2',$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED  $THEN '{objectsRule:"SKIP"}' $ELSE '<rules><objectsRule>SKIP</objectsRule></rules>' $END );
 end;
 /
 --

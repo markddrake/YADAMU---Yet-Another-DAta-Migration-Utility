@@ -106,7 +106,7 @@ class MongoWriter extends YadamuWriter {
 
   }
   
-  reportBatchError(batch,operation,cause) {
+  reportBatchError(operation,batch,cause) {
    	super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
    
@@ -127,7 +127,7 @@ class MongoWriter extends YadamuWriter {
       this.releaseBatch(batch)
 	  return this.skipTable
     } catch (cause) {
-	  this.reportBatchError(batch.map((r) => { return Object.values(r)}),`INSERT MANY`,cause)
+	  this.reportBatchError(`INSERT MANY`,batch.map((r) => { return Object.values(r)}),cause)
       this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
     } 
     

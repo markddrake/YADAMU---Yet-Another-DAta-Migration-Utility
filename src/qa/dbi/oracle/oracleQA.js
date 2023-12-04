@@ -58,6 +58,31 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
       return new OracleQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
+    async configureConnection() {
+
+      await super.configureConnection()
+	  
+	  const configOptions = []
+
+	  if (this.isManager()) {
+		  
+		configOptions.push(['VARCHAR2 length',this.EXTENDED_STRING ? 32767 : 4000])
+        
+        if (this.MAX_STRING_SIZE <= OracleConstants.VARCHAR_MAX_SIZE_EXTENDED) {
+		  configOptions.push(['JSON String Length',this.MAX_STRING_SIZE])
+        }
+        
+        if (this.XMLTYPE_STORAGE_CLAUSE !== this.XMLTYPE_STORAGE_MODEL ) {
+ 		  configOptions.push(['XMLType',this.XMLTYPE_STORAGE_CLAUSE])
+        }
+	  
+		configOptions.push(['JSON',this.DATA_TYPES.storageOptions.JSON_TYPE])
+		configOptions.push(['BOOLEAN',this.DATA_TYPES.storageOptions.BOOLEAN_TYPE])
+	    
+		this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Storage Options: ${configOptions.map((option) => { return `"${option[0]}":"${option[1]}"`}).join(', ')}`)
+      }
+    }
+  
     async scheduleTermination(pid,workerId) {
 	  const tags = this.getTerminationTags(workerId,`${pid.sid},${pid.serial}`)
 	  this.LOGGER.qa(tags,`Termination Scheduled.`);
@@ -99,7 +124,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 	
 export { OracleQA as default }
 
-const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_RULES); end;`;
+const _SQL_COMPARE_SCHEMAS = `begin YADAMU_COMPARE.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_RULES); end;`;
 
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL', TARGET_ROW_COUNT

@@ -128,15 +128,19 @@ class YadamuLibrary {
   }
   
   static booleanToInt(booleanValue) {
-    return this.toBoolean(booleanValue) === true ? 1 : 0
+    return YadamuLibrary.toBoolean(booleanValue) === true ? 1 : 0
   }
   
   static booleanToBit(booleanValue) {
-    return this.toBoolean(booleanValue) === true ? 1 : 0
+    return YadamuLibrary.toBoolean(booleanValue) === true ? 1 : 0
+  }
+  
+  static booleanToString(booleanValue) {
+    return YadamuLibrary.toBoolean(booleanValue) === true ? 'true' : 'false'
   }
   
   static booleanToBuffer(booleanValue) {
-    return new Buffer.from([this.booleanToInt(booleanValue)])
+    return new Buffer.from([YadamuLibrary.booleanToInt(booleanValue)])
   }
               
   static nameMatch(source,target,rule) {
@@ -310,6 +314,92 @@ class YadamuLibrary {
 	}
 	
 	return results
+  }
+
+  static  parseDTSIntervalUnits(interval) {
+	
+	const jsInterval = {}
+	let components = interval.split(' ')
+	
+	
+	switch (components.length) {
+	  case 8:
+        switch (components[7]) {
+	      case "seconds":
+          case "second":
+   		    jsInterval.secs = components[6]
+			jsInterval.time = true
+		    break;
+		  default:
+		    console.log('Unparseable Interval:',components)  
+        }
+      case 6:
+        switch (components[5]) {
+	      case "minutes":
+          case "minute":
+   	        jsInterval.mins = components[4]
+			jsInterval.time = true
+		    break;
+	      case "seconds":
+          case "second":
+   		    jsInterval.secs = components[4]
+			jsInterval.time = true
+		    break;
+		  default:
+		    console.log('Unparseable Interval:',components)  
+        }
+	  case 4:
+        switch (components[3]) {
+	      case "hours":
+          case "hour":
+   	        jsInterval.hours = components[2]
+			jsInterval.time = true
+		    break;
+	      case "minutes":
+          case "minute":
+   	        jsInterval.mins = components[2]
+			jsInterval.time = true
+		    break;
+	      case "seconds":
+          case "second":
+   		    jsInterval.secs = components[2]
+			jsInterval.time = true
+		    break;
+		  default:
+		    console.log('Unparseable Interval:',components)  
+		}
+	  case 2:	  
+        switch (components[1]) {
+          case "days":
+          case "day":
+            jsInterval.days = components[0]
+	        break;
+	      case "hours":
+          case "hour":
+   	        jsInterval.hours = components[0]
+			jsInterval.time = true
+		    break;
+	      case "minutes":
+          case "minute":
+   	        jsInterval.mins = components[0]
+			jsInterval.time = true
+		    break;
+	      case "seconds":
+          case "second":
+   		    jsInterval.secs = components[0]
+			jsInterval.time = true
+		    break;
+		  default:
+		    console.log('Unparseable Interval:',components)  
+		}
+        break
+      default:
+	    console.log('Unparseable Interval:',components)  
+	}
+
+    const interval8601 = `P${jsInterval.days ? `${jsInterval.days}D` : ''}${jsInterval.time ? `T${jsInterval.hours ? `${jsInterval.hours}H${jsInterval.mins ? `${jsInterval.mins}M` : ''}${jsInterval.secs ? `${jsInterval.secs}S` : ''}` : ''}` : ''}`
+	return interval8601
+
   }
 
   static getVendorName(connectionProperties) {

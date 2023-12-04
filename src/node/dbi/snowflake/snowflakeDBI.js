@@ -505,15 +505,36 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof SnowflakeError) || (cause instanceof CopyOperationAborted)) ? cause : new SnowflakeError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof SnowflakeError) || (cause instanceof CopyOperationAborted)) ? cause : new SnowflakeError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
   }
   
   async getInputStream(queryInfo) {
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
-    this.streamingStackTrace = new Error().stack;
-    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
-    const statement = this.connection.execute({sqlText: queryInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
-    return statement.streamRows();
+	
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    
+    while (true) {
+      // Exit with result or exception.  
+	  let stack
+      try {
+        this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+		stack = new Error().stack
+        const sqlStartTime = performance.now()
+        const statement = this.connection.execute({sqlText: queryInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
+    	const is = statement.streamRows();	
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return is;
+      } catch (e) {
+		const cause = this.trackExceptions(new SnowflakeError(this.DRIVER_ID,e,stack,sqlStatement))
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
   }  
   
   /*

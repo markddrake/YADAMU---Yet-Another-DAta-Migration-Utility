@@ -12,19 +12,19 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
   }
   
   emptyTable(tableMetadata) {
-	return ((tableMetadata.columnNames.length === 1) && (tableMetadata.columnNames[0] === 'JSON_DATA') && (tableMetadata.dataTypes[0] === 'json'))
+	return ((tableMetadata.columnNames.length === 1) && (tableMetadata.columnNames[0] === 'DOCUMENT') && (tableMetadata.dataTypes[0] === 'json'))
   }
   
   generateTableInfo(tableMetadata) {
-	 
+
     let insertMode = 'DOCUMENT';
     this.SPATIAL_FORMAT = this.getSpatialFormat(tableMetadata)
-    
+	
     let columnNames = tableMetadata.columnNames
     let dataTypes = tableMetadata.dataTypes
     let sizeConstraints = tableMetadata.sizeConstraints
 	let targetDataTypes = this.getTargetDataTypes(tableMetadata)
-	
+  
     /*
     **
     ** ARRAY_TO_DOCUMENT uses the column name, data types and size constraint information from the source database to set up 
@@ -39,24 +39,33 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
 	  targetDataTypes = this.getTargetDataTypes(tableMetadata.source)
     }
 
-   	
-    if (tableMetadata.hasOwnProperty("source") && (tableMetadata.source.columnNames.length === 1) && (tableMetadata.source.dataTypes[0].toUpperCase() === "JSON")) 	{
-        // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'   
-        insertMode = 'DOCUMENT'
-    }
+	if (this.dbi.WRITE_TRANSFORMATION === 'PASS_THROUGH') {
+      columnNames = ['DOCUMENT'];
+	  dataTypes = ['json']
+	  sizeConstraints = [[]]
+	  targetDataTypes = 'object'
+	}
+	
+	if ((tableMetadata.hasOwnProperty("source")) &&  (tableMetadata.source.columnNames.length === 1) && (tableMetadata.source.dataTypes[0].toUpperCase() === "JSON")) {
+	  // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'   																									
+      insertMode = "DOCUMENT"
+	}
     else {
-      switch (this.dbi.writeTransformation) {
+      switch (this.dbi.WRITE_TRANSFORMATION) {
         case 'ARRAY_TO_DOCUMENT':
           insertMode = 'OBJECT'
           break;
         case 'PRESERVE':
-          insertMode = 'ARRAY'
-          break;
+          insertMode = 'ARRAY'             
+		  break;
+		case 'PASS_THROUGH':
+		  insertMode = 'PASS_THROUGH'
+		  break;
         default:
           insertMode = 'OBJECT'
       }
-    }    
-    
+    }
+    	
     const tableInfo =  { 
       ddl             : tableMetadata.tableName
     , dml             : `insertMany(${tableMetadata.tableName})`

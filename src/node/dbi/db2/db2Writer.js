@@ -24,8 +24,11 @@ class DB2Writer extends YadamuWriter {
   }
 	 
   async _writeBatch(batch,rowCount) {
+
 	
 	batch.ArraySize = rowCount
+
+	// console.dir(batch,{depth:null})
 	
     batch.params.filter((param) => {
 	  switch (param.SQLType) {
@@ -36,7 +39,7 @@ class DB2Writer extends YadamuWriter {
         case this.dbi.DATA_TYPES.CLOB_TYPE:
         case this.dbi.DATA_TYPES.NCLOB_TYPE:
 		  for (const value of param.Data) {
-  		    const byteLength = Buffer.byteLength(value)
+  		    const byteLength = value === null ? 0 : Buffer.byteLength(value)
    		    param.Length = param.Length > byteLength ? param.Length : byteLength
 		  }
 		  break;
@@ -44,6 +47,7 @@ class DB2Writer extends YadamuWriter {
         case this.dbi.DATA_TYPES.VARBINARY_TYPE:
         case this.dbi.DATA_TYPES.BLOB_TYPE:
 		  for (const value of param.Data) {
+			if (value === null) continue
    		    param.Length = param.Length > value.length ? param.Length : value.length
 		  }
 		  break;
@@ -51,7 +55,6 @@ class DB2Writer extends YadamuWriter {
 	   
     })
 		
-	console.dir(batch,{depth:null})
 
 	/*
 	**

@@ -17,24 +17,24 @@ RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""",
 #
 # Postgres Command Line 
 #
-ADD https://get.enterprisedb.com/postgresql/postgresql-14.0-1-windows-x64.exe .
-RUN Start-Process .\postgresql-14.0-1-windows-x64.exe  -Wait -ArgumentList """--mode""", """unattended""", """--superpassword""", """oracle""", """--unattendedmodeui""", """none""", """--enable-components""", """commandlinetools""";`
+ADD https://get.enterprisedb.com/postgresql/postgresql-16.0-1-windows-x64.exe .
+RUN Start-Process .\postgresql-16.0-1-windows-x64.exe  -Wait -ArgumentList """--mode""", """unattended""", """--superpassword""", """oracle""", """--unattendedmodeui""", """none""", """--enable-components""", """commandlinetools""";`
     [Environment]::SetEnvironmentVariable("""Path""", """c:\Program Files\PostgreSQL\14\bin;""" +  $env:Path,"""Machine"""); `
-    Remove-Item  postgresql-14.0-1-windows-x64.exe 
+    Remove-Item  postgresql-16.0-1-windows-x64.exe 
 #
-ADD https://cdn.mysql.com//Downloads/MySQLGUITools/mysql-workbench-community-8.0.27-winx64.msi .
-RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""", """/i""", """mysql-workbench-community-8.0.27-winx64.msi""", """ ALLUSERS=1"""; `
-    Remove-Item .\mysql-workbench-community-8.0.27-winx64.msi; `
+ADD https://cdn.mysql.com//Downloads/MySQLGUITools/mysql-workbench-community-8.0.34-winx64.msi .
+RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""", """/i""", """mysql-workbench-community-8.0.34-winx64.msi""", """ ALLUSERS=1"""; `
+    Remove-Item .\mysql-workbench-community-8.0.34-winx64.msi; `
     New-Item -ItemType directory -Path """C:\Program Files\MySQL\8.0"""; `
     Move-Item """C:\Program Files\MySQL\MySQL Workbench 8.0 CE""" """C:\Program Files\MySQL\8.0\Workbench"""; `
     [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\MySQL\8.0\Workbench;""" +  $env:Path,"""Machine"""); 
 #
 # MySQLsh
 #
-ADD https://cdn.mysql.com//Downloads/MySQL-Shell/mysql-shell-8.0.26-windows-x86-64bit.zip .
-RUN Expand-Archive -Path .\mysql-shell-8.0.26-windows-x86-64bit.zip -destinationPath """C:\Program Files\MySQL"""; ` 
-    Remove-Item .\mysql-shell-8.0.26-windows-x86-64bit.zip; `
-	Move-Item """C:\Program Files\MySQL\mysql-shell-8.0.26-windows-x86-64bit""" """C:\Program Files\MySQL\8.0\Shell"""; `
+ADD https://cdn.mysql.com//Downloads/MySQL-Shell/mysql-shell-8.0.34-windows-x86-64bit.zip .
+RUN Expand-Archive -Path .\mysql-shell-8.0.34-windows-x86-64bit.zip -destinationPath """C:\Program Files\MySQL"""; ` 
+    Remove-Item .\mysql-shell-8.0.34-windows-x86-64bit.zip; `
+	Move-Item """C:\Program Files\MySQL\mysql-shell-8.0.34-windows-x86-64bit""" """C:\Program Files\MySQL\8.0\Shell"""; `
     [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\MySQL\8.0\Shell\bin;""" +  $env:Path,"""Machine"""); 
 #
 #

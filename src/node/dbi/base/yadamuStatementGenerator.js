@@ -100,10 +100,18 @@ class YadamuStatementGenerator {
   } 
 
   getSpatialFormat(tableMetadata) {
+	 
+	// console.log(tableMetadata)
 	  
 	if (tableMetadata.hasOwnProperty("source")) {
-   	  const spatialColumnList = tableMetadata.dataTypes.flatMap((dataType,idx) => { return (YadamuDataTypes.isSpatial(dataType) && (idx < tableMetadata.source.dataTypes.length)) ? [idx] : [] })
-      const spatialFormats = spatialColumnList.map((idx) => {
+	  // Get the names of all spatial columns
+	  // Use flatMap eliminate non-spatial columns from the result set.
+	  if ((tableMetadata.source.dataTypes.length === 1) & (tableMetadata.source.dataTypes[0].toUpperCase() === 'JSON')) {
+		 return this.dbi.INBOUND_SPATIAL_FORMAT
+	  }
+	  const spatialColumnList = tableMetadata.dataTypes.flatMap((dataType,idx) => { return (YadamuDataTypes.isSpatial(dataType) && (idx < tableMetadata.source.dataTypes.length)) ? [tableMetadata.columnNames[idx]] : [] })
+      const spatialFormats = spatialColumnList.map((columnName) => {
+		const idx = tableMetadata.source.columnNames.indexOf(columnName)
 		return YadamuDataTypes.isSpatial(tableMetadata.source.dataTypes[idx]) ?  this.dbi.INBOUND_SPATIAL_FORMAT  
 		     : YadamuDataTypes.isBinary(tableMetadata.source.dataTypes[idx])  ? 'WKB'  
 	         : YadamuDataTypes.isJSON(tableMetadata.source.dataTypes[idx])    ? 'GeoJSON'
@@ -261,7 +269,6 @@ class YadamuStatementGenerator {
 	 
 	 // If the soure and target vendor are the same no mapping operations are required ### this.dbi.DATATYPE_IDENTITY_MAPPING ???
 	
-	 
      if (this.dbi.DATABASE_VENDOR === this.SOURCE_VENDOR) {
        return [...tableMetadata.dataTypes]
      }

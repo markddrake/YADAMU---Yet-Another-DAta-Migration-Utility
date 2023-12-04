@@ -1,6 +1,5 @@
 $service = Get-Service -Name MongoDB -ErrorAction SilentlyContinue
 if($service -eq $null) {
-  Start-Sleep -Seconds $ENV:DELAY
   $NOW = Get-Date -Format "o"
   Write-Output "$NOW MongoDB: Enabling Database Service ""MongoDB""."
   New-Item -ItemType directory -Path C:\ProgramData\MongoDB\Server\5.0\data

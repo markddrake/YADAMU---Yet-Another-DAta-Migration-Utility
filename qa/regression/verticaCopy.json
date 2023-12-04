@@ -35,14 +35,6 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle#1",
-			"targets": [
-			   "vertica#1"
-		    ],
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
 			"source": "oracle12c",
 			"targets": [
 			   "vertica#1"

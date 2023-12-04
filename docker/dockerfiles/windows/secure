@@ -1,0 +1,5 @@
+FROM yadamu/regression:latest
+WORKDIR C:/YADAMU
+COPY qa/connections/winSecureConnections.json  qa/regression/connections.json
+ENTRYPOINT ["powershell","c:\\YADAMU\\bin\\chooseTest.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]

@@ -81,6 +81,278 @@ createSharedFolders $YADAMU_MOUNT_FOLDER
 $YADAMU_LOG_ROOT = Join-Path $YADAMU_MOUNT_FOLDER "log"
 
 switch ($ENV:YADAMU_TEST_NAME) {
+ 
+ "shortRegression" {
+    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
+    runRegressionTest "shortRegression"
+ }
+  
+  "export" {
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
+     runRegressionTest "export"
+     break
+  }
+  
+  "reset" {
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
+     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\postgres")
+     runRegressionTest "initialize"
+     runRegressionTest "stageDataSets"
+     runRegressionTest "import"
+     runRegressionTest "importDataTypes"
+     break
+  }
+    
+  "all" {
+    source qa/bin/createOutputFolders.sh mnt
+    runRegressionTest "shortRegression"
+    runRegressionTest "postgresDataTypes"
+    runRegressionTest "export"
+    runRegressionTest "import"
+    runRegressionTest "fileRoundtrip"
+    runRegressionTest "uploadRoundtrip"
+    runRegressionTest "dbRoundtrip"
+    runRegressionTest "mongoTestSuite"
+    runRegressionTest "lostConnection"
+    runRegressionTest "loaderTestSuite"
+    runRegressionTest "awsTestSuite"
+    runRegressionTest "azureTestSuite"
+    break
+  }	
+  
+  "everything" {
+    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
+    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
+    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
+    runRegressionTest "initialize"
+    runRegressionTest "stageDataSets"
+    runRegressionTest "shortRegression"
+    runRegressionTest "verticaShortRegression"
+	runRegressionTest "vertica10ShortRegression"
+	runRegressionTest "mssql2014ShortRegression"
+    runRegressionTest "snowflakeShortRegression"
+    runRegressionTest "postgresDataTypes"
+    runRegressionTest "verticaDataTypes"
+    runRegressionTest "vertica10DataTypes"
+    runRegressionTest "mssql2014DataTypes"
+    runRegressionTest "snowflakeDataTypes"
+    runRegressionTest "export"
+    runRegressionTest "import"
+    runRegressionTest "fileRoundtrip"
+    runRegressionTest "uploadRoundtrip"
+    runRegressionTest "dbRoundtrip"
+    runRegressionTest "mongoTestSuite"
+    runRegressionTest "lostConnection"
+    runRegressionTest "loaderTestSuite"
+    runRegressionTest "awsTestSuite"
+    runRegressionTest "azureTestSuite"
+    runRegressionTest "verticaTestSuite"
+	runRegressionTest "vertica10TestSuite"
+    runRegressionTest "oracleCopy"
+	runRegressionTest "postgresCopy"
+	runRegressionTest "mysqlCopy"
+	runRegressionTest "mariadbCopy"
+	runRegressionTest "verticaCopy"
+	runRegressionTest "vertica10Copy"
+	runRegressionTest "oracleCopy"
+	runRegressionTest "postgresCopy"
+	runRegressionTest "mysqlCopy"
+	runRegressionTest "mariadbCopy"
+	runRegressionTest "verticaCopy"
+	runRegressionTest "vertica10Copy"
+    runRegressionTest "mssql2014TestSuite"
+    runRegressionTest "snowflakeTestSuite"
+	runRegressionTest "snowflakeCopy"
+    runRegressionTest "snowflakeCopy"
+    break
+  }	
+ 
+  "loader" {
+    runRegressionTest "loaderTestSuite"
+    runRegressionTest "awsTestSuite"
+    runRegressionTest "azureTestSuite"
+  }
+ 
+  "oracle" {
+	runRegressionTest "oracleShortRegression"
+    runRegressionTest "oracleDataTypes"
+    runRegressionTest "oracleTestSuite"
+    runRegressionTest "oraclecCopy"
+    runRegressionTest "oraclecCopy"
+    break
+  }"
+
+  oracle23c" {
+	runRegressionTest "oracle23cShortRegression"
+    runRegressionTest "oracle23cDataTypes"
+    runRegressionTest "oracle23cTestSuite"
+    runRegressionTest "oracle23cLostConnection"
+    runRegressionTest "oracle23cCopy"
+    runRegressionTest "oracle23cCopy"
+    break
+  }
+
+  oracle21c" {
+	runRegressionTest "oracle21cShortRegression"
+    runRegressionTest "oracle21cDataTypes"
+    runRegressionTest "oracle21cTestSuite"
+    runRegressionTest "oracle21cLostConnection"
+    runRegressionTest "oracle21cCopy"
+    runRegressionTest "oracle21cCopy"
+    break
+  }
+
+  "oracle19c" {
+	runRegressionTest "oracle19cShortRegression"
+    runRegressionTest "oracle19cDataTypes"
+    runRegressionTest "oracle19cTestSuite"
+    runRegressionTest "oracle19cLostConnection"
+    runRegressionTest "oracle19cCopy"
+    runRegressionTest "oracle19cCopy"
+    break
+  }
+
+  "oracle11g" {
+	runRegressionTest "oracle11gShortRegression"
+    runRegressionTest "oracle11gDataTypes"
+    runRegressionTest "oracle11gTestSuite"
+    runRegressionTest "oracle11gLostConnection"
+    runRegressionTest "oracle11gCopy"
+    runRegressionTest "oracle11gCopy"
+    break
+  }
+
+  "mssql" {
+	runRegressionTest "mssqlShortRegression"
+    runRegressionTest "mssqlDataTypes"
+    runRegressionTest "mssqlTestSuite"
+    break
+  }
+
+  "mssql19" {
+	runRegressionTest "mssql2019ShortRegression"
+    runRegressionTest "mssql2019DataTypes"
+    runRegressionTest "mssql2019TestSuite"
+    break
+  }
+
+  "mssql17" {
+	runRegressionTest "mssql2017ShortRegression"
+    runRegressionTest "mssql2017DataTypes"
+    runRegressionTest "mssql2017TestSuite"
+    break
+  }
+
+  "mssql14" {
+	runRegressionTest "mssql2014ShortRegression"
+    runRegressionTest "mssql2014DataTypes"
+    runRegressionTest "mssql2014TestSuite"
+    break
+  }
+
+  "db2" {
+	runRegressionTest "db2ShortRegression"
+    runRegressionTest "db2DataTypes"
+    runRegressionTest "db2TestSuite"
+    break
+  }
+
+  "snowflake" {
+    runRegressionTest "snowflakeShortRegression"
+    runRegressionTest "snowflakeDataTypes"
+    runRegressionTest "snowflakeTestSuite"
+	runRegressionTest "snowflakeCopy"
+	runRegressionTest "snowflakeCopy"
+    break
+  }
+
+  "vertica" {
+	runRegressionTest "verticaShortRegression"
+    runRegressionTest "verticaDataTypes"
+    runRegressionTest "verticaTestSuite"
+	runRegressionTest "verticaCopy"
+	runRegressionTest "verticaCopy"
+    break
+  }
+
+  "vertica12" {
+	runRegressionTest "vertica12ShortRegression"
+    runRegressionTest "vertica12DataTypes"
+    runRegressionTest "vertica12TestSuite"
+	runRegressionTest "vertica12Copy"
+	runRegressionTest "vertica12Copy"
+    break
+  }
+
+  "vertica11" {
+	runRegressionTest "vertica11ShortRegression"
+    runRegressionTest "vertica11DataTypes"
+    runRegressionTest "vertica11TestSuite"
+	runRegressionTest "vertica11Copy"
+	runRegressionTest "vertica11Copy"
+    break
+  }
+    
+  "vertica10" {
+	runRegressionTest "vertica10ShortRegression"
+    runRegressionTest "vertica10DataTypes"
+	runRegressionTest "vertica10TestSuite"
+	runRegressionTest "vertica10Copy"
+	runRegressionTest "vertica10Copy"
+    break
+  }
+
+  "vertica09" {
+	runRegressionTest "vertica09ShortRegression"
+    runRegressionTest "vertica09DataTypes"
+    runRegressionTest "vertica09TestSuite"
+	runRegressionTest "vertica09Copy"
+	runRegressionTest "vertica09Copy"
+    break
+  }
+
+ "mongo" {
+	runRegressionTest "mongoShortRegression"
+    runRegressionTest "mongoDataTypes"
+    runRegressionTest "mongoTestSuite"
+    break
+  }
+
+  "ydb" {
+	runRegressionTest "ydbShortRegression"
+    runRegressionTest "ydbDataTypes"
+    runRegressionTest "ydbTestSuite"
+	runRegressionTest "ydbCopy"
+	runRegressionTest "ydbCopy"
+    break
+  }
+
+  "cdb" {
+	runRegressionTest "cdbShortRegression"
+    runRegressionTest "cdbDataTypes"
+    runRegressionTest "cdbTestSuite"
+    break
+  }
+
+  "copy" { 
+    runRegressionTest "oracleCopy"
+	runRegressionTest "postgresCopy"
+	runRegressionTest "mysqlCopy"
+	runRegressionTest "mariadbCopy"
+	runRegressionTest "verticaCopy"
+	runRegressionTest "vertica10Copy"
+    runRegressionTest "oracleCopy"
+	runRegressionTest "postgresCopy"
+	runRegressionTest "mysqlCopy"
+	runRegressionTest "mariadbCopy"
+	runRegressionTest "verticaCopy"
+	runRegressionTest "vertica10Copy"
+    break
+  }
 
   "regression" {
     runRegressionTest $ENV:TESTNAME
@@ -92,75 +364,16 @@ switch ($ENV:YADAMU_TEST_NAME) {
 	break
   } 
 
-  "interactive" {
-    wait-Event
-  } 
-  
-  "export" {
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
-	 runRegressionTest "export"
-	break
-  }
-  
-  "all" {
-    runRegressionTest "shortRegression"
-    runRegressionTest "postgresDataTypes"
-    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
-    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
-    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
-    runRegressionTest "export"
-    runRegressionTest "import"
-    runRegressionTest "fileRoundtrip"
-    runRegressionTest "dbRoundtrip"
-    runRegressionTest "mongoTestSuite"
-    runRegressionTest "lostConnection"
-    runRegressionTest "loaderTestSuite"
-    runRegressionTest "awsTestSuite"
-    runRegressionTest "azureTestSuite"
-	break
-  }	
-  
-  "snowflake" {
-    runRegressionTest "snowflakeDataTypes"
-    runRegressionTest "snowflakeTestSuite"
-	break
-  }
-
-  "vertica" {
-    runRegressionTest "vertica11DataTypes"
-    runRegressionTest "vertica10DataTypes"
-    runRegressionTest "vertica11TestSuite"
-	runRegressionTest "vertica10TestSuite"
-	break
-  }
-    
   "cmdLine" { 
     cmd /c   $YADAMU_SCRIPT_DIR/runCmdLineTests.bat
 	break
   }
 
-  "copy" { 
-    runRegressionTest "oracleCopy"
-	runRegressionTest "postgresCopy"
-	runRegressionTest "mysqlCopy"
-	runRegressionTest "mariadbCopy"
-	runRegressionTest "vertica10Copy"
-	runRegressionTest "vertica11Copy"
-	runRegressionTest "snowflakeCopy"
-	# runRegressionTest "redshiftCopy"
-	break
-  }
-
-  "vertica09" {
-    runRegressionTest "vertica09DataTypes"
-    runRegressionTest "vertica09TestSuite"
-	runRegressionTest "vertica09Copy"
-	break
-  }
-
+  "interactive" {
+    wait-Event
+  } 
+  
   default {
     Write-Output "Invalid Test ${YADAMU_TEST_NAME}: Valid values are shortRegression, export, snowflake, vertica, vertica09, cmdLine, copy, interactive or custom"
-  }
+  } 
 }

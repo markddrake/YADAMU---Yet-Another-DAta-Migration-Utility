@@ -123,12 +123,13 @@ class OracleOutputManager extends YadamuOutputManager {
           } 
           break;
         case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
-	      switch (this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE) {
+		  switch (this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE) {
+			case 'BOOLEAN':
+              return YadamuLibrary.booleanToString
 		    case 'RAW(1)':
+              return YadamuLibrary.booleanToBuffer
 		    default:
-              return (col,idx) =>  {
-                return YadamuLibrary.booleanToBuffer(col)
-              } 
+              return YadamuLibrary.booleanToBuffer
 	      }
 		  break;
         case this.dbi.DATA_TYPES.DATE_TYPE:
