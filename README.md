@@ -10,18 +10,19 @@ For homogeneous Oracle migrations all schema objects supported by DBMS_METADATA 
 For databases other than Oracle, or hetrogeneous migrations DDL operations are currently restriced to table layouts. Migration of indexes and other schema objects is not currently supported.
 
 Supported Databases :
+* Oracle 23c
 * Oracle 21c
 * Oracle 19c
 * Oracle 18c
 * Oracle 12cR2
 * Oracle 11gR2
 * Microsoft SQL Server 2014 - Microsoft SQL Server 2022
-* Postgres 11 through Postgres 14
+* Postgres 11 through Postgres 16
 * MySQL 8.0.12 and later
 * MariaDB 5.5 and later
-* MongoDB 4.0 and later1
+* MongoDB 4.0 and later
 * Snowflake Data Warehouse
-* Vertica 9 through Vertica 11
+* Vertica 9 through Vertica 23
 * DB2 11 LUW
 * Yugabyte
 * CockroachDB
