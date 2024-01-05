@@ -7,147 +7,148 @@
     "MODE": "DATA_ONLY"
   }
 , "tests"                  : [
-    {"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 20000 }}
+    {"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 20000 }}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 20000 }}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 15000 }}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 15000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 15000 }}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 15000 }}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 15000 }}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 1}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 1}}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 1}}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 1}}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 1}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 3500, "worker": 1}}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 3500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 3500, "worker": 1}}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 6000, "worker": 1}}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 20000 }}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 20000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 20000 }}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 10000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
-   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
-   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 0}}
-   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 0}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 0}}
+   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 0}}
+   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 0}}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 0}}
+   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 2500, "worker": 0}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 2500, "worker": 0}}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 35000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 10000 }}  
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 30000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
+   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 30000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 10000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
    ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
    ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 30000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
-   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
-   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 30000 }}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 10000 }}  
-   ,{"source":   "oracle#1",  "target": "oracle#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
-   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
-   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
-   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
-   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
-   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
-   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 30000 }}
+   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000 }}  
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 0}}
+   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1500, "worker": 1}}
+   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
+   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 1000, "worker": 1}}
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 30000 }}
+   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 10000 }}  
+   ,{"source":   "oracle#1",   "target": "oracle#1",    "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+   ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+   ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+   ,{"source":   "mssql#1",    "target": "mssql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
+   ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1500, "worker": 1}}
+   ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 2500, "worker": 1}}
+   ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "RETRY" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 1}}
  ]
 }

@@ -479,7 +479,6 @@ function validateIBMDB2Target(button) {
 }
 
 function validateMsSQLSource(button) {
-  console.log(1)
   button.disabled = true;
   const status = document.getElementById('source-mssql-status')
   const connectionProperties = {
