@@ -4,3 +4,12 @@
 deploy.bat
 dockerfiles/software/oracle/oracle-instantclient19.5-basic_19.5.0.0.0-2_amd64.deb
 patch/oracledb/lib/queryStream.js
+rebuild.bat
+qa/connections/YDB3.json
+qa/connections/YDB2.json
+qa/connections/YDB1.json
+qa/connections/winSecureConnections.json
+qa/connections/secureConnections.json
+qa/connections/rootkey.csv
+qa/connections/noPasswords.json
+qa/connections/awsCredentials.bat
