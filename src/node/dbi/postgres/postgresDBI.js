@@ -36,8 +36,7 @@ import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
-  YadamuError,
-  CopyOperationAborted
+  YadamuError
 }                                    from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
@@ -149,7 +148,6 @@ class PostgresDBI extends YadamuDBI {
     
     this.StatementLibrary = PostgresStatementLibrary
     this.statementLibrary = undefined
-    this.pipelineAborted = false;
 	
 	this.postgresStack = new Error().stack
     this.postgresOperation = undefined
@@ -160,6 +158,10 @@ class PostgresDBI extends YadamuDBI {
   ** Local methods 
   **
   */
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new PostgresError(driverId,cause,stack,sql)
+  }
+  
   
   async testConnection() {   
     try {
@@ -181,9 +183,8 @@ class PostgresDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new PostgresError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
-      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
-      // throw pgErr
+	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','POOL'],err.message)
     })
 
   }
@@ -203,7 +204,7 @@ class PostgresDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.connect()')
 	}
   }
 
@@ -225,7 +226,7 @@ class PostgresDBI extends YadamuDBI {
       await this.configureConnection()
       return this.connection
 	} catch (e) {
-      throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,operation))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
 	}
   }
   
@@ -261,10 +262,9 @@ class PostgresDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new PostgresError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
-      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
-      // throw pgErr
-    })
+	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','CONNECTION'],err.message)
+	})
    
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
@@ -290,7 +290,7 @@ class PostgresDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'Client.release()'))
+		const err = this.getDatabaseException(this.DRIVER_ID,e,stack,'Client.release()')
 		this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
       }
@@ -309,7 +309,7 @@ class PostgresDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'pg.Pool.close()'))
+	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.close()')
 	  }
 	}
   }
@@ -360,7 +360,7 @@ class PostgresDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -524,7 +524,7 @@ class PostgresDBI extends YadamuDBI {
       return elapsedTime;
     }
     catch (e) {
-      const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,copyStatement))
+      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,copyStatement)
 	  throw cause
 	}
   }
@@ -653,26 +653,25 @@ class PostgresDBI extends YadamuDBI {
     return this.generateSchemaInfo(results.rows)
   }
 
-  createParser(queryInfo,parseDelay) {
-    return new PostgresParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new PostgresParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
-  
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof PostgresError) || (cause instanceof CopyOperationAborted)) ? cause : new PostgresError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
 
-  async getInputStream(queryInfo) {        
+  async _getInputStream(queryInfo) {        
   
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
     /*
     **
-    **	If the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
+    **	If the previous pipleline operation failed, it appears that the driver will hang when creating a new QueryStream...
 	**
 	*/
   
-    if (this.failedPrematureClose) {
-	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
+    if (this.ACTIVE_INPUT_STREAM === true) {
+	  this.LOGGER.warning([this.DATABASE_VENDOR,'INPUT STREAM',queryInfo.TABLE_NAME],'Pipeline Aborted. Switching database connection')
+	  await this.closeConnection()
+	  this.connection = this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+	  await this.configureConnection()
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
@@ -719,7 +718,7 @@ class PostgresDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -781,12 +780,12 @@ class PostgresDBI extends YadamuDBI {
     return await super.generateStatementCache(PostgresStatementGenerator, schema)
   }
 
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputManager(PostgresOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputManager(PostgresOutputManager,tableName,pipelineState)
   }
 
-  getOutputStream(tableName,metrics) {
-	 return super.getOutputStream(PostgresWriter,tableName,metrics)
+  getOutputStream(tableName,pipelineState) {
+	 return super.getOutputStream(PostgresWriter,tableName,pipelineState)
   }
  
   classFactory(yadamu) {
@@ -804,31 +803,31 @@ class PostgresDBI extends YadamuDBI {
 	 await this.executeSQL(`create server if not exists "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)
   }
   
-  async copyOperation(tableName,copyOperation,metrics) {
+  async copyOperation(tableName,copyOperation,copyState) {
 	
 	try {
-	  metrics.writerStartTime = performance.now()
+	  copyState.startTime = performance.now()
 	  let results = await this.beginTransaction()
 	  results = await this.executeSQL(copyOperation.ddl)
 	  results = await this.executeSQL(copyOperation.dml)
-	  metrics.read = results.rowCount
-	  metrics.written = results.rowCount
+	  copyState.read = results.rowCount
+	  copyState.written = results.rowCount
 	  results = await this.executeSQL(copyOperation.drop)
-	  metrics.writerEndTime = performance.now()
+	  copyState.endTime = performance.now()
 	  results = await this.commitTransaction()
-	  metrics.committed = metrics.written 
-	  metrics.written = 0
+	  copyState.committed = copyState.written 
+	  copyState.written = 0
   	} catch(e) {
-	  metrics.writerError = e
+	  copyState.writerError = e
 	  try {
   	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
-		e.cause = metrics.writerError
-		metrics.writerError = e
+		e.cause = copyState.writerError
+		copyState.writerError = e
 	  }
 	}
-	return metrics
+	return copyState
   }
 
   async finalizeCopy() {

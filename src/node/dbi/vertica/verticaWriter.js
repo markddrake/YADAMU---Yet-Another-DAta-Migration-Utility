@@ -20,8 +20,8 @@ class VerticaWriter extends YadamuWriter {
   get STAGING_FILE()       { return this._STAGING_FILE }
   set STAGING_FILE(v)      { this._STAGING_FILE = v }
   
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   async setTableInfo(tableName) {
@@ -179,7 +179,7 @@ class VerticaWriter extends YadamuWriter {
       }
     })
    
-    const batchStagingFileName = `${this.STAGING_FILE}-${parseInt(this.BATCH_METRICS.batchNumber).toString().padStart(5,"0")}`
+    const batchStagingFileName = `${this.STAGING_FILE}-${parseInt(this.BATCH_SNAPSHOT.batchNumber).toString().padStart(5,"0")}`
 	// results = await Promise.all(Object.keys(copyOperations).map(async(key,idx) => {
 	const keys = Object.keys(copyOperations)
 	for (const idx in keys) {
@@ -198,7 +198,7 @@ class VerticaWriter extends YadamuWriter {
           await this.reportCopyErrors(results.errors,batch[key],stack,sqlStatement)
         }
         this.adjustRowCounts(results.inserted)
-        this.COPY_METRICS.skipped+= results.rejected
+        // this.PIPELINE_STATE.skipped+= results.rejected
         await this.cleanupStagingFile(stagingFilePath,true);
         await this.dbi.releaseSavePoint(); 
       } catch (cause) {
@@ -209,6 +209,7 @@ class VerticaWriter extends YadamuWriter {
         await this.reportBatchError(`COPY`,cause,batch[key])
         await this.dbi.restoreSavePoint(cause);
         this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);  
+		this.dbi.resetExceptionTracking()
         for (const key of Object.keys(copyOperations)) {     
           batch.insert.push(...batch[key])     
         }

@@ -17,8 +17,8 @@ import YadamuOutputManager      from "../base/yadamuOutputManager.js"
 
 class MsSQLOutputManager extends YadamuOutputManager {
     
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   createBatch() {
@@ -143,14 +143,14 @@ class MsSQLOutputManager extends YadamuOutputManager {
       this.rowTransformation(row)	
       this.batch.rows.add.apply(this.batch.rows,row);
  
-  	  this.COPY_METRICS.cached++;
+  	  this.PIPELINE_STATE.cached++;
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
 		// ### Should this use HandleIterative Error ???
         this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
         this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
-		this.COPY_METRICS.skipped++
+		this.PIPELINE_STATE.skipped++
         return
 	  }
 	  throw e

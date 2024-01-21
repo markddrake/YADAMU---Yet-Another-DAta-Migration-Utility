@@ -19,11 +19,6 @@ import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
 
-import {
-  YadamuError,
-  CopyOperationAborted
-}                                     from '../../core/yadamuException.js'
-
 /* Vendor Specific DBI Implimentation */  
 
 import SnowflakeConstants             from './snowflakeConstants.js'
@@ -109,15 +104,19 @@ class SnowflakeDBI extends YadamuDBI {
 	this.statementLibrary = undefined
   }
 
-  getSchemaIdentifer() {
-	return `${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}`
-  }  
-  
   /*
   **
   ** Local methods 
   **
   */
+  
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new SnowflakeError(driverId,cause,stack,sql)
+  }
+  
+  getSchemaIdentifer() {
+	return `${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}`
+  }  
   
   establishConnection(connection) {
       
@@ -125,7 +124,7 @@ class SnowflakeDBI extends YadamuDBI {
 	  const stack = new Error().stack
       connection.connect((err,connection) => {
         if (err) {
-          reject(this.trackExceptions(new SnowflakeError(this.DRIVER_ID,err,stack,`snowflake-sdk.Connection.connect()`)))
+          reject(this.getDatabaseException(this.DRIVER_ID,err,stack,`snowflake-sdk.Connection.connect()`))
         }
         resolve(connection)
       })
@@ -232,7 +231,7 @@ class SnowflakeDBI extends YadamuDBI {
       , complete       : async (err,statement,rows) => {
 		                   const sqlEndTime = performance.now()
                            if (err) {
-              		         const cause = this.trackExceptions(new SnowflakeError(this.DRIVER_ID,err,stack,sqlStatement))
+              		         const cause = this.getDatabaseException(this.DRIVER_ID,err,stack,sqlStatement)
     		                 if (attemptReconnect && cause.lostConnection()) {
 	      				       attemptReconnect = false
 			   			       try {
@@ -500,15 +499,11 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	return tableInfo
   }     
   
-  createParser(queryInfo,parseDelay) {
-    return new SnowflakeParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new SnowflakeParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
   
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof SnowflakeError) || (cause instanceof CopyOperationAborted)) ? cause : new SnowflakeError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-  
-  async getInputStream(queryInfo) {
+  async _getInputStream(queryInfo) {
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
 	
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
@@ -525,7 +520,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.trackExceptions(new SnowflakeError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -552,13 +547,13 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return await super.generateStatementCache(SnowflakeStatementGenerator,schema) 
   }
  
-  getOutputStream(tableName,metrics) {
+  getOutputStream(tableName,pipelineState) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(SnowflakeWriter,tableName,metrics)
+	 return super.getOutputStream(SnowflakeWriter,tableName,pipelineState)
   }
   
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputStream(SnowflakeOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputStream(SnowflakeOutputManager,tableName,pipelineState)
   }
  
   async initializeWorker(manager) {
@@ -581,10 +576,10 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	 return super.generateCopyStatements(metadata) 
   }
  
-  async reportCopyErrors(tableName,metrics) {
+  async reportCopyErrors(tableName,copyState) {
 	  
-    const err = new Error(`Errors detected durng COPY operation: ${metrics.skipped} records rejected.`)
-    err.sql = metrics.sql;
+    const err = new Error(`Errors detected durng COPY operation: ${copyState.skipped} records rejected.`)
+    err.sql = copyState.sql;
 	err.tags = []
 
 	try {
@@ -605,33 +600,33 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     let results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE)
   }
   
-  async copyOperation(tableName,copyOperation,metrics) {
+  async copyOperation(tableName,copyOperation,copyState) {
 	
 	try {
-	  metrics.writerStartTime = performance.now()
+	  copyState.startTime = performance.now()
 	  let results = await this.beginTransaction()
 	  results = await this.executeSQL(`alter session set TIME_INPUT_FORMAT='${SnowflakeConstants.TIME_INPUT_FORMAT[this.systemInformation.vendor]}'`)
 	  results = await this.executeSQL(copyOperation.dml)
 	  results.forEach((file) => {
-	    metrics.read += parseInt(file.rows_parsed)
-	    metrics.written += parseInt(file.rows_loaded)
-	    metrics.skipped += parseInt(file.errors_seen)
+	    copyState.read += parseInt(file.rows_parsed)
+	    copyState.written += parseInt(file.rows_loaded)
+	    copyState.skipped += parseInt(file.errors_seen)
 	  })
-	  metrics.writerEndTime = performance.now()
+	  copyState.endTime = performance.now()
 	  results = await this.commitTransaction()
-	  metrics.committed = metrics.written 
-	  metrics.written = 0
+	  copyState.committed = copyState.written 
+	  copyState.written = 0
   	} catch(e) {
-	  metrics.writerError = e
+	  copyState.writerError = e
 	  try {
   	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
-		e.cause = metrics.writerError
-		metrics.writerError = e
+		e.cause = copyState.writerError
+		copyState.writerError = e
 	  }
 	}
-	return metrics
+	return copyState
   }
   
   async finalizeCopy() {

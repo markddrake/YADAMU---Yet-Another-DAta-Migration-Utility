@@ -4,6 +4,8 @@ import {
   PassThrough
 }                          from 'stream'
 
+import DBIConstants        from '../base/dbiConstants.js'
+
 import JSONParser          from './jsonParser.js'
 
 class exportFileHeader extends Transform {
@@ -30,7 +32,7 @@ class exportFileHeader extends Transform {
 	this.METADATA = undefined
     this.DDL = []
 	this.source = source;
-	this.jsonParser = new JSONParser(this.LOGGER,'DDL_ONLY',importFilePath)
+	this.jsonParser = new JSONParser('DDL_ONLY',importFilePath,DBIConstants.PIPELINE_STATE,this.LOGGER)
     source.pipe(this.jsonParser).pipe(this)
   }
 

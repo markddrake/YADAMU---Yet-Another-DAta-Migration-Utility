@@ -8,8 +8,9 @@ import CSVLibrary        from './csvLibrary.js';
 
 class CSVOutputManager extends JSONOutputManager {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,true,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,true,status,yadamuLogger)
+	pipelineState.insertMode = 'CSV'
 	this.startTable = undefined
   }
    

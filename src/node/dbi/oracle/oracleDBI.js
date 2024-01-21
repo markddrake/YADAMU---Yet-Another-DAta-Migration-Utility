@@ -14,7 +14,8 @@ import {
 }                                     from 'stream'
 
 import { 
-  pipeline 
+  pipeline,
+  finished
 }                                     from 'stream/promises';
 
 /* Database Vendors API */                                    
@@ -29,11 +30,6 @@ import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 import StringWriter                   from '../../util/stringWriter.js'
 import BufferWriter                   from '../../util/bufferWriter.js'
 import HexBinToBinary                 from '../../util/hexBinToBinary.js'
-
-
-import {
-  CopyOperationAborted
-}                                     from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
 							          							          
@@ -250,6 +246,9 @@ class OracleDBI extends YadamuDBI {
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
   
+  set PARSER(v)                       { this._PARSER = v }
+  get PARSER()                        { return this._PARSER }
+  
   constructor(yadamu,manager,connectionSettings,parameters) {
 
     super(yadamu,manager,connectionSettings,parameters)
@@ -273,6 +272,10 @@ class OracleDBI extends YadamuDBI {
 	
   }
   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new OracleError(driverId,cause,stack,sql)
+  }
+    
   initializeManager() {
 	super.initializeManager()
 	this.StatementGenerator = OracleStatementGenerator
@@ -334,7 +337,7 @@ class OracleDBI extends YadamuDBI {
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Pool Created')
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.createPool()'))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Oracledb.createPool()')
 	}
   }
 
@@ -355,7 +358,7 @@ class OracleDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return connection
     } catch (e) {
-	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.Pool.getConnection()'))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Oracledb.Pool.getConnection()')
 	}
 
   }
@@ -373,6 +376,10 @@ class OracleDBI extends YadamuDBI {
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
 
 	if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
+	  // Cannot close connection until the Parser has finished as LOB operations in the parser are dependant on the connection.
+      if (this.IS_READER && (this.PARSER !== undefined)) {
+        await Promise.allSettled([finished(this.PARSER)])
+	  }	
       let stack;
       try {
         stack = new Error().stack
@@ -380,7 +387,7 @@ class OracleDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.Connection.close()'))
+  	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Oracledb.Connection.close()')
 	  }
 	}
   };
@@ -403,7 +410,7 @@ class OracleDBI extends YadamuDBI {
         this.pool = undefined
       } catch (e) {
         this.pool = undefined
-	    throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.Pool.close()'))
+	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Oracledb.Pool.close()')
       }
     
 	}
@@ -420,7 +427,7 @@ class OracleDBI extends YadamuDBI {
       // this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return lob;
    	} catch (e) {
-	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,`Oracledb.Connection.createLob()`))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,`Oracledb.Connection.createLob()`)
     }
   }
 
@@ -449,7 +456,7 @@ class OracleDBI extends YadamuDBI {
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'WRITE TO BLOB'],`Bytes Written: ${blob.offset-1}.`)
 	  return blob
 	} catch(e) {
-	  throw e instanceof OracleError ? e : new OracleError(this.DRIVER_ID,e,stack,operation)
+	  throw e instanceof OracleError ? e : this.createDatabaseError(this.DRIVER_ID,e,stack,operation)
 	}
   };
 
@@ -491,7 +498,7 @@ class OracleDBI extends YadamuDBI {
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'WRITE TO CLOB'],`Characters Written: ${clob.offset-1}.`)
 	  return clob
 	} catch(e) {
-	  throw e instanceof OracleError ? e : new OracleError(this.DRIVER_ID,e,stack,operation)
+	  throw e instanceof OracleError ? e : this.createDatabaseError(this.DRIVER_ID,e,stack,operation)
 	}
   };
 
@@ -607,7 +614,7 @@ class OracleDBI extends YadamuDBI {
   async enableConstraints() {
 
 	try  {
-      // this.checkConnectionState(this.latestError)
+      // this.checkConnectionState(this.LATEST_ERROR)
       const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.CURRENT_SCHEMA}
       const results = await this.executeSQL(this.StatementLibrary.SQL_ENABLE_CONSTRAINTS,args)
       this.processLog(results,'Enable Constraints')
@@ -621,7 +628,7 @@ class OracleDBI extends YadamuDBI {
   async refreshMaterializedViews() {
 
     try  {
-      // this.checkConnectionState(this.latestError)
+      // this.checkConnectionState(this.LATEST_ERROR)
 	  const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.CURRENT_SCHEMA}
       const results = await this.executeSQL(this.StatementLibrary.SQL_REFRESH_MATERIALIZED_VIEWS,args)
       this.processLog(results,'Materialized View Refresh')
@@ -661,7 +668,7 @@ class OracleDBI extends YadamuDBI {
 	      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		  return results;
         } catch (e) {
-		  const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement,binds,{rows : rows.length})
+		  const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,sqlStatement,binds,{rows : rows.length})
 		  if (attemptReconnect && cause.lostConnection()) {
             attemptReconnect = false;
 		    // reconnect() throws cause if it cannot reconnect or if rows are lost (ABORT, SKIP)
@@ -789,7 +796,7 @@ class OracleDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement,args,outputFormat)
+		const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,sqlStatement,args,outputFormat)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -979,7 +986,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async finalizeExport() {
-	this.checkConnectionState(this.latestError)
+	this.checkConnectionState(this.LATEST_ERROR)
     await this.setCurrentSchema(this.vendorProperties.user)
   }
 
@@ -1007,7 +1014,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async finalizeImport() {
-    this.checkConnectionState(this.latestError)
+    this.checkConnectionState(this.LATEST_ERROR)
 	await this.setCurrentSchema(this.vendorProperties.user)
   }
 
@@ -1050,7 +1057,7 @@ class OracleDBI extends YadamuDBI {
       await this.connection.commit()
   	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,`Oracledb.Transaction.commit()`))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,`Oracledb.Transaction.commit()`)
 	}
   }
 
@@ -1078,7 +1085,7 @@ class OracleDBI extends YadamuDBI {
       await this.connection.rollback()
   	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  const newIssue = this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,`Oracledb.Transaction.rollback()`))
+	  const newIssue = this.getDatabaseException(this.DRIVER_ID,e,stack,`Oracledb.Transaction.rollback()`)
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
 	}
   }
@@ -1341,8 +1348,8 @@ class OracleDBI extends YadamuDBI {
 	return partitionMetadata
   }
 		
-  createParser(queryInfo,parseDelay) {
-	const parser = new OracleParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+	const parser = new OracleParser(this,queryInfo,pipelineState,this.LOGGER)
     this.inputStream.on('metadata',(resultSetMetadata) => {parser.setColumnMetadata(resultSetMetadata)})
 	return parser;
   }
@@ -1358,7 +1365,7 @@ class OracleDBI extends YadamuDBI {
   async enableTriggers(schema,tableName) {
     // Parallel Trigger operations seem to generate Deadlocks. - Route the ALTER TABLE through the manager connection
 	try {
-  	  this.checkConnectionState(this.latestError)
+  	  this.checkConnectionState(this.LATEST_ERROR)
       const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" ENABLE ALL TRIGGERS`;
 	  return this.isManager() ? await this.executeSQL(sqlStatement,[]) : await this.manager.executeSQL(sqlStatement,[])
 	} catch (e) {
@@ -1420,17 +1427,23 @@ class OracleDBI extends YadamuDBI {
   }
 
   adjustQuery(queryInfo) {
-	if (this.latestError instanceof OracleError && this.latestError.knownBug(33561708)) {
+	if (this.LATEST_ERROR instanceof OracleError && this.LATEST_ERROR.knownBug(33561708)) {
 	  queryInfo.CLIENT_SELECT_LIST = queryInfo.CLIENT_SELECT_LIST.replace(/get_WKB\(\)/g,'get_GeoJSON()')
 	  queryInfo.EXPORT_SELECT_LIST = queryInfo.EXPORT_SELECT_LIST.replace(/get_WKB\(\)/g,'get_GeoJSON()')
+	  queryInfo.convertGeoJSONtoWKB = true
 	}
   }
-
-  inputStreamError(cause,sqlStatement) {
-	return this.trackExceptions(((cause instanceof OracleError) || (cause instanceof CopyOperationAborted)) ? cause : new OracleError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
+  
+  async handleInputStreamError(inputStream,err,sqlStatement) {
+	const result = await super.handleInputStreamError(inputStream,err,sqlStatement)
+    // Nasty Hack to stop "ORA-13199: wk buffer merge failure error" surfacing as an Unhandled Exception
+	if (this.LATEST_ERROR instanceof OracleError && this.LATEST_ERROR.knownBug(33561708)) {
+	  err.ignoreUnhandledRejection = true
+    }
+	return result
   }
-
-  async getInputStream(queryInfo) {
+  
+  async _getInputStream(queryInfo) {
 	
     if ((queryInfo.WITH_CLAUSE) && (this.DATABASE_VERSION < 12) && ((!queryInfo.hasOwnProperty('PARTITION_COUNT')) || (queryInfo.PARTITION_NUMBER === 0))) {
   	  // The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
@@ -1448,18 +1461,9 @@ class OracleDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
         this.inputStream = await this.connection.queryStream(queryInfo.SQL_STATEMENT,[],{extendedMetaData: true})
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
-		this.inputStream.on('end',() => {
-		}).on('error',(err) => {
-		  // Nasty Hack to stop "ORA-13199: wk buffer merge failure error" surfacing as an Unhandled Exception
-		  const cause = new OracleError(this.DRIVER_ID,err,stack ,queryInfo.SQL_STATEMENT,{},{})
-		  if (cause.knownBug(33561708)) {
-			err.ignoreUnhandledRejection = true
-			err.stack = err.stack || cause.stack
-		  }
-		})
 	    return this.inputStream
 	  } catch (e) {
-		const cause = new OracleError(this.DRIVER_ID,e,stack ,queryInfo.SQL_STATEMENT,{},{})
+		const cause = this.createDatabaseError(this.DRIVER_ID,e,stack ,queryInfo.SQL_STATEMENT,{},{})
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -1491,12 +1495,12 @@ class OracleDBI extends YadamuDBI {
 	return this.statementCache
   }
 
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputManager(OracleOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputManager(OracleOutputManager,tableName,pipelineState)
   }
 
-  getOutputStream(tableName,metrics) {
-	 return super.getOutputStream(OracleWriter,tableName,metrics)
+  getOutputStream(tableName,pipelineState) {
+	 return super.getOutputStream(OracleWriter,tableName,pipelineState)
   }
 
   classFactory(yadamu) {
@@ -1604,7 +1608,7 @@ class OracleDBI extends YadamuDBI {
 	 await this.initializeData()
   }
 
-  async copyOperation(tableName,copyOperation,metrics) {
+  async copyOperation(tableName,copyOperation,copyState) {
 
     /*
     **
@@ -1612,7 +1616,7 @@ class OracleDBI extends YadamuDBI {
     **
     */
    
-	metrics.sql = copyOperation.dml
+	copyState.sql = copyOperation.dml
 
     if (copyOperation.dml.startsWith('insert /*+ WITH_PLSQL */') && (this.DATABASE_VERSION < 12)) {
 		/*
@@ -1626,7 +1630,7 @@ class OracleDBI extends YadamuDBI {
     }
 
 	try {
-	  metrics.writerStartTime = performance.now()
+	  copyState.startTime = performance.now()
 	  await this.disableTriggers(this.CURRENT_SCHEMA,tableName)
 	  let results = await this.beginTransaction()
 	  results = await this.executeSQL(copyOperation.ddl)
@@ -1636,12 +1640,12 @@ class OracleDBI extends YadamuDBI {
 		}))
 	  }
 	  results = await this.executeSQL(copyOperation.dml)
-	  metrics.read = results.rowsAffected
-	  metrics.written = results.rowsAffected
+	  copyState.read = results.rowsAffected
+	  copyState.written = results.rowsAffected
 	  results = await this.commitTransaction()
-	  metrics.committed = metrics.written 
-	  metrics.written = 0
-	  metrics.writerEndTime = performance.now()
+	  copyState.committed = copyState.written 
+	  copyState.written = 0
+	  copyState.endTime = performance.now()
 	  results = await this.executeSQL(copyOperation.drop)
 	  if (copyOperation.hasOwnProperty("dropFunctions")) {
 		const results = await Promise.all(copyOperation.dropFunctions.map((func) => {
@@ -1656,13 +1660,13 @@ class OracleDBI extends YadamuDBI {
 		let results = await this.rollbackTransaction()
 	    results = await this.executeSQL(copyOperation.dml2,[{dir: oracledb.BIND_IN, type: oracledb.NUMBER, val: this.TABLE_MAX_ERRORS},{dir: oracledb.BIND_OUT, type: oracledb.STRING}])
 	    results = JSON.parse(results.outBinds[0])
-		metrics.read = results.rowsAffected
-	    metrics.written = results.rowsAffected
-		metrics.rejected = results.rowsRejected
+		copyState.read = results.rowsAffected
+	    copyState.written = results.rowsAffected
+		copyState.rejected = results.rowsRejected
 	    results = await this.commitTransaction()
-	    metrics.committed = metrics.written 
-	    metrics.written = 0
-	    metrics.writerEndTime = performance.now()
+	    copyState.committed = copyState.written 
+	    copyState.written = 0
+	    copyState.endTime = performance.now()
 	    results = await this.executeSQL(copyOperation.drop)
 	    if (copyOperation.hasOwnProperty("dropFunctions")) {
 		  const results = await Promise.all(copyOperation.dropFunctions.map((func) => {
@@ -1671,7 +1675,7 @@ class OracleDBI extends YadamuDBI {
 	    }
 	    await this.enableTriggers(this.CURRENT_SCHEMA,tableName)
 	  } catch (e) {
-	    metrics.writerError = e
+	    copyState.writerError = e
 	    try {
           await this.enableTriggers(this.CURRENT_SCHEMA,tableName)
 	      if (e.copyFileNotFoundError && e.copyFileNotFoundError()) {
@@ -1680,12 +1684,12 @@ class OracleDBI extends YadamuDBI {
 	      this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	      let results = await this.rollbackTransaction()
 	    } catch (e) {
-		  e.cause = metrics.writerError
-		  metrics.writerError = e
+		  e.cause = copyState.writerError
+		  copyState.writerError = e
 	    }
 	  } 
 	}
-	return metrics
+	return copyState
   }
 
   async finalizeCopy() {

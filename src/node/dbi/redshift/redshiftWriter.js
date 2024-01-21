@@ -7,8 +7,8 @@ import YadamuWriter from '../base/yadamuWriter.js';
 
 class RedshiftWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   reportBatchError(operation,cause,batch) {
@@ -30,7 +30,7 @@ class RedshiftWriter extends YadamuWriter {
 		const results = await this.dbi.insertBatch(sqlStatement,batch);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
-        this.metrics.written += rowCount;
+        this.PIPELINE_STATE.written += rowCount;
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
@@ -38,6 +38,7 @@ class RedshiftWriter extends YadamuWriter {
         await this.dbi.restoreSavePoint(cause);
 		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
+		this.dbi.resetExceptionTracking()
         repackBatch = true;
       }
     } 
@@ -52,7 +53,7 @@ class RedshiftWriter extends YadamuWriter {
         await this.dbi.createSavePoint();
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);
         await this.dbi.releaseSavePoint();
-		this.metrics.written++;
+		this.PIPELINE_STATE.written++;
       } catch(cause) {
         await this.dbi.restoreSavePoint(cause);
         this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);

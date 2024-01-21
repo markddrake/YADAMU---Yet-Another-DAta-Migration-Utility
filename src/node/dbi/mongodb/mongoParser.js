@@ -74,7 +74,7 @@ class MongoParser extends YadamuParser {
   
   async doTransform(document) {
 
-	// if (this.COPY_METRICS.parsed === 1) console.log('mongoParser(sourceDocument)',document,this.documentTransformations.length)
+	// if (this.PIPELINE_STATE.parsed === 1) console.log('mongoParser(sourceDocument)',document,this.documentTransformations.length)
 		
     for (const documentTransformation of this.documentTransformations) {
 	  document = documentTransformation(document)
@@ -82,13 +82,13 @@ class MongoParser extends YadamuParser {
 
     const data = document
 
-	// if (this.COPY_METRICS.parsed === 1) console.log('mongoParser(array)',data)
+	// if (this.PIPELINE_STATE.parsed === 1) console.log('mongoParser(array)',data)
 		
 	return await super.doTransform(data)
   }
   
-  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
-    super(dbi,queryInfo,yadamuLogger,parseDelay)
+  constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
+    super(dbi,queryInfo,pipelineState,yadamuLogger)
   }
 
 }

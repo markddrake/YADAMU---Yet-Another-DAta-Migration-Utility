@@ -8,8 +8,8 @@ import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 
 class MySQLWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
    
   async processWarnings(results,row) {
@@ -40,8 +40,9 @@ class MySQLWriter extends YadamuWriter {
   }
   
   recodeSpatialColumns(batch,msg) {
-    this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT ROWS`,this.COPY_METRICS.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
+    this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT ROWS`,this.PIPELINE_STATE.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
     YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,false)
+    this.dbi.resetExceptionTracking()
   }  
   
   async retryGeoJSONAsWKT(sqlStatement,rowNumber,row) {
@@ -51,6 +52,7 @@ class MySQLWriter extends YadamuWriter {
       sqlStatement = sqlStatement.replace(/ST_GeomFromGeoJSON\(\?\)/g,'ST_GeomFromText(?)')
       const results = await this.dbi.executeSQL(sqlStatement,row)
       this.adjustRowCounts(1)
+	  this.dbi.resetExceptionTracking()
     } catch (cause) {
 	  this.handleIterativeError('INSERT ONE',cause,rowNumber,row);
     }
@@ -69,7 +71,7 @@ class MySQLWriter extends YadamuWriter {
 
     // console.log(rowCount,batch)
 
-	// this.LOGGER.trace([this.constructor.name,'_writeBatch',this.tableName,this.tableInfo.insertMode,this.COPY_METRICS.batchNumber,rowCount,batch.length],'Start')    
+	// this.LOGGER.trace([this.constructor.name,'_writeBatch',this.tableName,this.tableInfo.insertMode,this.PIPELINE_STATE.batchNumber,rowCount,batch.length],'Start')    
 	
     let recodedBatch = false;
 	
@@ -89,6 +91,7 @@ class MySQLWriter extends YadamuWriter {
    		  this.reportBatchError('INSERT MANY',cause,batch)
           await this.dbi.restoreSavePoint(cause);
           this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Multi-row insert mode.`);     
+          this.dbi.resetExceptionTracking()
 		  this.tableInfo.insertMode = "Rows"
           batch = batch.flat()
         }
@@ -115,6 +118,7 @@ class MySQLWriter extends YadamuWriter {
 		    }
 	   	    this.reportBatchError('INSERT ROWS',cause,batch)
             this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);    
+		    this.dbi.resetExceptionTracking()
   		    this.tableInfo.insertMode = "Iterative"
             break;			
 		  }

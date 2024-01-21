@@ -13,30 +13,41 @@ import {
   IncompleteJSON 
 }                from './fileException.js'
 
+import DBIConstants                   from '../base/dbiConstants.js'
+
 class JSONParser extends Transform {
 
-  get LOGGER()             { return this._LOGGER }
-  set LOGGER(v)            { this._LOGGER = v }
+  get LOGGER()               { return this._LOGGER }
+  set LOGGER(v)              { this._LOGGER = v }
+  get DEBUGGER()             { return this._DEBUGGER }
+  set DEBUGGER(v)            { this._DEBUGGER = v }
   
-  get DEBUGGER()           { return this._DEBUGGER }
-  set DEBUGGER(v)          { this._DEBUGGER = v }
- 
-  constructor(yadamuLogger, mode, exportFilePath) {
+  get PIPELINE_STATE()       { return this._PIPELINE_STATE }
+  set PIPELINE_STATE(v)      { this._PIPELINE_STATE =  v }
+
+  get STREAM_STATE()         { return this.PIPELINE_STATE[DBIConstants.PARSER_STREAM_ID] }
+  set STREAM_STATE(v)        { this.PIPELINE_STATE[DBIConstants.PARSER_STREAM_ID] = v }
+	    
+  constructor(mode, exportFilePath, pipelineState, yadamuLogger) {
 
     super({objectMode: true });  
     
-    this.LOGGER = yadamuLogger;
     this.mode = mode;
 	this.exportFilePath = exportFilePath
+	this.PIPELINE_STATE = pipelineState
+    this.STREAM_STATE = {}
+
+    this.LOGGER = yadamuLogger;
 	
 	this.parser = Parser.createStream()
-    this.parseCompelte = false;
+    this.parseComplete = false;
+	this.tableState = {}
 	
     this.tableList  = new Set();
     this.objectStack = [];
     this.dataPhase = false;     
     
-    this.currentObject = undefined;
+    this.currentObject = undefined
     this.chunks = [];
 
     this.jDepth = 0; 
@@ -241,7 +252,10 @@ class JSONParser extends Transform {
     try {
       // this.LOGGER.trace([this.constructor.name,tableName],'startTable()')
 	  this.currentTable = tableName
-	  this.readerStartTime = performance.now();
+	  this.tableState = {
+		startTime : performance.now()
+      , parsed    : 0
+	  }
 	  this.push({table: tableName})
     } catch(e) {
 	  this.LOGGER.handleException(['JSONParser','START_TABLE',tableName],e)
@@ -252,17 +266,14 @@ class JSONParser extends Transform {
     // this.LOGGER.trace([this.constructor.name,this.currentTable],'endTable()')
     this.tableList.delete(this.currentTable);
 	// Snapshot the table start and end times.
-	this.push({
-      eod: {
-	    startTime : this.readerStartTime
-	  , endTime   : performance.now()
-	  }
-	})
+	this.tableState.endTime = performance.now()
+	this.push({eod: this.tableState})
   } 
   
   nextRow(data) {
 	// this.LOGGER.trace([this.constructor.name,this.currentTable],'nextRow()')
-    this.push({data:data});
+	this.tableState.parsed++;
+	this.push({data:data});
   }
   
   endOfFile() {
@@ -271,18 +282,24 @@ class JSONParser extends Transform {
 	this.push({eof: true})
   }
   
-  
   _transform(data,enc,callback) {
 	// console.log("\n###CHUNK###:",data.toString())
-	this.parser.write(data);
-	// Current logic may push() one or more times after the callback() has been invoked..
-    callback();
-  };
-
+	try {
+	  this.parser.write(data);
+	  // Current logic may push() one or more times after the callback() has been invoked..
+      callback();
+	} catch (e) { 
+   	  this.PIPELINE_STATE[DBIConstants.PARSER_STREAM_ID].error = e
+	  callback(e) 
+	}
+  }
+  
   _flush(callback) {
 	
     if (!this.parseComplete) {
-	  callback(new IncompleteJSON(this.exportFilePath))
+	  const parserError = new IncompleteJSON(this.exportFilePath)
+   	  this.PIPELINE_STATE[DBIConstants.PARSER_STREAM_ID].error = parserError
+	  callback(parserError)
     }
 	else {
 	  callback()

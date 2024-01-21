@@ -28,7 +28,6 @@ import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
-  CopyOperationAborted,
   UnimplementedMethod
 }                                     from '../../core/yadamuException.js'
 
@@ -92,12 +91,17 @@ class DB2DBI extends YadamuDBI {
   **
   */
   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new DB2Error(driverId,cause,stack,sql)
+  }
+  
+  
   async testConnection() {   
     const ibmdb = await ( import(process.versions.hasOwnProperty('electron') ? "ibm_db_electron" : "ibm_db"))
 	const stack = new Error().stack
 	const connection = await new Promise((resolve,reject) => {
       ibmdb.open(this.createConnectionString(),(err,conn) => {
-	    if (err) reject(new DB2Error(this.DRIVER_ID,err,stack,'DB2.open()'))
+	    if (err) reject(this.createDatabaseError(this.DRIVER_ID,err,stack,'DB2.open()'))
 	    resolve(conn)
 	  })
 	})
@@ -121,7 +125,7 @@ class DB2DBI extends YadamuDBI {
 	   const results = await this.connection.query(`select 1 from sysibm.sysdummy1`)
 	   return false
 	 } catch(e) {
-	   const cause = new DB2Error(this.DRIVER_ID,e,stack,'DB2.Pool.badConnection()')
+	   const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,'DB2.Pool.badConnection()')
 	   if (cause.lostConnection()) {
 		 return true
 	   }
@@ -151,7 +155,7 @@ class DB2DBI extends YadamuDBI {
         const stack = new Error().stack
 	    const connection = await new Promise((resolve,reject) => {
           this.connectionPool.open(this.createConnectionString(),(err,conn) => {
-	        if (err) reject(new DB2Error(this.DRIVER_ID,err,stack,'DB2.Pool.getConnection()'))
+	        if (err) reject(this.createDatabaseError(this.DRIVER_ID,err,stack,'DB2.Pool.getConnection()'))
 	        resolve(conn)
 	      })
 	    })
@@ -230,7 +234,7 @@ class DB2DBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new DB2Error(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if itYAD cannot reconnect...
@@ -273,7 +277,7 @@ class DB2DBI extends YadamuDBI {
 		return results;
       } catch (e) {
 		timerAbort.abort()
-		const cause = this.trackExceptions(new DB2Error(this.DRIVER_ID,e,stack,batch.sql))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,batch.sql)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if itYAD cannot reconnect...
@@ -569,15 +573,11 @@ class DB2DBI extends YadamuDBI {
      return queryInfo;
   }   
 
-  createParser(queryInfo,parseDelay) {
-    return new DB2Parser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new DB2Parser(this,queryInfo,pipelineState,this.LOGGER)
   }  
-  
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof DB2Error) || (cause instanceof CopyOperationAborted)) ? cause : new DB2Error(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-  
-  async getInputStream(queryInfo) {
+
+  async _getInputStream(queryInfo) {
 
     // Either return the databases native readable stream or use the DB2Reader to create a class that wraps a cursor or event stream in a Readable
 
@@ -597,7 +597,7 @@ class DB2DBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -624,14 +624,14 @@ class DB2DBI extends YadamuDBI {
     return await super.generateStatementCache(DB2StatementGenerator, schema)
   }
 
-  getOutputStream(tableName,metrics) {
+  getOutputStream(tableName,pipelineState) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(DB2Writer,tableName,metrics)
+	 return super.getOutputStream(DB2Writer,tableName,pipelineState)
   }
 
-  getOutputManager(tableName,metrics) {
+  getOutputManager(tableName,pipelineState) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(DB2OutputManager,tableName,metrics)
+	 return super.getOutputStream(DB2OutputManager,tableName,pipelineState)
   }
 
   classFactory(yadamu) {

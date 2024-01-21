@@ -10,7 +10,7 @@ class ErrorDBI extends FileDBI {
 	this.FILE = filename
   }
  
-  getOutputStream(tableName) {
+  getOutputManager(tableName) {
     // Override parent method to allow output stream to be passed to worker
     // this.LOGGER.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
 	const os = new ErrorOutputManager(this,tableName,this.firstTable,this.LOGGER)

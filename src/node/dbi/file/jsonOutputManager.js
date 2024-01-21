@@ -5,15 +5,18 @@ import {
 
 import Yadamu                from '../../core/yadamu.js';
 import YadamuConstants       from '../../lib/yadamuConstants.js';
-import PerformanceReporter   from '../../util/performanceReporter.js';
 
 import YadamuDataTypes       from '../base/yadamuDataTypes.js';
 import YadamuOutputManager   from '../base/yadamuOutputManager.js';
 
+import DBIConstants          from '../base/dbiConstants.js'
+
 class JSONOutputManager extends YadamuOutputManager {
 	     
-  constructor(dbi,tableName,metrics,firstTable,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,firstTable,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
+	this.PIPELINE_STATE.displayName = this.tableName
+	this.PIPELINE_STATE.ddlComplete = performance.now()
 	this.startTable = firstTable ? `"${tableName}":[` :  `,"${tableName}":[`
 	this.rowSeperator = '';
 	this.rowCount = 0
@@ -173,7 +176,7 @@ class JSONOutputManager extends YadamuOutputManager {
   }
   
   formatRow(row) {
-	// if (this.COPY_METRICS.committed === 0) console.log('JOM',row)
+	// if (this.PIPELINE_STATE.committed === 0) console.log('JOM',row)
     return `${this.rowSeperator}${JSON.stringify(row)}`
   }
   
@@ -186,15 +189,15 @@ class JSONOutputManager extends YadamuOutputManager {
 
     this.push(this.formatRow(row));
 	this.rowSeperator = ','
-    this.COPY_METRICS.committed++;
-    if ((this.FEEDBACK_INTERVAL > 0) && ((this.COPY_METRICS.committed % this.FEEDBACK_INTERVAL) === 0)) {
-      this.LOGGER.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.COPY_METRICS.committed}.`);
+    this.PIPELINE_STATE.committed++;
+    if ((this.FEEDBACK_INTERVAL > 0) && ((this.PIPELINE_STATE.committed % this.FEEDBACK_INTERVAL) === 0)) {
+      this.LOGGER.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.PIPELINE_STATE.committed}.`);
     }
   }
   
   async doTransform(messageType,obj) {
 	 
-    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.COPY_METRICS.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
+    // this.LOGGER.trace([this.constructor.name,this.PIPELINE_STATE.displayName,this.dbi.getWorkerNumber(),messageType,this.PIPELINE_STATE.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
 	
     switch (messageType) {
       case 'data':
@@ -210,7 +213,7 @@ class JSONOutputManager extends YadamuOutputManager {
 	    break;  
       case 'eod':
         // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
-        // this.LOGGER.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,this.rowCount],`${YadamuConstants.END_OF_DATA}`)  
+        // this.LOGGER.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.PIPELINE_STATE.displayName,this.rowCount],`${YadamuConstants.END_OF_DATA}`)  
         this.emit(YadamuConstants.END_OF_DATA)
       default:
     }
@@ -226,22 +229,22 @@ class JSONOutputManager extends YadamuOutputManager {
 	// Called from _flush() when there are no more rows to process for the current table.
 	// Generate the required reporting based on this component having no further data, since the downstream pipeline components remain open.
 	  
-    // this.LOGGER.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.hasPendingRows(),this.COPY_METRICS.received,this.COPY_METRICS.committed,this.COPY_METRICS.written,this.COPY_METRICS.cached],`JSONOutputManager.processPendingRows(${this.hasPendingRows()})`)
-	this.COPY_METRICS.managerEndTime = performance.now()
+    // this.LOGGER.trace([this.constructor.name,this.PIPELINE_STATE.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.hasPendingRows(),this.PIPELINE_STATE.received,this.PIPELINE_STATE.committed,this.PIPELINE_STATE.written,this.PIPELINE_STATE.cached],`JSONOutputManager.processPendingRows(${this.hasPendingRows()})`)
+	this.PIPELINE_STATE[DBIConstants.TRANSFORMATION_STREAM_ID].endTime = performance.now()
 	this.finalizeTable()
   }
   
   async doDestroy(err) {
     // Workaround for unexpected "[ERR_STREAM_DESTROYED]: Cannot call pipe after a stream was destroyed" exceptions	 
+    this.STREAM_STATE.endTime = performance.now()
+	this.PIPELINE_STATE.insertMode = this.dbi.OUTPUT_FORMAT
+
     if (this.writableEnded && this.writableFinished && err?.code === 'ERR_STREAM_DESTROYED') {
-      // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished,err.code],`JSON_Writer_destroy(): Swallowed error "${err.message}".`)
+      // this.LOGGER.trace([this.constructor.name,this.PIPELINE_STATE.displayName,this.dbi.getWorkerNumber(),this.PIPELINE_STATE.received,this.PIPELINE_STATE.cached,this.PIPELINE_STATE.written,this.PIPELINE_STATE.skipped,this.PIPELINE_STATE.lost,this.writableEnded,this.writableFinished,err.code],`JSON_Writer_destroy(): Swallowed error "${err.message}".`)
       err = undefined
 	}
 	
 	// Defer performance reporting to here... Ensures parser 'finish' event has occurred.
-	this.reportGenerator = new PerformanceReporter(this.dbi,this.tableInfo,this.COPY_METRICS,{},this.LOGGER)
-	this.reportGenerator.reportPerformance(err)
-	this.reportGenerator.end()
 	await super.doDestroy(err)
   }
   

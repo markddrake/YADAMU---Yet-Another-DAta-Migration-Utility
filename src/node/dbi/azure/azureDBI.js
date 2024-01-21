@@ -16,10 +16,6 @@ import {
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  YadamuError
-}                                     from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 
 import CloudDBI                       from '../cloud/cloudDBI.js';
@@ -75,6 +71,9 @@ class AzureDBI extends CloudDBI {
     super(yadamu,manager,connectionSettings,parameters)
   }   
   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new AzureError(driverId,cause,stack,sql)
+  }
   
   getVendorProperties() {
 

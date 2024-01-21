@@ -133,12 +133,10 @@ switch ($ENV:YADAMU_TEST_NAME) {
     runRegressionTest "shortRegression"
     runRegressionTest "verticaShortRegression"
 	runRegressionTest "vertica10ShortRegression"
-	runRegressionTest "mssql2014ShortRegression"
     runRegressionTest "snowflakeShortRegression"
     runRegressionTest "postgresDataTypes"
     runRegressionTest "verticaDataTypes"
     runRegressionTest "vertica10DataTypes"
-    runRegressionTest "mssql2014DataTypes"
     runRegressionTest "snowflakeDataTypes"
     runRegressionTest "export"
     runRegressionTest "import"
@@ -164,10 +162,12 @@ switch ($ENV:YADAMU_TEST_NAME) {
 	runRegressionTest "mariadbCopy"
 	runRegressionTest "verticaCopy"
 	runRegressionTest "vertica10Copy"
-    runRegressionTest "mssql2014TestSuite"
     runRegressionTest "snowflakeTestSuite"
 	runRegressionTest "snowflakeCopy"
     runRegressionTest "snowflakeCopy"
+	runRegressionTest "mssql2014ShortRegression"
+    runRegressionTest "mssql2014DataTypes"
+    runRegressionTest "mssql2014TestSuite"
     break
   }	
  
@@ -339,6 +339,16 @@ switch ($ENV:YADAMU_TEST_NAME) {
   }
 
   "copy" { 
+    runRegressionTest "oracleCopy"
+	runRegressionTest "postgresCopy"
+	runRegressionTest "mysqlCopy"
+	runRegressionTest "mariadbCopy"
+	runRegressionTest "verticaCopy"
+	runRegressionTest "vertica10Copy"
+    break
+  }
+
+  "copy2" { 
     runRegressionTest "oracleCopy"
 	runRegressionTest "postgresCopy"
 	runRegressionTest "mysqlCopy"

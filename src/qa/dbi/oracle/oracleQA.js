@@ -40,25 +40,33 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 
  	async recreateSchema() {
         
-      try {
-        const dropUser = `drop user "${this.parameters.TO_USER}" cascade`;
-        await this.executeSQL(dropUser,{});      
-      } catch (e) {
-        if ((e.cause) && (e.cause.errorNum && (e.cause.errorNum === 1918))) {
-        }
-        else {
-          throw e;
-        }
-      }
-      const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.vendorProperties.password}`;
-      await this.executeSQL(createUser,{});      
-    }  
+	 let retryCount = 5
+	 while (true) {
+        try {
+          const dropUser = `drop user "${this.parameters.TO_USER}" cascade`;
+          await this.executeSQL(dropUser,{});      
+		  break;
+        } catch (e) {
+		  if (e.lockingError() && (retryCount > 0)) {
+			await setTimeout(1000)
+			retryCount--
+			continue
+		 }
+         if (e.nonexistentUser()) {
+     		break;
+		 }
+		 throw e
+       }
+	 }
+     const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.vendorProperties.password}`;
+     await this.executeSQL(createUser,{});      
+   }  
      
-    classFactory(yadamu) {
-      return new OracleQA(yadamu,this,this.connectionParameters,this.parameters)
-    }
+   classFactory(yadamu) {
+     return new OracleQA(yadamu,this,this.connectionParameters,this.parameters)
+   }
 	
-    async configureConnection() {
+   async configureConnection() {
 
       await super.configureConnection()
 	  
@@ -102,7 +110,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 			  this.LOGGER.log(tags,`Worker finished prior to termination.`)
  		    }
 			else {
-			  const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement)
+			  const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,sqlStatement)
 			  this.LOGGER.handleException(tags,cause)
 			}
             if (!e.message.startsWith('DPI-1010')) {

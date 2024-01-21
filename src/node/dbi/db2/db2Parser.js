@@ -6,8 +6,8 @@ import YadamuDataTypes      from '../base/yadamuDataTypes.js'
 
 class DB2Parser extends YadamuParser {
   
-  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
-    super(dbi,queryInfo,yadamuLogger,parseDelay)    	
+  constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
+    super(dbi,queryInfo,pipelineState,yadamuLogger)    	
   }
 
   generateTransformations(queryInfo) {

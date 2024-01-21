@@ -36,8 +36,7 @@ import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
-  YadamuError,
-  CopyOperationAborted
+  YadamuError
 }                                    from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
@@ -165,6 +164,10 @@ class YugabyteDBI extends YadamuDBI {
   **
   */
   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new YugabyteError(driverId,cause,stack,sql)
+  }
+    
   async testConnection() {   
 	try {
       const pgClient = new Client(this.vendorProperties)
@@ -186,9 +189,8 @@ class YugabyteDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new YugabyteError(this.DRIVER_ID,err,this.yugabyteStack,this.yugabyteOperation))
-      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
-      // throw pgErr
+	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.yugabyteStack,this.yugabyteOperation)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','POOL'],err.message)
     })
 
   }
@@ -208,7 +210,7 @@ class YugabyteDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.trackExceptions(new YugabyteError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.connect()')
 	}
   }
 
@@ -230,7 +232,7 @@ class YugabyteDBI extends YadamuDBI {
       await this.configureConnection()
       return this.connection
 	} catch (e) {
-      throw this.trackExceptions(new CockroachError(this.DRIVER_ID,e,stack,operation))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
 	}
   }
   
@@ -266,9 +268,8 @@ class YugabyteDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new YugabyteError(this.DRIVER_ID,err,this.yugabyteStack,this.yugabyteOperation))
-      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
-      // throw pgErr
+	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.yugabyteStack,this.yugabyteOperation)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','CONNECTION'],err.message)
     })
    
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
@@ -295,7 +296,7 @@ class YugabyteDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.trackExceptions(new YugabyteError(this.DRIVER_ID,e,stack,'Client.release()'))
+		const err = this.getDatabaseException(this.DRIVER_ID,e,stack,'Client.release()')
 		throw err
       }
 	}
@@ -313,7 +314,7 @@ class YugabyteDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.trackExceptions(new YugabyteError(this.DRIVER_ID,e,stack,'pg.Pool.close()'))
+	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.close()')
 	  }
 	}
   }
@@ -364,7 +365,7 @@ class YugabyteDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new YugabyteError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -553,7 +554,7 @@ class YugabyteDBI extends YadamuDBI {
       return elapsedTime;
     }
     catch (e) {
-      const cause = this.trackExceptions(new YugabyteError(this.DRIVER_ID,e,stack,copyStatement))
+      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,copyStatement)
 	  throw cause
 	}
   }
@@ -681,15 +682,11 @@ class YugabyteDBI extends YadamuDBI {
     return this.generateSchemaInfo(results.rows)
   }
 
-  createParser(queryInfo,parseDelay) {
-    return new YugabyteParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new YugabyteParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
   
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof YugabyteError) || (cause instanceof CopyOperationAborted)) ? cause : new YugabyteError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-
-  async getInputStream(queryInfo) {        
+  async _getInputStream(queryInfo) {        
   
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
@@ -699,10 +696,19 @@ class YugabyteDBI extends YadamuDBI {
 	**
 	*/
   
-    if (this.failedPrematureClose) {
-	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
+    /*
+    **
+    **	If the previous pipleline operation failed, it appears that the driver will hang when creating a new QueryStream...
+	**
+	*/
+  
+    if (this.ACTIVE_INPUT_STREAM === true) {
+	  this.LOGGER.warning([this.DATABASE_VENDOR,'INPUT STREAM',queryInfo.TABLE_NAME],'Pipeline Aborted. Switching database connection')
+	  await this.closeConnection()
+	  this.connection = this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+	  await this.configureConnection()
 	}
- 		
+ 		 		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     while (true) {
       // Exit with result or exception.  
@@ -747,7 +753,7 @@ class YugabyteDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new YugabyteError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -830,12 +836,12 @@ class YugabyteDBI extends YadamuDBI {
 	return statementCache
   }
 
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputManager(YugabyteOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputManager(YugabyteOutputManager,tableName,pipelineState)
   }
 
-  getOutputStream(tableName,metrics) {
-	 return super.getOutputStream(YugabyteWriter,tableName,metrics)
+  getOutputStream(tableName,pipelineState) {
+	 return super.getOutputStream(YugabyteWriter,tableName,pipelineState)
   }
  
   classFactory(yadamu) {
@@ -856,10 +862,10 @@ class YugabyteDBI extends YadamuDBI {
 	 await this.commitTransaction();
   }
   
-  async copyOperation(tableName,copyOperation,metrics) {
+  async copyOperation(tableName,copyOperation,copyState) {
 	
 	try {
-	  metrics.writerStartTime = performance.now()
+	  copyState.startTime = performance.now()
 	  let results = await this.beginTransaction()
 	  // results = await this.executeSQL(copyOperation.ddl)
 
@@ -867,28 +873,28 @@ class YugabyteDBI extends YadamuDBI {
 	  // await this.beginTransaction()
 	  
 	  results = await this.executeSQL(copyOperation.dml)
-	  metrics.read = results.rowCount
-	  metrics.written = results.rowCount
+	  copyState.read = results.rowCount
+	  copyState.written = results.rowCount
 
 	  // await this.commitTransaction()
 	  // await this.beginTransaction()
 	  
 	  // results = await this.executeSQL(copyOperation.drop)
-	  metrics.writerEndTime = performance.now()
+	  copyState.endTime = performance.now()
 	  results = await this.commitTransaction()
-	  metrics.committed = metrics.written 
-	  metrics.written = 0
+	  copyState.committed = copyState.written 
+	  copyState.written = 0
   	} catch(e) {
-	  metrics.writerError = e
+	  copyState.writerError = e
 	  try {
   	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
-		e.cause = metrics.writerError
-		metrics.writerError = e
+		e.cause = copyState.writerError
+		copyState.writerError = e
 	  }
 	}
-	return metrics
+	return copyState
   }
 
   async finalizeCopy() {

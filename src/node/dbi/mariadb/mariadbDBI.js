@@ -14,11 +14,6 @@ import mariadb                        from 'mariadb';
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  YadamuError,
-  CopyOperationAborted
-}                                     from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
@@ -97,6 +92,10 @@ class MariadbDBI extends YadamuDBI {
 	
     this.StatementLibrary = MariadbStatementLibrary
     this.statementLibrary = undefined
+  }
+  
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new MariadbError(driverId,cause,stack,sql)
   }
   
   async testConnection() {   
@@ -183,7 +182,7 @@ class MariadbDBI extends YadamuDBI {
 	  connection.ping()
       return connection
 	} catch (e) {
-	  throw this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Pool.getConnection()'))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'mariadb.Pool.getConnection()')
 	}
   }
 
@@ -199,7 +198,7 @@ class MariadbDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    throw this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'Mariadb.Connection.end()'))
+  	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Mariadb.Connection.end()')
 	  }
 	}
   };
@@ -216,7 +215,7 @@ class MariadbDBI extends YadamuDBI {
         this.pool = undefined;
       } catch (e) {
         this.pool = undefined;
-  	    throw this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'Mariadb.Pool.end()'))
+  	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Mariadb.Pool.end()')
 	  }
 	}
 	
@@ -252,7 +251,7 @@ class MariadbDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -328,11 +327,6 @@ class MariadbDBI extends YadamuDBI {
 	
   }
 
-  async finalizeRead(tableInfo) {
-    this.checkConnectionState(this.latestError) 
-    await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
-  }
-
   /*
   **
   ** Begin a transaction
@@ -357,7 +351,7 @@ class MariadbDBI extends YadamuDBI {
 		super.beginTransaction()
 		break
       } catch (e) {
-		const cause = new MariadbError(e,stack,'mariadb.Connection.beginTransaction()')
+		const cause = this.createDatabaseError(e,stack,'mariadb.Connection.beginTransaction()')
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -390,7 +384,7 @@ class MariadbDBI extends YadamuDBI {
       await this.connection.commit()
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Connection.commit()'))
+	  const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'mariadb.Connection.commit()')
 	  if (cause.lostConnection()) {
         await this.reconnect(cause,'COMMIT TRANSACTION')
 	  }
@@ -425,7 +419,7 @@ class MariadbDBI extends YadamuDBI {
       await this.connection.rollback()
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  const newIssue = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Connection.rollback()'))
+	  const newIssue = this.getDatabaseException(this.DRIVER_ID,e,stack,'mariadb.Connection.rollback()')
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     } 
 	
@@ -540,15 +534,11 @@ class MariadbDBI extends YadamuDBI {
     return await super.generateStatementCache(MariadbStatementGenerator,schema) 
   }
 
-  createParser(queryInfo,parseDelay) {
-    return new MariadbParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new MariadbParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
 
-  inputStreamError(cause,sqlStatement) {
-	 return this.trackExceptions(((cause instanceof MariadbError) || (cause instanceof CopyOperationAborted)) ? cause : new MariadbError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-    
-  async getInputStream(queryInfo) {
+  async _getInputStream(queryInfo) {
     
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
     
@@ -563,7 +553,7 @@ class MariadbDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -576,12 +566,12 @@ class MariadbDBI extends YadamuDBI {
 	
   }
 
-  getOutputStream(tableName,metrics) {
-	 return super.getOutputStream(MariadbWriter,tableName,metrics)
+  getOutputStream(tableName,pipelineState) {
+	 return super.getOutputStream(MariadbWriter,tableName,pipelineState)
   }
 
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputManager(MariadbOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputManager(MariadbOutputManager,tableName,pipelineState)
   }
 
   classFactory(yadamu) {

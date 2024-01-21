@@ -36,8 +36,8 @@ class MongoWriter extends YadamuWriter {
   **  
   */
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   setTableInfo(tableName) {
@@ -101,7 +101,7 @@ class MongoWriter extends YadamuWriter {
 	
 	this.rowTransformation(row)
 	this.batchRow(row)
-    this.COPY_METRICS.cached++
+    this.PIPELINE_STATE.cached++
     return this.skipTable
 
   }
@@ -129,6 +129,7 @@ class MongoWriter extends YadamuWriter {
     } catch (cause) {
 	  this.reportBatchError(`INSERT MANY`,batch.map((r) => { return Object.values(r)}),cause)
       this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+  	  this.dbi.resetExceptionTracking()
     } 
     
          

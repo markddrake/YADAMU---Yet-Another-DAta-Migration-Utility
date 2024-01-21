@@ -15,11 +15,6 @@ const { MongoClient } = mongodb;
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  YadamuError,
-  CopyOperationAborted
-}                                     from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
@@ -140,7 +135,11 @@ class MongoDBI extends YadamuDBI {
     super(yadamu,manager,connectionSettings,parameters)
     this.DATA_TYPES = MongoDataTypes
   }
-                                                             ;
+           
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new MongoError(driverId,cause,stack,sql)
+  }
+ 
   async _executeDDL(collectionList) {
 	  
 	const existingCollections = await this.listCollections({},{nameOnly: true})
@@ -193,7 +192,7 @@ class MongoDBI extends YadamuDBI {
       await this.client.connect()   
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
-       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+       throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
      }
   }
 
@@ -213,7 +212,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return this.connection
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -233,7 +232,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -255,7 +254,7 @@ class MongoDBI extends YadamuDBI {
       let results = await this.connection.dropDatabase() 
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
-       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+       throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
      }
   }
 
@@ -274,7 +273,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -292,7 +291,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
   
@@ -311,7 +310,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -329,7 +328,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -347,7 +346,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -367,7 +366,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return count
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -386,7 +385,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collections;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
   
@@ -405,7 +404,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collectionList;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
   
@@ -426,7 +425,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 
@@ -446,7 +445,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
     
@@ -466,7 +465,7 @@ class MongoDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
 	
@@ -520,7 +519,7 @@ class MongoDBI extends YadamuDBI {
       await this.client.close()   
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
   
@@ -550,7 +549,7 @@ class MongoDBI extends YadamuDBI {
 	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results[0]
     } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
     
@@ -857,7 +856,7 @@ class MongoDBI extends YadamuDBI {
             }
           }
         } catch(e) {		
-          throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+          throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
         }
       }
 	  
@@ -879,10 +878,10 @@ class MongoDBI extends YadamuDBI {
     return schemaInfo
   }
 
-  createParser(tableInfo,parseDelay) {
+  _getParser(tableInfo,pipelineState) {
     tableInfo.READ_TRANSFORMATION = this.READ_TRANSFORMATION
     tableInfo.ID_TRANSFORMATION = this.ID_TRANSFORMATION
-    return new MongoParser(this,tableInfo,this.LOGGER,parseDelay)
+    return new MongoParser(this,tableInfo,pipelineState,this.LOGGER)
   }  
 
   generateQueryInformation(tableMetadata) {
@@ -891,11 +890,7 @@ class MongoDBI extends YadamuDBI {
     return tableInfo
   }   
   
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof MongoError) || (cause instanceof CopyOperationAborted)) ? cause : new MongoError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-  
-  async getInputStream(collectionInfo,parser) {
+  async _getInputStream(collectionInfo,parser) {
             
     const collectionName = collectionInfo.TABLE_NAME
     const operation = `${collectionName}.find().stream()`
@@ -913,7 +908,7 @@ class MongoDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return mongoStream;
       } catch (e) {
-		const cause = this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -935,12 +930,12 @@ class MongoDBI extends YadamuDBI {
 	return await super.generateStatementCache(MongoStatementGenerator,schema) 
   }
   
-  getOutputStream(collectionName,metrics) {
-     return super.getOutputStream(MongoWriter,collectionName,metrics)
+  getOutputStream(collectionName,pipelineState) {
+     return super.getOutputStream(MongoWriter,collectionName,pipelineState)
   }
   
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputManager(MongoOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputManager(MongoOutputManager,tableName,pipelineState)
   }
   
   async createSchema(schema) {  
@@ -965,7 +960,7 @@ class MongoDBI extends YadamuDBI {
     Object.keys(metadata).forEach((table) => {
       const mappedTableName = metadata[table].tableName.indexOf('$') > -1 ? metadata[table].tableName.replace(/\$/g,'') : undefined
       if (mappedTableName) {
-		this.LOGGER.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
+		this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
         dbMappings[table] = {
   	      tableName : mappedTableName
 		}

@@ -8,8 +8,8 @@ import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 
 class MariadbWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   getMetrics() {
@@ -73,6 +73,7 @@ class MariadbWriter extends YadamuWriter {
   		  this.reportBatchError(`INSERT MANY`,cause,batch)
           await this.dbi.restoreSavePoint(cause);
           this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+  		  this.dbi.resetExceptionTracking()
           this.tableInfo.insertMode = 'Iterative'
           repackBatch = true;
         }

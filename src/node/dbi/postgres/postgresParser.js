@@ -3,8 +3,8 @@ import YadamuParser from '../base/yadamuParser.js'
 
 class PostgresParser extends YadamuParser {
     
-  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
-    super(dbi,queryInfo,yadamuLogger,parseDelay);     
+  constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
+    super(dbi,queryInfo,pipelineState,yadamuLogger);     
   }
   
   generateTransformations(queryInfo) {

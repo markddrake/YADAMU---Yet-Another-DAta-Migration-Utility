@@ -26,9 +26,8 @@ import {
   ConnectionError, 
   DatabaseError, 
   BatchInsertError, 
-  IterativeInsertError, 
-  InputStreamError, 
-  UnimplementedMethod
+  CopyOperationAborted,
+  IterativeInsertError
 }                         from '../../core/yadamuException.js'
 
 import DBIConstants       from './dbiConstants.js'
@@ -132,7 +131,6 @@ class YadamuDBI extends EventEmitter {
   get STATEMENT_SEPERATOR()          { return '\n--\n' }
   get RETRY_COUNT()                  { return 3 }
   
-  get PARSE_DELAY()                  { return this.parameters.PARSE_DELAY                 || DBIConstants.PARSE_DELAY };
   get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()             { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
   get MODE()                         { return this.parameters.MODE                        || DBIConstants.MODE }
@@ -205,7 +203,13 @@ class YadamuDBI extends EventEmitter {
   get SAVE_POINT_SET()                { return this._SAVE_POINT_SET === true }
   set SAVE_POINT_SET(v)               { this._SAVE_POINT_SET = v }
 
-  // get ATTEMPT_RECONNECTION()          { return ((this.ON_ERROR !== 'ABORT' || this.RECONNECT_ON_ABORT)) && !this.RECONNECT_IN_PROGRESS}
+  set ACTIVE_INPUT_STREAM(v)          { this._ACTIVE_INPUT_STREAM = v }
+  get ACTIVE_INPUT_STREAM()           { return this._ACTIVE_INPUT_STREAM }
+
+  set PREVIOUS_PIPELINE_ABORTED(v)    { this._PREVIOUS_PIPELINE_ABORTED = v }
+  get PREVIOUS_PIPELINE_ABORTED()     { return this._PREVIOUS_PIPELINE_ABORTED }
+
+  // get ATTEMPT_RECONNECTION()       { return ((this.ON_ERROR !== 'ABORT' || this.RECONNECT_ON_ABORT)) && !this.RECONNECT_IN_PROGRESS}
   get ATTEMPT_RECONNECTION()          { return !this.RECONNECT_IN_PROGRESS}
 
   get SOURCE_DIRECTORY()              { return this.parameters.SOURCE_DIRECTORY || this.parameters.DIRECTORY }
@@ -340,8 +344,27 @@ class YadamuDBI extends EventEmitter {
   
   get DEBUGGER()           { return this._DEBUGGER }
   set DEBUGGER(v)          { this._DEBUGGER = v }
+  
+  get ERROR_STATE()        { return this._ERROR_STATE }
+  
+  get LATEST_ERROR()       { return this._ERROR_STATE.LATEST_ERROR }
+  set LATEST_ERROR(v)      { this._ERROR_STATE.LATEST_ERROR = v }
 
+  get PARTITIONED_TABLE_STATE() {
+    return this.isManager() ? this._PARTITIONED_TABLE_STATE : this.manager.PARTITIONED_TABLE_STATE[this.PIPELINE_STATE.partitionedTableName]
+  }
+  
+  set PARTITIONED_TABLE_STATE(v) {
+    if (this.isManager()) {
+      this._PARTITIONED_TABLE_STATE = v
+    }
+    else {
+     this.manager.PARTITIONED_TABLE_STATE[this.PIPELINE_STATE.partitionedTableName] = v
+    }
+  }1
+    
   constructor(yadamu,manager,connectionSettings,parameters) {
+
     super()
     this.DRIVER_ID = performance.now()
     yadamu.activeConnections.add(this)
@@ -366,6 +389,10 @@ class YadamuDBI extends EventEmitter {
     
     this._DATABASE_VERSION = 'N/A'    
 
+	this._ERROR_STATE = {
+	  LATEST_ERROR  : undefined
+	}
+
     this.vendorProperties = this.getVendorProperties()   
 
     this.systemInformation = undefined;
@@ -380,14 +407,14 @@ class YadamuDBI extends EventEmitter {
     this.TRANSACTION_IN_PROGRESS = false;
     this.SAVE_POINT_SET = false;
     this.DESCRIPTION = this.getSchemaIdentifer()
+	
+	this.ACTIVE_INPUT_STREAM = false
+	this.PREVIOUS_PIPELINE_ABORTED = false
     
     this.tableInfo  = undefined;
     this.insertMode = 'Batch'
     this.skipTable = true;
 
-    this.firstError = undefined
-    this.latestError = undefined    
-    
     this.ddlInProgress = false;
     this.activeWriters = new Set()
     
@@ -444,7 +471,7 @@ class YadamuDBI extends EventEmitter {
           this.LOGGER.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
           if (this.PARTITION_LEVEL_OPERATIONS) {
             // Need target schema metadata to determine if we can perform partition level write operations.
-            this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { console.log(1); reject(e) })
+            this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { reject(e) })
           }
           else {
             resolve(true)
@@ -456,7 +483,9 @@ class YadamuDBI extends EventEmitter {
     })
 	
 	this.readyForData = new Promise((resolve,reject) => { resolve(false) })
-	
+ 
+    this.PARTITIONED_TABLE_STATE = {}
+
   }
   
   isReadyForData() {
@@ -726,21 +755,27 @@ class YadamuDBI extends EventEmitter {
   isDatabase() {
     return true;
   }
-  
-  trackExceptions(err) {
-    // Reset by passing undefined 
-    this.firstError = this.firstError === undefined ? err : this.firstError
-    this.latestError = err
-    return err
-  } 
-  
+
   resetExceptionTracking() {
-    this.firstError = undefined
-    this.latestError = undefined
+    this.LATEST_ERROR = undefined
   }
    
+  trackExceptions(err) {
+    this.LATEST_ERROR = err
+    return err
+  } 
+   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new DatabaseError(driverId,cause,stack,sql)
+  }
+  
+  getDatabaseException(driverId,cause,stack,sql) {
+    const err = this.createDatabaseError(driverId,cause,stack,sql)
+    return this.trackExceptions(err)
+  }
+
   raisedError(error) {
-	return error === this.latestError
+	return error === this.LATEST_ERROR
   }
   
   setSystemInformation(systemInformation) {
@@ -908,7 +943,7 @@ class YadamuDBI extends EventEmitter {
     return metadata 
   }
   
-    applyIdentifierMappings(metadata,mappings,reportMappedIdentifiers) {
+  applyIdentifierMappings(metadata,mappings,reportMappedIdentifiers) {
       
     // This function does not change the names of the keys in the metadata object.
     // It only changes the value of the tableName property associated with a mapped tables.
@@ -1080,15 +1115,17 @@ class YadamuDBI extends EventEmitter {
    
     /*
     **
-    ** Invoked when the connection is lost. A lost connection scenario is an implicit rollback. All uncommitted rows are lost. 
+	** Invoked when the connection is lost. 
+	** If the WRITE connection is lost any rows written but committed cannot be recovered and are lost.
+    ** If a READ connection is lost the mode (ABORT/SKIP/FLUSH/RETRY) will determine what happens to rows written but not yet committed.
     **
     */
  
-    if ((this.COPY_METRICS !== undefined) && (this.COPY_METRICS.lost  !== undefined) && (this.COPY_METRICS.written  !== undefined)) {
-      if (this.COPY_METRICS.written > 0) {
-        this.LOGGER.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.COPY_METRICS.written} uncommitted rows discarded when connection lost.`)
-        this.COPY_METRICS.lost += this.COPY_METRICS.written;
-        this.COPY_METRICS.written = 0;
+    if (this.IS_WRITER === true) {
+      if (this.PIPELINE_STATE.written > 0) {
+        this.LOGGER.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.PIPELINE_STATE.written} uncommitted rows discarded when connection lost.`)
+        this.PIPELINE_STATE.lost += this.PIPELINE_STATE.written;
+        this.PIPELINE_STATE.written = 0;
       }
     }
   }   
@@ -1170,7 +1207,7 @@ class YadamuDBI extends EventEmitter {
       }
       // Sucessfully reonnected. Throw the original error if rows were lost as a result of the lost connection
       this.RECONNECT_IN_PROGRESS = false;
-      if ((this.COPY_METRICS !== undefined) && (this.COPY_METRICS.lost > 0)) { 
+      if ((this.PIPELINE_STATE !== undefined) && (this.PIPELINE_STATE.lost > 0)) { 
         throw cause
       }
       return
@@ -1287,7 +1324,7 @@ class YadamuDBI extends EventEmitter {
 
     const closeOptions = this.getCloseOptions()
                 
-    await this.writersFinished()
+    await this.workersFinished()
 
     if (this.isManager()) {
       // this.LOGGER.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
@@ -1312,7 +1349,7 @@ class YadamuDBI extends EventEmitter {
     **
     */
 
-    await this.writersFinished() 
+    await this.workersFinished() 
 
     if (!this.DESTROYED) {
 
@@ -1719,6 +1756,7 @@ class YadamuDBI extends EventEmitter {
   }
   
   async finalizeData() {
+	 // Called dbWriter when all the data for all tables has been written.  Used to restore any changes that were mode to the Database Schema state prior to closing connection.
   }
 
   async finalizeImport() {
@@ -1781,93 +1819,96 @@ class YadamuDBI extends EventEmitter {
     return queryInfo
   }   
 
-  createParser(queryInfo,parseDelay) {
-    throw new UnimplementedMethod('createParser(queryInfo,parseDelay)',`YadamuDBI`,this.constructor.name)
+  inputStreamError(err,sqlStatement) {
+     return this.trackExceptions(((err instanceof DatabaseError) || (err instanceof CopyOperationAborted)) ? err : this.createDatabaseError(this.DRIVER_ID,err,new Error().stack,sqlStatement))
   }
- 
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(new InputStreamError(cause,new Error().stack,sqlStatement))
+
+  handleInputStreamError(inputStream,err,sqlStatement) {
+	this.PREVIOUS_PIPELINE_ABORTED = true;
+    inputStream.STREAM_STATE.state = 'ERROR'
+    inputStream.STREAM_STATE.readableLength = inputStream.readableLength || 0
+    inputStream.STREAM_STATE.endTime = performance.now()
+    inputStream.PIPELINE_STATE.failed = true;
+    inputStream.PIPELINE_STATE.errorSource = inputStream.PIPELINE_STATE.errorSource || DBIConstants.INPUT_STREAM_ID
+    inputStream.STREAM_STATE.error = inputStream.STREAM_STATE.error || (inputStream.PIPELINE_STATE.errorSource === DBIConstants.INPUT_STREAM_ID) ? this.inputStreamError(err,sqlStatement) : inputStream.STREAM_STATE.error
+    this.failedPrematureClose = YadamuError.prematureClose(err)
   }
   
-  async getInputStream(queryInfo) {
-    stack = new Error().stack;
-    throw new UnimplementedMethod('getInputStream()',`YadamuDBI`,this.constructor.name)
+  
+  async getInputStream(queryInfo,pipelineState) {
+	
+	const inputStream = await this._getInputStream(queryInfo)
+    
+	this.ACTIVE_INPUT_STREAM = false
+	this.PREVIOUS_PIPELINE_ABORTED = false;
+	
+	inputStream.PIPELINE_STATE = pipelineState
+	inputStream.STREAM_STATE = { 
+	  vendor : this.DATABASE_VENDOR 
+	, state  : 'CREATED'
+	}
+    pipelineState[DBIConstants.INPUT_STREAM_ID] = inputStream.STREAM_STATE
+    inputStream.once('readable',() => {
+	  this.ACTIVE_INPUT_STREAM = true
+	  inputStream.STREAM_STATE.state = 'READABLE'
+      inputStream.STREAM_STATE.startTime = performance.now()
+    }).on('end',() => {
+	  this.ACTIVE_INPUT_STREAM = false
+      inputStream.STREAM_STATE.state = 'END'
+      inputStream.STREAM_STATE.endTime = performance.now()
+      inputStream.STREAM_STATE.readableLength = inputStream.readableLength || 0
+    }).on('error',async (err) => {
+      this.handleInputStreamError(inputStream,err,queryInfo.SQL_STATEMENT)
+    })	
     return inputStream;
   }      
 
-  async getInputStreams(queryInfo,parseDelay) {
-    const streams = []
-    const metrics = DBIConstants.NEW_COPY_METRICS
-    metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
-    const inputStream = await this.getInputStream(queryInfo)
-    inputStream.COPY_METRICS = metrics
-    inputStream.once('readable',() => {
-      inputStream.COPY_METRICS.readerStartTime = performance.now()
-    }).on('error',(err) => { 
-      metrics.readerEndTime = performance.now()
-      metrics.failed = true;
-      this.failedPrematureClose = YadamuError.prematureClose(err)
-      this.underlyingCause =  this.failedPrematureClose ? null : this.inputStreamError(err,queryInfo.SQL_STATEMENT)
-      metrics.readerError = this.underlyingCause
-    }).on('end',() => {
-      inputStream.COPY_METRICS.readerEndTime = performance.now()
-    })
-    streams.push(inputStream)
-    
-    const parser = this.createParser(queryInfo,parseDelay)
-    parser.COPY_METRICS = metrics
-    parser.once('readable',() => {
-      metrics.parserStartTime = performance.now()
-    }).on('finish',() => {
-      metrics.parserEndTime = performance.now()
-    }).on('error',(err) => {
-      metrics.parserEndTime = performance.now()
-      metrics.failed = true;
-      metrics.parserError = YadamuError.prematureClose(err) ? null : err
-    })
-    
-    streams.push(parser)
-    return streams;
-  }
-  
-  getOutputManager(OutputManager,tableName,metrics) {
-    return new OutputManager(this,tableName,metrics,this.status,this.LOGGER)
+  getParser(queryInfo,pipelineState) {
+    const parser = this._getParser(queryInfo,pipelineState)
+    return parser
   }
 
-  getOutputStream(TableWriter,tableName,metrics) {
-    // this.LOGGER.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
-    return new TableWriter(this,tableName,metrics,this.status,this.LOGGER)
+  async getInputStreams(queryInfo,pipelineState) {
+
+    this.PIPELINE_STATE = pipelineState
+	pipelineState.readerState = this.ERROR_STATE
+	this.resetExceptionTracking()
+
+    const streams = []
+
+	const inputStream = await this.getInputStream(queryInfo,pipelineState)
+    streams.push(inputStream)
+    
+    const parser = this.getParser(queryInfo,pipelineState)
+    streams.push(parser)
+	return streams;
   }
   
+  getOutputManager(OutputManager,tableName,pipelineState) {
+    const outputManager = new OutputManager(this,tableName,pipelineState,this.status,this.LOGGER)
+    return outputManager
+  }
+
+  getOutputStream(OutputStream,tableName,pipelineState) {
+    // this.LOGGER.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
+    const outputStream = new OutputStream(this,tableName,pipelineState,this.status,this.LOGGER)
+    return outputStream
+  }
   
-  getOutputStreams(tableName,metrics) {
-    // A Writer needs to track the metrics do it can make decisions about whether or not to honor a reconnect() request following a lost connection. 
-    this.COPY_METRICS = metrics
+  getOutputStreams(tableName,pipelineState) {
+    // A Writer needs to track the pipelineState do it can make decisions about whether or not to honor a reconnect() request following a lost connection. 
+    this.PIPELINE_STATE = pipelineState
+	pipelineState.writerState = this.ERROR_STATE
+	this.resetExceptionTracking()
     const streams = []
-    metrics.TARGET_DATABASE_VENDOR = this.DATABASE_VENDOR
-    const outputManager = this.getOutputManager(tableName,metrics)
-    outputManager.once('readable',() => {
-      metrics.managerStartTime = performance.now()
-    }).on('finish',() => { 
-      metrics.managerEndTime = performance.now()
-    }).on('error',(err) => {
-      metrics.managerEndTime = performance.now()
-      metrics.failed = true;
-      metrics.managerError = YadamuError.prematureClose(err) ? null : err
-    })
-    streams.push(outputManager)
+    	
+    const transformationManager = this.getOutputManager(tableName,pipelineState)
+    streams.push(transformationManager)
     
-    const tableWriter = this.getOutputStream(tableName,metrics)
-    tableWriter.once('pipe',() => {
-      metrics.writerStartTime = performance.now()
-    }).on('error',(err) => {
-      metrics.writerEndTime = performance.now()
-      metrics.failed = true;
-      metrics.writerError = YadamuError.prematureClose(err) ? null : err
-    })
+    const outputStream = this.getOutputStream(tableName,pipelineState)
+	streams.push(outputStream)
     
-    streams.push(tableWriter)
-    return streams;
+	return streams;
   }
   
   keepAlive(rowCount) {
@@ -1934,19 +1975,19 @@ class YadamuDBI extends EventEmitter {
     throw new UnimplementedMethod('getConnectionID()',`YadamuDBI`,this.constructor.name)
   }
   
-  async writersFinished() {
+  async workersFinished() {
       
-    // this.LOGGER.trace([this.constructor.name,'writersFinished()',this.ROLE,this.getWorkerNumber()],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
+    // this.LOGGER.trace([this.constructor.name,'workersFinished()',this.ROLE,this.getWorkerNumber()],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
 
-    // this.LOGGER.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
+    // this.LOGGER.trace([this.constructor.name,'workersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
     await Promise.allSettled(this.activeWriters)
-    // this.LOGGER.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
+    // this.LOGGER.trace([this.constructor.name,'workersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
 
   }
   
   async destroyWorker() {
     // this.LOGGER.trace([this.constructor.name,'destroyWorker()',this.ROLE,this.getWorkerNumber()],`Terminating Worker`)
-    await this.writersFinished()
+    await this.workersFinished()
     await this.releaseWorkerConnection() 
     this.emit(YadamuConstants.DESTROYED)
   }
@@ -1997,13 +2038,13 @@ class YadamuDBI extends EventEmitter {
     return statementCache
   }     
 
-  async reportCopyErrors(tableName,metrics) {
+  async reportCopyErrors(tableName,pipelineState) {
   }
  
   async initializeCopy() {
   }
   
-  async copyOperation(tableName,copyOperation,metrics) {
+  async copyOperation(tableName,copyOperation,copyState) {
     
     /*
     **
@@ -2012,26 +2053,26 @@ class YadamuDBI extends EventEmitter {
     */
     
     try {
-      metrics.writerStartTime = performance.now()
+      copyState.startTime = performance.now()
       let results = await this.beginTransaction()
       results = await this.executeSQL(copyOperation.dml)
-      metrics.read = results.affectedRows
-      metrics.written = results.affectedRows
-      metrics.writerEndTime = performance.now()
+      copyState.read = results.affectedRows
+      copyState.written = results.affectedRows
+      copyState.endTime = performance.now()
       results = await this.commitTransaction()
-      metrics.committed = metrics.written 
-      metrics.written = 0
+      copyState.committed = copyState.written 
+      copyState.written = 0
     } catch(e) {
-      metrics.writerError = e
+      copyState.writerError = e
       try {
         this.LOGGER.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
         let results = await this.rollbackTransaction()
       } catch (e) {
-        e.cause = metrics.writerError
-        metrics.writerError = e
+        e.cause = copyState.writerError
+        copyState.writerError = e
       }
     }
-    return metrics
+    return copyState
   }
           
   async finalizeCopy() {
@@ -2045,7 +2086,161 @@ class YadamuDBI extends EventEmitter {
 	 await this.initialize()
 	 return new YadamuCompare(this,configuration)
   }
+
+  trackPartitionedTableState(partitionState) {
+
+    if (!this.PARTITIONED_TABLE_STATE) {
+      this.PARTITIONED_TABLE_STATE = { 
+        startTime : partitionState.startTime
+      , endTime   : partitionState.endTime
+      , read      : partitionState.read
+      , committed : partitionState.committed
+      , lost      : partitionState.lost
+      , skipped   : partitionState.skipped
+      , sqlTime   : partitionState.sqlTime
+      , remaining : partitionState.partitionCount - 1
+      }
+    }
+    else {
+      const tableState = this.PARTITIONED_TABLE_STATE
+      tableState.startTime = partitionState.startTime < tableState.startTime ? partitionState.startTime : tableState.startTime
+      tableState.endTime =   partitionState.endTime > tableState.endTime ? partitionState.endTime : tableState.endTime
+	  tableState.read+=      partitionState.read
+	  tableState.committed+= partitionState.committed
+	  tableState.lost +=     partitionState.lost
+	  tableState.skipped+=   partitionState.skipped
+	  tableState.sqlTime+=   partitionState.sqlTime
+      tableState.remaining--
+
+      if (tableState.remaining === 0) {
+		const summary = this.yadamu.recordMetrics(partitionState.partitionedTableName,tableState);  
+	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(summary.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(tableState.sqlTime))}s. Throughput: ${summary.throughput} rows/s.`
+	    this.LOGGER.info([`${partitionState.partitionedTableName}`,`${partitionState.insertMode}`],`Total Rows ${tableState.committed}. ${timings}`)  
+      }
+	}
+
+  }
   
+  getRootCause(pipelineState,err) {
+	
+	switch (pipelineState.errorSource) {
+	  case DBIConstants.INPUT_STREAM_ID:
+	    return pipelineState[DBIConstants.INPUT_STREAM_ID].error
+	  case DBIConstants.PARSER_STREAM_ID:
+	    return pipelineState[DBIConstants.PARSER_STREAM_ID].error
+	  case DBIConstants.TRANSFORMATION_STREAM_ID:
+	    return pipelineState[DBIConstants.TRANSFORMATION_STREAM_ID].error
+	  case DBIConstants.OUTPUT_STREAM_ID:
+	    return pipelineState[DBIConstants.OUTPUT_STREAM_ID].error
+	  default:
+	    return (pipelineState.readerState.LATEST_ERROR || pipelineState.readerState.WRITER_ERROR || err)
+	}
+  }
+  
+    
+  reportPipelineStatus(pipelineState,err) {
+ 
+	const cause = this.getRootCause(pipelineState,err)
+
+	// Use parsed as proxy for read when the reader does not maintain the counter read
+	pipelineState.read = pipelineState.read || pipelineState.parsed
+	
+    pipelineState.insertMode    = (!pipelineState.ddlComplete) ? 'DDL Error' : pipelineState.insertMode
+	
+	// console.log(pipelineState)
+	
+	const readElapsedTime = pipelineState[DBIConstants.PARSER_STREAM_ID].endTime - pipelineState[DBIConstants.INPUT_STREAM_ID].startTime;
+    const writerElapsedTime = pipelineState[DBIConstants.OUTPUT_STREAM_ID].endTime - pipelineState[DBIConstants.TRANSFORMATION_STREAM_ID].startTime;        
+    const pipeElapsedTime = pipelineState[DBIConstants.OUTPUT_STREAM_ID].endTime - pipelineState.startTime;
+    const readThroughput = isNaN(readElapsedTime) ? 'N/A' : Math.round((pipelineState.read/readElapsedTime) * 1000)
+    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((pipelineState.committed/writerElapsedTime) * 1000)
+    
+    let rowCountSummary = ''
+    
+    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readElapsedTime)}s. Throughput ${Math.round(readThroughput)} rows/s.`
+    const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s.  Idle Time: ${YadamuLibrary.stringifyDuration(pipelineState.idleTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(pipelineState.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
+
+    // Any Pending Rows will not be processed. Pending will be zero if all batches have been written
+    pipelineState.skipped += pipelineState.pending  
+	pipelineState.pending = 0
+
+    // Any Cached Rows will not be processed. Cached will be zero following AbortTable()
+    pipelineState.skipped += pipelineState.cached   
+	pipelineState.cached  = 0
+
+    // Written rows that have not been committed will be lost. Written will be zero following a commit or rollback transaction or following AbortTable()
+	pipelineState.lost    += pipelineState.written  
+	pipelineState.written = 0
+
+	if (err) {
+
+      // console.log(pipelineState)
+		  
+	  // Account for any rows in-flight between the reader and the parter or the parser and the output manager. 
+		
+	  if (!isNaN(pipelineState[DBIConstants.INPUT_STREAM_ID].pending)) {
+		// 'readable-stream' based Readble implementations (e.g. MySQL) may not maintain this value.
+        pipelineState.read  += pipelineState[DBIConstants.INPUT_STREAM_ID].pending
+	  }
+	  	  	  
+      pipelineState.skipped += (pipelineState.read - pipelineState.parsed) 
+	  pipelineState.skipped += (pipelineState.parsed - pipelineState.received)
+    }
+    
+	switch (true) {
+	  case (!pipelineState.hasOwnProperty('ddlComplete')):
+	    rowCountSummary = 'Operation Aborted. DDL Error.'
+		break	  
+	  case (pipelineState.tableNotFound === true) :
+	    rowCountSummary = 'Operation Aborted. Table not found.'
+		break
+      case ((pipelineState.read === 0) && (pipelineState.readerState.LATEST_ERROR)):
+        rowCountSummary = 'Operation Aborted. Read operation failed.'
+	    break;
+	  case ((pipelineState.read === pipelineState.committed) && (pipelineState.skipped === 0) && (pipelineState.lost === 0)):
+        rowCountSummary = `Rows ${pipelineState.read}.`
+	    break;
+  	  default:
+        rowCountSummary = `Read ${pipelineState.read}. Written ${pipelineState.committed}.`
+        rowCountSummary = pipelineState.lost > 0 ? `${rowCountSummary} Lost ${pipelineState.lost}.` : rowCountSummary
+        rowCountSummary = pipelineState.skipped > 0 ? `${rowCountSummary} Skipped ${pipelineState.skipped}.` : rowCountSummary
+    }
+
+    rowCountSummary = (this.yadamu.QA_TEST && pipelineState.receivedOoS > 0) ? `${rowCountSummary} [Out of Sequence ${pipelineState.receivedOoS}].` : rowCountSummary
+   	
+	if (cause) {
+	  const tags = YadamuError.lostConnection(cause) ? ['LOST CONNECTION'] : []
+      tags.push(pipelineState.readerState.LATEST_ERROR ? 'READABLE STREAM' : 'WRITABLE STREAM')
+	  this.LOGGER.handleException(['PIPELINE',...tags,pipelineState.displayName,pipelineState[DBIConstants.INPUT_STREAM_ID].vendor,this.DATABASE_VENDOR,this.ON_ERROR,this.getWorkerNumber()],cause)
+	  
+	}
+	
+	if (pipelineState.failed) {
+      this.LOGGER.error([`${pipelineState.displayName}`,`${pipelineState.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+    }
+    else {
+	  switch (true) {
+		case (pipelineState.read == pipelineState.committed):
+          this.LOGGER.info([`${pipelineState.displayName}`,`${pipelineState.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+		  break
+	    case (pipelineState.read === (pipelineState.committed + pipelineState.skipped)):
+          this.LOGGER.warning([`${pipelineState.displayName}`,`${pipelineState.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+		  break
+		default:
+          this.LOGGER.error([`${pipelineState.displayName}`,`${pipelineState.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+      }
+    }     
+
+    if (pipelineState.partitionedTableName) {
+	  this.trackPartitionedTableState(pipelineState)
+    }
+    else {
+      this.yadamu.recordMetrics(pipelineState.displayName,pipelineState)
+	}
+	
+    return cause
+  }
+    
 }
 
 export { YadamuDBI as default}

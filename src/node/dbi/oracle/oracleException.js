@@ -57,8 +57,13 @@ class OracleError extends DatabaseError {
     this.outputFormat = outputFormat
     
   }
-
+  
   invalidCredentials() { 
+  }
+  
+  underlyingCause(prefix,errorNum) {
+	const code = prefix + '-' + errorNum.toString().padStart(5,'0')
+	return this.cause.stack.includes(code)
   }
 
   invalidPool() {
@@ -82,8 +87,24 @@ class OracleError extends DatabaseError {
     return (this.cause.errorNum && OracleConstants.JSON_PARSING_ERROR.includes(this.cause.errorNum))
   }
 
+  lockingError() {
+    return (this.cause.errorNum && OracleConstants.LOCKING_ERROR.includes(this.cause.errorNum) || (this.recurisveSQLError() && this.underlyingCause('ORA',...OracleConstants.LOCKING_ERROR)))
+  }
+
+  recurisveSQLError() {
+    return (this.cause.errorNum && OracleConstants.RECURSIVE_SQL_ERROR.includes(this.cause.errorNum))
+  }
+  
   spatialError() {
     return (this.cause.errorNum && OracleConstants.SPATIAL_ERROR.includes(this.cause.errorNum))
+  }
+
+  missingTable() {
+    return (this.cause.errorNum && OracleConstants.MISSING_TABLE_ERROR.includes(this.cause.errorNum))
+  }
+
+  nonexistentUser() {
+    return (this.cause.errorNum && OracleConstants.NONEXISTENT_USER.includes(this.cause.errorNum))
   }
 
   knownBug(bugNumber) {
@@ -119,6 +140,7 @@ class StagingFileError extends OracleError {
     this.remote_staging_area = remote
   }
 }
+
 export {
   OracleError,
   StagingFileError

@@ -11,11 +11,21 @@ import {
   Transform 
 }                       from 'stream';
 
+import DBIConstants      from './dbiConstants.js';
+
 class YadamuParser extends Transform {
 
-  get COPY_METRICS()       { return this._COPY_METRICS }
-  set COPY_METRICS(v)      { this._COPY_METRICS =  v }
-      
+  get LOGGER()               { return this._LOGGER }
+  set LOGGER(v)              { this._LOGGER = v }
+  get DEBUGGER()             { return this._DEBUGGER }
+  set DEBUGGER(v)            { this._DEBUGGER = v }
+  
+  get PIPELINE_STATE()       { return this._PIPELINE_STATE }
+  set PIPELINE_STATE(v)      { this._PIPELINE_STATE =  v }
+
+  get STREAM_STATE()         { return this.PIPELINE_STATE[DBIConstants.PARSER_STREAM_ID] }
+  set STREAM_STATE(v)        { this.PIPELINE_STATE[DBIConstants.PARSER_STREAM_ID] = v }
+	  
   generateTransformations(queryInfo) {
 	
 	return queryInfo.DATA_TYPE_ARRAY.map((dataTypes,idx) => {
@@ -39,20 +49,13 @@ class YadamuParser extends Transform {
     }
   }
 
-  get LOGGER()             { return this._LOGGER }
-  set LOGGER(v)            { this._LOGGER = v }
-  get DEBUGGER()           { return this._DEBUGGER }
-  set DEBUGGER(v)          { this._DEBUGGER = v }
-  
-  constructor(dbi,queryInfo,yadamuLogger, parseDelay) {
+  constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
     super({objectMode: true });  
 	this.dbi = dbi
     this.queryInfo = queryInfo;
-	this.startTime = performance.now()
 	this.setTransformations(queryInfo)
-	this.parseDelay = parseDelay
-	this.timings = []
-
+	this.PIPELINE_STATE = pipelineState
+	this.STREAM_STATE = { vendor : dbi.DATABASE_VENDOR }
 	this.LOGGER   = yadamuLogger || this.dbi.LOGGER
 	this.DEBUGGER = this.dbi.DEBUGGER
   }
@@ -75,7 +78,7 @@ class YadamuParser extends Transform {
   	  }
 		   
 	  this.push({partition: partitionInfo})	
-	  this.timings.push(['PARTITION',performance.now()])
+	  // this.timings.push(['PARTITION',performance.now()])
     }
 	else {
   	  // console.log('YadamuParser()','PUSH','TABLE',this.queryInfo.MAPPED_TABLE_NAME)
@@ -84,20 +87,20 @@ class YadamuParser extends Transform {
     }
 	  
   }
-	
+  	
   async doConstruct() {
+	this.STREAM_STATE.startTime = performance.now()
 	this.sendTableMessage()
-    // Workaround for issue with 'data' messages sometime (very, very rarely) appearing before 'table' messages
-    // To-date issue has only been observed when writing to Loader based drivers
-
-	if (this.parseDelay) {
-      await setTimeout(this.parseDelay) 
-	}
-  
   }
 
   _construct(callback) {
-	this.doConstruct().then(() => { callback() }).catch((e) => { callback(e) })
+	
+	this.doConstruct().then(() => { 
+	  callback() 
+	}).catch((e) => { 
+   	  this.STREAM_STATE.error = e
+	  callback(e) 
+	})
   }
   
   async doTransform(data) {
@@ -107,7 +110,7 @@ class YadamuParser extends Transform {
 
   _transform(data,enc,callback) {
 
-    this.COPY_METRICS.parsed++
+    this.PIPELINE_STATE.parsed++
 
     this.doTransform(data).then((row) => {
 	  this.push({data:row})
@@ -115,6 +118,7 @@ class YadamuParser extends Transform {
 	  callback() 
 	  // if (this.timings.length === 3) {console.log( this.timings )}
     }).catch((e) => { 
+   	  this.STREAM_STATE.error = e
 	  callback(e) 
 	})
   
@@ -122,9 +126,35 @@ class YadamuParser extends Transform {
 
    _final(callback) {
 	// this.LOGGER.trace([this.constructor.name,this.queryInfo.TABLE_NAME],'_final()');
-	this.endTime = performance.now();
 	callback()
   } 
+
+  async doDestroy(err) {
+	      
+    this.STREAM_STATE.endTime = performance.now()
+	this.STREAM_STATE.readableLength = this.readableLength || 0
+    this.STREAM_STATE.writableLength = this.writableLength || 0
+	this.PIPELINE_STATE.insertMode = this.tableInfo ? this.tableInfo.insertMode : this.dbi.insertMode
+
+    if (err) {
+      this.PIPELINE_STATE.failed = true
+      this.PIPELINE_STATE.errorSource = this.PIPELINE_STATE.errorSource || DBIConstants.PARSER_STREAM_ID
+	  this.STREAM_STATE.error = this.STREAM_STATE.error || (this.PIPELINE_STATE.errorSource === DBIConstants.PARSER_STREAM_ID) ? err : this.STREAM_STATE.error
+    }  
+
+  }
+
+   _destroy(err,callback) {
+
+	 // this.LOGGER.trace([this.constructor.name,this.queryInfo.TABLE_NAME],'_destroy()');	
+    
+	this.doDestroy(err).then(() => { 
+	  callback(err) 
+	}).catch((e) => { 
+	  e.rootCause = err; 
+	  callback(e) 
+    })
+   }
   
 }
 

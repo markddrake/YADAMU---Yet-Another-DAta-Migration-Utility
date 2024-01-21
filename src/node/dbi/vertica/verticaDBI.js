@@ -29,8 +29,7 @@ import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 import ArrayReadable                  from '../../util/arrayReadable.js'
 
 import {
-  YadamuError,
-  CopyOperationAborted
+  YadamuError
 }                                     from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
@@ -122,6 +121,10 @@ class VerticaDBI extends YadamuDBI {
 
   }
 
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new VerticaError(driverId,cause,stack,sql)
+  }
+  
   /*
   **
   ** Local methods 
@@ -147,9 +150,8 @@ class VerticaDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const verticaError = this.trackExceptions(new VerticaError(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation))
-      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],verticaError)
-      // throw verticaError
+	  // const verticaError = this.createDatabaseException(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation)
+      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','POOL'],verticaError)
     })
 
   }
@@ -168,7 +170,7 @@ class VerticaDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
+	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.connect()')
 	}
   }
 
@@ -190,7 +192,7 @@ class VerticaDBI extends YadamuDBI {
       await this.configureConnection()
       return this.connection
 	} catch (e) {
-      throw this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,operation))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
 	}
   }
 
@@ -230,9 +232,8 @@ class VerticaDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const verticaError = this.trackExceptions(new VerticaError(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation))
-      this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],verticaError)
-      // throw verticaError
+	  // const verticaError = this.createDatabaseException(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','CONNECTION'],err.message)
     })
    
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
@@ -256,7 +257,7 @@ class VerticaDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,'Client.release()'))
+		const err = this.getDatabaseException(this.DRIVER_ID,e,stack,'Client.release()')
 		throw err
       }
 	}
@@ -274,7 +275,7 @@ class VerticaDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,'pg.Pool.close()'))
+	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.close()')
 	  }
 	}
   }
@@ -324,7 +325,7 @@ class VerticaDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -528,14 +529,10 @@ class VerticaDBI extends YadamuDBI {
 	return schemaInfo
   }
 
-  createParser(queryInfo,parseDelay) {
-    return new VerticaParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new VerticaParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
   
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof VerticaError) || (cause instanceof CopyOperationAborted)) ? cause : new VerticaError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-
   generateSelectListEntry(columnInfo) {
 	const dataType = VerticaDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
@@ -568,14 +565,23 @@ class VerticaDBI extends YadamuDBI {
     }
   }
 
-  async getInputStream(queryInfo) {        
+  async _getInputStream(queryInfo) {        
   
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
-	if (this.failedPrematureClose) {
-	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
+    /*
+    **
+    **	If the previous pipleline operation failed, it appears that the driver will hang when creating a new QueryStream...
+	**
+	*/
+  
+    if (this.ACTIVE_INPUT_STREAM === true) {
+	  this.LOGGER.warning([this.DATABASE_VENDOR,'INPUT STREAM',queryInfo.TABLE_NAME],'Pipeline Aborted. Switching database connection')
+	  await this.closeConnection()
+	  this.connection = this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+	  await this.configureConnection()
 	}
- 		
+	
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     
 	/*
@@ -598,7 +604,7 @@ class VerticaDBI extends YadamuDBI {
 		const inputStream = new VerticaInputStream(this.connection,queryInfo.SQL_STATEMENT,this.LOGGER)
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -642,12 +648,12 @@ class VerticaDBI extends YadamuDBI {
     return await super.generateStatementCache(VerticaStatementGenerator, schema)
   }
 
-  getOutputStream(tableName,metrics) {
-	 return super.getOutputStream(VerticaWriter,tableName,metrics)
+  getOutputStream(tableName,pipelineState) {
+	 return super.getOutputStream(VerticaWriter,tableName,pipelineState)
   }
   
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputStream(VerticaOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputStream(VerticaOutputManager,tableName,pipelineState)
   }
  
   classFactory(yadamu) {
@@ -660,13 +666,13 @@ class VerticaDBI extends YadamuDBI {
     return pid
   }
 
-  async reportCopyErrors(tableName,metrics) {
+  async reportCopyErrors(tableName,copyState) {
 
 	 const causes = []
 	 let sizeIssue = 0;
-	 metrics.rejected.forEach((r) => {
+	 copyState.rejected.forEach((r) => {
 	   const err = new Error()
-	   err.stack =  `${metrics.stack.slice(0,5)}: ${r[1]}${metrics.stack.slice(5)}`
+	   err.stack =  `${copyState.stack.slice(0,5)}: ${r[1]}${copyState.stack.slice(5)}`
 	   err.recordNumber = r[0]
 	   const columnNameOffset = r[1].indexOf('column: [') + 9
 	   /*
@@ -682,44 +688,44 @@ class VerticaDBI extends YadamuDBI {
 	   }
   	   causes.push(err)
 	 })
-	 const err = new Error(`Errors detected durng COPY operation: ${metrics.rejected.length} records rejected.`)
+	 const err = new Error(`Errors detected durng COPY operation: ${copyState.rejected.length} records rejected.`)
 	 err.tags = []
 	 if (causes.length === sizeIssue) {
 	    err.tags.push("CONTENT_TOO_LARGE")
 	 } 
      err.cause = causes;	 
-	 err.sql = metrics.sql;
+	 err.sql = copyState.sql;
 	 this.LOGGER.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
 
-  async copyOperation(tableName,copyOperation,metrics) {
+  async copyOperation(tableName,copyOperation,copyState) {
 	
 	try {
   	  const rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	  const sqlStatement = `${copyOperation.dml} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`;
-	  metrics.writerStartTime = performance.now()
+	  copyState.startTime = performance.now()
 	  let results = await this.beginTransaction()
-	  metrics.stack = new Error().stack
+	  copyState.stack = new Error().stack
 	  results = await this.insertBatch(sqlStatement,rejectedRecordsTableName)
-	  metrics.writerEndTime = performance.now()
-	  metrics.written = results.inserted
-	  metrics.skipped = results.rejected 
-	  metrics.rejected = results.errors
-	  metrics.read = metrics.written + metrics.skipped
+	  copyState.endTime = performance.now()
+	  copyState.written = results.inserted
+	  copyState.skipped = results.rejected 
+	  copyState.rejected = results.errors
+	  copyState.read = copyState.written + copyState.skipped
 	  results = await this.commitTransaction()
-	  metrics.committed = metrics.written 
-	  metrics.written = 0
+	  copyState.committed = copyState.written 
+	  copyState.written = 0
   	} catch(e) {
-	  metrics.writerError = e
+	  copyState.writerError = e
 	  try {
   	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
-		e.cause = metrics.writerError
-		metrics.writerError = e
+		e.cause = copyState.writerError
+		copyState.writerError = e
 	  }
 	}
-	return metrics
+	return copyState
   }    
 
   async getComparator(configuration) {

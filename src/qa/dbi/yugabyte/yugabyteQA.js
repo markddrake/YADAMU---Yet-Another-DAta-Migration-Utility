@@ -43,32 +43,7 @@ class YugabyteQA extends YadamuQALibrary.qaMixin(YugabyteDBI) {
       }
       await this.createSchema(this.parameters.TO_USER);    
     }      
-
-    classFactory(yadamu) {
-      return new DB2QA(yadamu,this,this.connectionParameters,this.parameters)
-    }
 	
-	async scheduleTermination(pid,workerId) {
-	  let stack
-	  const operation = `select pg_terminate_backend(${pid})`
-	  const tags = this.getTerminationTags(workerId,pid)
-	  this.LOGGER.qa(tags,`Termination Scheduled.`);
-	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
-        if (this.pool !== undefined && this.pool.end) {
-	      stack = new Error().stack
-		  this.LOGGER.log(tags,`Killing connection.`);
-	      const conn = await this.getConnectionFromPool();
-		  const res = await conn.query(operation);
-		  await conn.release()
-		}
-		else {
-		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
-		}
-      }).catch((e) => {
-        this.yadamu.LOGGER.handleException(tags,new YugabyteError(this.DRIVER_ID,e,stack,operation));
-      })
-	}
-		
     classFactory(yadamu) {
       return new YugabyteQA(yadamu,this,this.connectionParameters,this.parameters)
     }
@@ -90,7 +65,8 @@ class YugabyteQA extends YadamuQALibrary.qaMixin(YugabyteDBI) {
 		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		}
       }).catch((e) => {
-        this.yadamu.LOGGER.handleException(tags,new YugabyteError(this.DRIVER_ID,e,stack,operation));
+		const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,operation)
+        this.LOGGER.handleException(tags,cause)
       })
 	}
 

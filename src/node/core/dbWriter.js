@@ -197,8 +197,8 @@ class DBWriter extends Writable {
           if (this.dbi.metadata.hasOwnProperty(obj.table)) {
              // Table is in the list of tables to be processed.
              this.dataSource.unpipe(this)
-             console.log(obj.table,this.dataSource.constructor.name,this.dataSource.COPY_METRICS)
-             const outputStreams = await this.dbi.getOutputStreams(obj.table,this.dataSource.COPY_METRICS)
+             console.log(obj.table,this.dataSource.constructor.name,this.dataSource.PIPELINE_STATE)
+             const outputStreams = await this.dbi.getOutputStreams(obj.table,this.dataSource.PIPELINE_STATE)
              const outputManager = outputStreams[0]
              console.log(outputManager.constructor.name)
              outputManager.once('eod',() => {

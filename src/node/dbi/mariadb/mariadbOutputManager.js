@@ -16,8 +16,8 @@ import YadamuOutputManger       from '../base/yadamuOutputManager.js'
 
 class MariadbOutputManger extends YadamuOutputManger {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   generateTransformations(dataTypes) {
@@ -125,13 +125,13 @@ class MariadbOutputManger extends YadamuOutputManger {
   
 	  }
     
-      this.COPY_METRICS.cached++
+      this.PIPELINE_STATE.cached++
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
         this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
         this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
-		this.COPY_METRICS.skipped++
+		this.PIPELINE_STATE.skipped++
         return
 	  }
 	  throw e

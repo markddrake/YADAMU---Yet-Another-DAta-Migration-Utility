@@ -51,7 +51,7 @@ import LoaderParser                   from './loaderParser.js'
 import JSONOutputManager              from './jsonOutputManager.js'
 import ArrayOutputManager             from './arrayOutputManager.js'
 import CSVOutputManager               from './csvOutputManager.js'
-import CSVTransform                   from './csvTransform.js'
+import CSVParser                      from './csvParser.js'
 
 /*
 **
@@ -107,8 +107,8 @@ class CloudService {
   async createReadStream(path) {
     return new Promise((resolve,reject) => {
 	  const stack = new Error().stack
-      const is = fs.createReadStream(path);
-      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,path) : new FileError(this.DRIVER_ID,err,stack,path) )})
+      const inputStream = fs.createReadStream(path);
+      inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,path) : new FileError(this.DRIVER_ID,err,stack,path) )})
     })
   }
 }
@@ -238,7 +238,7 @@ class LoaderDBI extends YadamuDBI {
   get FILE_EXTENSION() {
     this._FILE_EXTENSION = this._FILE_EXTENSION || (() => { 
 	  // Referencing _OUTPUT_FORMAT sets _FILE_EXTENSION
-	  const outputformat = this.OUTPUT_FORMAT; 
+	  this.PIPELINE_STATE = this.OUTPUT_FORMAT; 
 	  return this._FILE_EXTENSION
 	})()
 	return this._FILE_EXTENSION
@@ -484,16 +484,31 @@ class LoaderDBI extends YadamuDBI {
     const result = await this.writeMetadata()
   }
   
-  getOutputStream(tableName,metrics) {
+  getOutputStream(tableName,pipelineState) {
 	// this.LOGGER.trace([this.constructor.name],`getOutputStream()`)
-	const os = new this.OUTPUT_MANAGER(this,tableName,metrics,this.status,this.LOGGER)  
+	const os = new this.OUTPUT_MANAGER(this,tableName,pipelineState,this.status,this.LOGGER)  
     return os;
   }
   
-  getFileOutputStream(tableName) {
-     // this.LOGGER.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
-    const os = fs.createWriteStream(this.makeAbsolute(this.getDataFileName(tableName)))
-	return os;
+  getFileOutputStream(tableName,pipelineState) {
+
+    // this.LOGGER.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
+    const outputStream = fs.createWriteStream(this.makeAbsolute(this.getDataFileName(tableName)))
+	outputStream.PIPELINE_STATE = pipelineState
+	outputStream.STREAM_STATE = { 
+	  vendor : this.DATABASE_VENDOR
+	}
+    pipelineState[DBIConstants.OUTPUT_STREAM_ID] = outputStream.STREAM_STATE
+	outputStream.on('finish',() => {
+      outputStream.STREAM_STATE.endTime = performance.now()
+    }).on('error',(err) => {
+      outputStream.STREAM_STATE.endTime = performance.now()
+      pipelineState.failed = true;
+  	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.INPUT_STREAM_ID
+      outputStream.STREAM_STATE.onError = err
+      this.failedPrematureClose = YadamuError.prematureClose(err)
+    })
+	return outputStream;
   }
 
   async createInitializationVector() {
@@ -506,18 +521,25 @@ class LoaderDBI extends YadamuDBI {
 	})	    
   } 
  
-  async getOutputStreams(tableName,metrics) {
+  async getOutputStreams(tableName,pipelineState) {
+
     // this.LOGGER.trace([this.constructor.name,'getOutputStreams()'],`Waiting on DDL Complete. [${this.ddlComplete}]`)
 	await this.ddlComplete;
     // this.LOGGER.trace([this.constructor.name,'getOutputStreams()'],`DDL Complete. [${this.ddlComplete}]`)
 	this.reloadControlFile()
+
+    this.PIPELINE_STATE = pipelineState
+	pipelineState.writerState = this.ERROR_STATE
+
 	const streams = []
 	
-	const writer = this.getOutputStream(tableName,metrics)
-	writer.once('readable',() => {
-	  metrics.writerStartTime = performance.now()
+	const transformationManager = this.getOutputStream(tableName,pipelineState)
+	const transformStreamState = transformationManager.STREAM_STATE
+	
+	transformationManager.once('readable',() => {
+	  transformStreamState.startTime = performance.now()
 	})
-	streams.push(writer)
+	streams.push(transformationManager)
 	
 	if (this.COMPRESSED_CONTENT) {
       streams.push(this.COMPRESSION_FORMAT === 'GZIP' ? createGzip() : createDeflate())
@@ -530,8 +552,9 @@ class LoaderDBI extends YadamuDBI {
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(iv))
 	}
-	  
-	streams.push(this.getFileOutputStream(tableName))
+
+	const outputStream = this.getFileOutputStream(tableName,pipelineState)
+    streams.push(outputStream)
 
     // console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
 	return streams;
@@ -576,7 +599,7 @@ class LoaderDBI extends YadamuDBI {
 	return this.controlFile.ddl
   }
 
-  async getInputStream(filename) {
+  async _getInputStream(filename) {
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,tableInfo.TABLE_NAME],`Creating input stream on ${filename}`)
     const stream = fs.createReadStream(filename)
     const stack = new Error().stack;
@@ -598,25 +621,30 @@ class LoaderDBI extends YadamuDBI {
     throw new YadamuError('Loading of "CSV" data sets not supported')
   }
   
-  async getInputStreams(tableInfo,parseDelay) {
+  async getInputStreams(tableInfo,pipelineState) {
+	  
+    this.PIPELINE_STATE = pipelineState
+	pipelineState.readerState = this.ERROR_STATE
+	this.resetExceptionTracking()
+	
 	const streams = []
 	const filename = this.makeAbsolute(this.getDataFileName(tableInfo.TABLE_NAME))
 
-    const metrics = DBIConstants.NEW_COPY_METRICS
-	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
-
-	const is = await this.getInputStream(filename)
-	is.COPY_METRICS = metrics
-	is.once('readable',() => {
-	  metrics.readerStartTime = performance.now()
+    const inputStream = await this.getInputStream(filename,pipelineState)
+    const inputStreamState = inputStream.STREAM_STATE
+	
+	inputStream.once('readable',() => {
+	  inputStreamState.startTime = performance.now()
 	}).on('error',(err) => { 
-      metrics.readerEndTime = performance.now()
-	  metrics.readerError = err
-	  metrics.failed = true
+      inputStreamState.endTime = performance.now()
+	  pipelineState.failed = true
+	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.INPUT_STREAM_ID
+      inputStreamState.pipelineError = err
     }).on('end',() => {
-      metrics.readerEndTime = performance.now()
+      inputStreamState.endTime = performance.now()
     })
-	streams.push(is)
+	
+	streams.push(inputStream)
 	
 	if (this.ENCRYPTED_INPUT) {
 	  const iv = await this.loadInitializationVector(filename)
@@ -636,27 +664,29 @@ class LoaderDBI extends YadamuDBI {
 	switch (this.controlFile.settings.contentType) {
 	  case 'CSV':
 	    parser = this.getCSVParser()
-		transform =  new CSVTransform(this,tableInfo,this.LOGGER,parseDelay)
+		transform =  new CSVTransform(this,tableInfo, pipelineState, this.LOGGER)
 		break;
 	  case 'JSON':
-	    parser =  new JSONParser(this.LOGGER, this.MODE, filename)
-	    transform = new LoaderParser(this,tableInfo,this.LOGGER,parseDelay)
+	    parser =  new JSONParser(this.MODE, filename, pipelineState, this.LOGGER )
+	    transform = new LoaderParser(this,tableInfo, pipelineState, this.LOGGER)
 	}  
+
+    const parserStreamState = parser.STREAM_STATE
 	  
-    parser.COPY_METRICS = metrics
     parser.once('readable',() => {
-	  metrics.parserStartTime = performance.now()
+	  parserStreamState.startTime = performance.now()
 	})
     streams.push(parser)  
 	  
-	transform.COPY_METRICS = metrics
     transform.on('end',() => {
-	  metrics.parserEndTime = performance.now()
+	  parserStreamState.endTime = performance.now()
 	}).on('error',(err) => {
-	  metrics.parserEndTime = performance.now()
-	  metrics.parserError = err
-	  metrics.failed = true;
+	  parserStreamState.endTime = performance.now()
+	  pipelineState.failed = true;
+	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.PARSER_STREAM_ID
+      parserStreamState.pipelineError = err
     })
+
     streams.push(transform)
 	
 	// console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
@@ -672,7 +702,7 @@ class LoaderDBI extends YadamuDBI {
  	    tableName         : table
 	  , _SPATIAL_FORMAT   : this.INBOUND_SPATIAL_FORMAT
 	  , _BATCH_SIZE       : this.BATCH_SIZE
-      , insertMode        : 'JSON'
+      , insertMode        : this.OUTPUT_FORMAT
       , columnNames       : [... tableMetadata.columnNames]
       , targetDataTypes   : [... tableMetadata.dataTypes]
 	  , dml               : null
@@ -736,7 +766,7 @@ class LoaderDBI extends YadamuDBI {
   async compareInputStreams(filename) {
          
     const streams = []
-    const is = await this.getInputStream(filename);
+    const is = await this.getInputStream(filename,DBIConstants.PIPELINE_STATE);
     streams.push(is)
       
     if (this.ENCRYPTED_INPUT) {

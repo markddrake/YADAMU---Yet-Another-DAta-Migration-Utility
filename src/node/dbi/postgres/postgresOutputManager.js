@@ -11,8 +11,8 @@ import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class PostgresOutputManager extends YadamuOutputManager  {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   generateTransformations(dataTypes) {
@@ -152,7 +152,7 @@ class PostgresOutputManager extends YadamuOutputManager  {
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 	this.rowTransformation(row)
     this.batch.push(...row);
-    this.COPY_METRICS.cached++
+    this.PIPELINE_STATE.cached++
 	return this.skipTable
   }
       

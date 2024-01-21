@@ -54,15 +54,15 @@ class TeradataParser extends YadamuParser {
 
   /*
   async doTransform(data) {
-    if (this.COPY_METRICS.parsed === 1) console.log('P1',data)
+    if (this.PIPELINE_STATE.parsed === 1) console.log('P1',data)
     await super.doTransform(data)
-    if (this.COPY_METRICS.parsed === 1) console.log('P2',data)
+    if (this.PIPELINE_STATE.parsed === 1) console.log('P2',data)
 	return data 
   }
   */
   
-  constructor(queryInfo,yadamuLogger,parserDelay) {
-    super(queryInfo,yadamuLogger,parserDelay);      
+  constructor(dbi,queryInfo,yadamuLogger,pipelineState) {
+    super(dbi,queryInfo,yadamuLogger,pipelineState);      
   }
   
 }

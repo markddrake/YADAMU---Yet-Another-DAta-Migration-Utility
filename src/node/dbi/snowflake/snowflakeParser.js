@@ -84,11 +84,11 @@ class SnowflakeParser extends YadamuParser {
     }
   }
   
-  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
-    super(dbi,queryInfo,yadamuLogger,parseDelay)     	
+  constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
+    super(dbi,queryInfo,pipelineState,yadamuLogger)     	
   	if (global.gc) {
       this.collectTheGarbage = () => {
-	    if ((this.COPY_METRICS.parsed % 100000) === 0) {
+	    if ((this.PIPELINE_STATE.parsed % 100000) === 0) {
 	      const startTime = performance.now()
 	      global.gc()
 	      console.log('Forced Garbage Collection. Elapsed Time',performance.now() - startTime) 

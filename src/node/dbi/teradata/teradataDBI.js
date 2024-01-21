@@ -23,10 +23,6 @@ import {
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  UnimplementedMethod
-}                                    from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
@@ -87,12 +83,17 @@ class TeradataDBI extends YadamuDBI {
   **
   */
   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new TeradataError(driverId,cause,stack,sql)
+  }
+  
+  
   establishConnection(connection) {
       
     return new Promise((resolve,reject) => {
       connection.connect((err,connection) => {
         if (err) {
-          reject(this.trackExceptions(new TeradataError(this.DRIVER_ID,err,`Teradata-sdk.Connection.connect()`)))
+          reject(this.getDatabaseException(this.DRIVER_ID,err,`Teradata-sdk.Connection.connect()`))
         }
         resolve(connection)
       })
@@ -106,7 +107,7 @@ class TeradataDBI extends YadamuDBI {
       connection = await this.establishConnection(connection)
       connection.destroy()
     } catch (e) {
-      throw this.trackExceptions(new TeradataError(this.DRIVER_ID,e,'Teradata-SDK.connection.connect()'))
+      throw this.getDatabaseException(this.DRIVER_ID,e,'Teradata-SDK.connection.connect()')
     }
   }
   
@@ -135,7 +136,7 @@ class TeradataDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection;
     } catch (e) {
-      const err = this.trackExceptions(new TeradataError(this.DRIVER_ID,e,'TeradataConnection.connect()'))
+      const err = this.getDatabaseException(this.DRIVER_ID,e,'TeradataConnection.connect()')
       throw err;
     }
     
@@ -188,10 +189,10 @@ class TeradataDBI extends YadamuDBI {
 		results.push(await this.executeSQL(ddlStatement,{}))
       }
     } catch (e) {
-      console.log(e)
-	 const exceptionFile = this.LOGGER.handleException([this.DATABASE_VENDOR,'DDL'],e)
-	 await this.LOGGER.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
-	 results = e;
+      // console.log(e)
+	  const exceptionFile = this.LOGGER.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	  await this.LOGGER.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
+	  results = e;
     }
     return results;
   }
@@ -220,7 +221,7 @@ class TeradataDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return cursor;
     } catch (e) {
-      const err = this.trackExceptions(new TeradataError(this.DRIVER_ID,e,`terdata.cursor.callProc(${procedureName})`))
+      const err = this.getDatabaseException(this.DRIVER_ID,e,`terdata.cursor.callProc(${procedureName})`)
       throw err;
     }
     
@@ -373,15 +374,11 @@ class TeradataDBI extends YadamuDBI {
     return schemaInfo
   }
 
-  createParser(queryInfo,parseDelay) {
-    return new TeradataParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new TeradataParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
-  
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof TeradataError) || (cause instanceof CopyOperationAborted)) ? cause : new TeradataError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
 
-  async getInputStream(queryInfo) {
+  async _getInputStream(queryInfo) {
 
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
 
@@ -398,7 +395,7 @@ class TeradataDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.trackExceptions(new TeradataError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -425,14 +422,14 @@ class TeradataDBI extends YadamuDBI {
     return await super.generateStatementCache(TeradataStatementGenerator,schema) 
   }
  
-  getOutputStream(tableName,metrics) {
+  getOutputStream(tableName,pipelineState) {
      // Get an instance of the YadamuWriter implementation associated for this database
-     return super.getOutputStream(TeradataWriter,tableName,metrics)
+     return super.getOutputStream(TeradataWriter,tableName,pipelineState)
   }
 
-  getOutputManager(tableName,metrics) {
+  getOutputManager(tableName,pipelineState) {
      // Get an instance of the YadamuWriter implementation associated for this database
-     return super.getOutputStream(TeradataOutputManager,tableName,metrics)
+     return super.getOutputStream(TeradataOutputManager,tableName,pipelineState)
   }
   
   classFactory(yadamu) {

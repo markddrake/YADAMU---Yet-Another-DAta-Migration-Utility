@@ -9,8 +9,8 @@ class ArrayOutputManager extends JSONOutputManager {
   // Write each row as a JSON array without a surrounding Array and without a comma seperating the rows. 
   // Each array is on a seperate line
   
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
    
   formatRow(row) {

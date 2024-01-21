@@ -8,7 +8,7 @@ class MsSQLError extends DatabaseError {
     super(driverId,cause,stack,sql);
   }
 
-  getUnderlyingError() {
+  getCause() {
 	let cause = this.cause;
 	while (cause.originalError && (cause.originalError instanceof Error)) {
 	  cause =  cause.originalError;
@@ -20,7 +20,7 @@ class MsSQLError extends DatabaseError {
   }
 
   lostConnection() { 
-    let cause = this.getUnderlyingError()
+    let cause = this.getCause()
 	return ((cause.code &&  MsSQLConstants.LOST_CONNECTION_ERROR.includes(cause.code)) || ((this.cause.number) && (this.cause.number === 596)))
   }
 
@@ -33,7 +33,7 @@ class MsSQLError extends DatabaseError {
   }
   
   serverUnavailable() {
-    let cause = this.getUnderlyingError()
+    let cause = this.getCause()
 	return ((cause.code &&  MsSQLConstants.LOST_CONNECTION_ERROR.includes(cause.code)) || ((this.cause.number) && (this.cause.number === 596)))
   }
 
@@ -46,7 +46,7 @@ class MsSQLError extends DatabaseError {
   }
   
   contentTooLarge() {
-    let cause = this.getUnderlyingError()
+    let cause = this.getCause()
     return ((cause?.info?.number &&  MsSQLConstants.CONTENT_TOO_LARGE_ERROR.includes(cause.info.number))) 
   }
 

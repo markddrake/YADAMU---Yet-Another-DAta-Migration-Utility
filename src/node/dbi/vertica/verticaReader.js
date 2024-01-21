@@ -189,7 +189,6 @@ class VerticaReader extends Readable {
 	}
 	
 	parseIntervalDayToSecond = (value) => {
-	   console.log(value);
        return value
 	}
 
@@ -218,7 +217,7 @@ class VerticaReader extends Readable {
 	   if (!this.streamComplete) {
 		 try {
 		   await this.request.cancel();
-		   this.streamCanceled = true;
+		   this.streamCancelled = true;
 		 } catch (e) {
 	     }
 	   }

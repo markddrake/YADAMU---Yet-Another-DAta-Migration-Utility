@@ -44,8 +44,8 @@ class MongoOutputManager extends YadamuOutputManager {
   **  
   */
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   
   generateTransformations(dataTypes) {
@@ -242,7 +242,7 @@ class MongoOutputManager extends YadamuOutputManager {
 	
 	this.rowTransformation(row)
 	this.batchRow(row)
-    this.COPY_METRICS.cached++
+    this.PIPELINE_STATE.cached++
     return this.skipTable
 
   }

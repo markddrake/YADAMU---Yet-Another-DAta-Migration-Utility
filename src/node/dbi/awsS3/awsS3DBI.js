@@ -16,10 +16,6 @@ import {
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  YadamuError
-}                                     from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 
 import CloudDBI                       from '../cloud/cloudDBI.js';
@@ -27,8 +23,9 @@ import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                    
 							          							          
-import AWSS3Constants      from './awsS3Constants.js';
-import AWSS3StorageService from './awsS3StorageService.js';
+import AWSS3Constants                 from './awsS3Constants.js';
+import AWSS3StorageService            from './awsS3StorageService.js';
+import AWSS3Error                     from './awsS3Exception.js';
 
 class AWSS3DBI extends CloudDBI {
  
@@ -82,6 +79,10 @@ class AWSS3DBI extends CloudDBI {
     super(yadamu,manager,connectionSettings,parameters)
   }    
    
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new AWSS3Error(driverId,cause,stack,sql)
+  }
+  
   updateVendorProperties(vendorProperties) {
 	
 	let url = vendorProperties.endpoint

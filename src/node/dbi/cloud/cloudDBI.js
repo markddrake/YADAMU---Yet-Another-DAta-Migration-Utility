@@ -18,6 +18,7 @@ import {
 
 
 /* Yadamu DBI */                                    
+import DBIConstants  from '../base/dbiConstants.js'
 
 import LoaderDBI     from '../loader/loaderDBI.js';
 
@@ -171,13 +172,27 @@ class CloudDBI extends LoaderDBI {
     
   }
   
-  getFileOutputStream(tableName) {
+  getFileOutputStream(tableName,pipelineState) {
     // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
 	const file = this.makeAbsolute(this.getDataFileName(tableName))
 	const extension = path.extname(file);
 	const contentType = mime.lookup(extension) || 'application/octet-stream'
-	return this.cloudService.createWriteStream(file,contentType,this.activeWriters)
-	
+	const outputStream = this.cloudService.createWriteStream(file,contentType,this.activeWriters)
+	outputStream.PIPELINE_STATE = pipelineState
+	outputStream.STREAM_STATE = { 
+	  vendor : this.DATABASE_VENDOR
+	}
+    pipelineState[DBIConstants.OUTPUT_STREAM_ID] = outputStream.STREAM_STATE
+	outputStream.on('finish',() => {
+      outputStream.STREAM_STATE.endTime = performance.now()
+    }).on('error',(err) => {
+      outputStream.STREAM_STATE.endTime = performance.now()
+      pipelineState.failed = true;
+  	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.INPUT_STREAM_ID
+      outputStream.STREAM_STATE.onError = err
+      this.failedPrematureClose = YadamuError.prematureClose(err)
+    })
+	return outputStream
   }  
   
   /*
@@ -203,7 +218,7 @@ class CloudDBI extends LoaderDBI {
 	}
   }
 
-  async getInputStream(filename) {
+  async _getInputStream(filename) {
 
     // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating readable stream on ${this.getDataFileName(tableName)}`)
     const stream = await this.cloudService.createReadStream(filename)

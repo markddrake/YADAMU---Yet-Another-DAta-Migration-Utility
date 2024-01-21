@@ -16,6 +16,7 @@ import YadamuLibrary    from '../../lib/yadamuLibrary.js';
 import NullWriter       from '../../util/nullWritable.js';
 
 import YadamuCompare    from '../base/yadamuCompare.js'
+import DBIConstants     from '../base/dbiConstants.js'
 
 import LoaderDBI        from './loaderDBI.js';
 import JSONParser       from './jsonParser.js';
@@ -32,7 +33,7 @@ class LoaderCompare extends YadamuCompare {
 
 	const streams = await this.dbi.compareInputStreams(filename)
 		
-	const jsonParser = new JSONParser(this.LOGGER, this.MODE, filename)
+	const jsonParser = new JSONParser(this.MODE, filename, DBIConstants.PIPELINE_STATE, this.LOGGER)
 	streams.push(jsonParser);
 	
 	const arrayWriter = new ArrayWriter(this)

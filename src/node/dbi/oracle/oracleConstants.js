@@ -185,6 +185,11 @@ class OracleConstants {
     return this._SPATIAL_ERROR
   }
 
+  static get NONEXISTENT_USER() {
+    this._NONEXISTENT_USER = this._NONEXISTENT_USER || Object.freeze([1918]) 
+    return this._NONEXISTENT_USER
+  }
+
   static get JSON_PARSING_ERROR() {
     this._JSON_PARSING_ERROR = this._JSON_PARSING_ERROR || Object.freeze([40441])
     return this._JSON_PARSING_ERROR
@@ -193,6 +198,16 @@ class OracleConstants {
   static get OCI_CALLOUT_ERROR() {
     this._OCI_CALLOUT_ERROR = this._OCI_CALLOUT_ERROR || Object.freeze([29913])
     return this._OCI_CALLOUT_ERROR
+  }
+
+  static get RECURSIVE_SQL_ERROR() {
+    this._RECURSIVE_SQL_ERROR = this._RECURSIVE_SQL_ERROR || Object.freeze([604])
+    return this._RECURSIVE_SQL_ERROR
+  }
+
+  static get LOCKING_ERROR() {
+    this._LOCKING_ERROR = this._LOCKING_ERROR || Object.freeze([54])
+    return this._LOCKING_ERROR
   }
 
 }

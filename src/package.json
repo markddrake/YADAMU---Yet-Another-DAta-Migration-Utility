@@ -40,7 +40,7 @@
     "pg-copy-streams": "^6.0.6",
     "pg-query-stream": "^4.5.3",
     "readable-stream": "^4.4.2",
-    "snowflake-sdk": "^1.9.0",
+    "snowflake-sdk": "^1.9.1",
     "uuid": "^9.0.1",
     "wkx": "^0.5.0"
   },

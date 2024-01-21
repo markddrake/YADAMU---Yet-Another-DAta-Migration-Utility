@@ -36,8 +36,8 @@ class OracleOutputManager extends YadamuOutputManager {
   **
   */
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
     this.tempLobCount = 0;
     this.cachedLobCount = 0;
     this.lobList = []
@@ -335,9 +335,9 @@ class OracleOutputManager extends YadamuOutputManager {
     ** If talbeInfo.lobColuns = false then there are no lobs so there is no need to re-order the row.
     */
 
-    // this.LOGGER.trace([this.constructor.name,this.tableInfo.lobColumns,this.COPY_METRICS.cached],'cacheRow()')
+    // this.LOGGER.trace([this.constructor.name,this.tableInfo.lobColumns,this.PIPELINE_STATE.cached],'cacheRow()')
 	
-    // if (this.COPY_METRICS.received === 1) {console.log('Cache Row (1)\n',row)}
+    // if (this.PIPELINE_STATE.received === 1) {console.log('Cache Row (1)\n',row)}
 
     try {
       this.bindRowAsLOB = false;
@@ -397,10 +397,10 @@ class OracleOutputManager extends YadamuOutputManager {
         this.batch.rows.push(row);
       }
 	  this.checkNumericBinds(row)
-      this.COPY_METRICS.cached++
-      // if (this.COPY_METRICS.received === 1) {console.log('Cache Row (2)\n',row)}
+      this.PIPELINE_STATE.cached++
+      // if (this.PIPELINE_STATE.received === 1) {console.log('Cache Row (2)\n',row)}
     } catch (cause) {
-      this.handleIterativeError('CACHE ONE',cause,this.COPY_METRICS.cached+1,row);
+      this.handleIterativeError('CACHE ONE',cause,this.PIPELINE_STATE.cached+1,row);
     }
 
     return this.skipTable
@@ -408,7 +408,7 @@ class OracleOutputManager extends YadamuOutputManager {
   }
 
   flushBatch() {
-    return ((this.COPY_METRICS.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.TEMPLOB_BATCH_LIMIT) || (this.batch.cachedLobCount > this.dbi.CACHELOB_BATCH_LIMIT))
+    return ((this.PIPELINE_STATE.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.TEMPLOB_BATCH_LIMIT) || (this.batch.cachedLobCount > this.dbi.CACHELOB_BATCH_LIMIT))
   }
 
   async handleIterativeError(operation,cause,rowNumber,record) {

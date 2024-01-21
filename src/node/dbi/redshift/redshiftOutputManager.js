@@ -11,8 +11,8 @@ import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class RedshiftWriter extends YadamuOutputManager {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
   generateTransformations(targetDataTypes) {
 

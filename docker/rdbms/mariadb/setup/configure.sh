@@ -2,10 +2,11 @@
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y wget lsb-release gnupg
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B7B3B788A8D3785C
 wget https://repo.mysql.com//mysql-apt-config_0.8.24-1_all.deb
 dpkg -i mysql-apt-config_0.8.24-1_all.deb
 apt-get update
-apt-get install -y mysql-shell
+apt-get install -y --allow-unauthenticated mysql-shell
 export STAGE=/var/lib/mysql/stage
 cd $STAGE
 mkdir -p log

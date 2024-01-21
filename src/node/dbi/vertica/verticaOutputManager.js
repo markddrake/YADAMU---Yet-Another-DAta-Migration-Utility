@@ -17,8 +17,8 @@ import {
 
 class VerticaOutputManager extends YadamuOutputManager {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   toSQLIntervalYM(interval) {
@@ -253,7 +253,7 @@ class VerticaOutputManager extends YadamuOutputManager {
     
   cacheRow(row) {
 	 
-    // if (this.COPY_METRICS.cached === 1) console.log('verticaWriter',row)
+    // if (this.PIPELINE_STATE.cached === 1) console.log('verticaWriter',row)
 		
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
@@ -263,19 +263,19 @@ class VerticaOutputManager extends YadamuOutputManager {
 	try {
       this.rowTransformation(row)
       this.batch.copy.push(row);	
-      this.COPY_METRICS.cached++
+      this.PIPELINE_STATE.cached++
 	  return this.skipTable
 	} catch (cause) {
 	  if (cause instanceof EmptyStringDetected) {
 		const emptyStringKey = cause.emptyStringList.join('-')
 		this.batch[emptyStringKey] = this.batch[emptyStringKey] || []
 		this.batch[emptyStringKey].push(row)
-	    this.COPY_METRICS.cached++
+	    this.PIPELINE_STATE.cached++
 	    return this.skipTable
 	  }
 	  if (cause instanceof WhitespaceIssue) {
 	    this.batch.insert.push(row);
-        this.COPY_METRICS.cached++
+        this.PIPELINE_STATE.cached++
 	    return this.skipTable
 	  }
 	  throw cause;

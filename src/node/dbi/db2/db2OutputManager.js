@@ -11,8 +11,8 @@ import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class DB2OutputManager extends YadamuOutputManager {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   generateTransformations(targetDataTypes) {
@@ -246,7 +246,7 @@ class DB2OutputManager extends YadamuOutputManager {
   ** The default implimentation is shown below. It applies any transformation functions that have were defiend in setTableInfo andt
   ** pushes the row into an array or rows waiting to fed to a batch insert mechanism
   **
-  ** If your override this function you must ensure that this.COPY_METRICS.cached is incremented once for each call to cache row.
+  ** If your override this function you must ensure that this.PIPELINE_STATE.cached is incremented once for each call to cache row.
   ** 
   ** Also if your solution does not cache one row in this.batch for each row processed you will probably need to override the following 
   ** functions in addtion to cache row.
@@ -259,7 +259,7 @@ class DB2OutputManager extends YadamuOutputManager {
   this.rowTransformation(row)
   this.batch.push(row);
     
-  this.COPY_METRICS.cached++
+  this.PIPELINE_STATE.cached++
   return this.skipTable;
    
   **
@@ -268,7 +268,7 @@ class DB2OutputManager extends YadamuOutputManager {
   cacheRow(row) {
 	this.rowTransformation(row)
 	row.forEach((col,idx) => { this.batch.params[idx].Data.push(col)})
-    this.COPY_METRICS.cached++
+    this.PIPELINE_STATE.cached++
     return this.skipTable;  
   }
       

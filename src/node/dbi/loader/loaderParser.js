@@ -4,9 +4,9 @@ import YadamuParser     from '../base/yadamuParser.js'
 
 class LoaderParser extends YadamuParser {
   
-  constructor(dbi,tableInfo,yadamuLogger,parseDelay) {
+  constructor(dbi,tableInfo,pipelineState,yadamuLogger) {
 	  
-    super(dbi,tableInfo,yadamuLogger,parseDelay);      
+    super(dbi,tableInfo,pipelineState,yadamuLogger);      
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 

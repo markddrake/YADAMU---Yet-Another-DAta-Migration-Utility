@@ -11,8 +11,8 @@ import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class SnowflakeWriter extends YadamuOutputManager {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {  
-	super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {  
+	super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   generateTransformations(dataTypes) {
@@ -131,7 +131,7 @@ class SnowflakeWriter extends YadamuOutputManager {
   	  this.batch.push(row);
     }
 	
-    this.COPY_METRICS.cached++
+    this.PIPELINE_STATE.cached++
 	return this.skipTable
 	
   }

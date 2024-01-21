@@ -437,19 +437,18 @@ class Yadamu {
 	}
   }
   
-  recordMetrics(tableName,metrics) {
-	
-	const elapsedTime =  Math.round(metrics.writerEndTime - metrics.pipeStartTime)
+  recordMetrics(tableName,tableState) {
+	const elapsedTime =  Math.round(tableState.endTime - tableState.startTime)
 	
 	const tableSummary = {
 	  elapsedTime       : elapsedTime
-	, throughput        : Math.round((metrics.committed/elapsedTime) * 1000)
-    , rowCount          : metrics.committed
-	, rowsSkipped       : metrics.skipped
-	, sqlExecutionTime  : metrics.sqlTime
+	, throughput        : Math.round((tableState.committed/elapsedTime) * 1000)
+    , rowCount          : tableState.committed
+	, rowsSkipped       : tableState.skipped
+	, sqlExecutionTime  : tableState.sqlTime
 	}
 	
-	// console.log(metrics,tableSummary)
+	// console.log(tableState,tableSummary)
 
 	Object.assign(this.metrics,{[tableName]:tableSummary})
 	
@@ -457,7 +456,6 @@ class Yadamu {
   }
   
   reportStatus(status,yadamuLogger) {
-     
     const endTime = performance.now();
       
 	const metrics = yadamuLogger.getMetrics();
@@ -485,8 +483,7 @@ class Yadamu {
   
   reportError(e,parameters,status,yadamuLogger) {
     
-	
-    if (!(e instanceof ConnectionError)) {
+	if (!(e instanceof ConnectionError)) {
 	  yadamuLogger.handleException([`YADAMU`,`"${status.operation}"`],e);
 	}
 	
@@ -946,7 +943,7 @@ class Yadamu {
     const activeStreams = []
     try {
       // dbReader.getInputStream() returns itself (this) for databases...	  
-	  yadamuPipeline.push(...dbReader.getInputStreams())
+	  yadamuPipeline.push(...await(dbReader.getInputStreams(DBIConstants.PIPELINE_STATE)))
 	  yadamuPipeline.push(dbWriter)
 
       
@@ -968,7 +965,7 @@ class Yadamu {
 	  if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
 	    e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
 	  }
-  	  // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
+  	  this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
       // this.LOGGER.trace([this.constructor.name,'doPipelineOperation()'],`Waiting for Streams to finish. [${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}]`);
 	  // await Promise.allSettled(activeStreams)
 	  // this.LOGGER.trace([this.constructor.name,'doPipelineOperation()'],`Streams Finished. [${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}]`);

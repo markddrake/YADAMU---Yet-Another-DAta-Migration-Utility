@@ -18,8 +18,8 @@ import SnowflakeError          from './snowflakeException.js'
 
 class SnowflakeWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {  
-	super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {  
+	super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   reportBatchError(operation,cause,batch) {
@@ -51,10 +51,13 @@ class SnowflakeWriter extends YadamuWriter {
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-		this.reportBatchError(`INSERT MANY`,cause,batch)
-		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		if (!cause.requestTooLarge()) {
+		  this.reportBatchError(`INSERT MANY`,cause,batch)
+		  this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+	    }
+		this.dbi.resetExceptionTracking()
 		this.tableInfo.insertMode = 'BinarySplit'   
-      }
+	  }
     }
 	
     // Suppress SQL Trace after first Iterative operation
@@ -119,8 +122,10 @@ class SnowflakeWriter extends YadamuWriter {
 	    } catch (cause) {
 		  this.dbi.SQL_TRACE.disable()
 	      if ((batchRowCount > 1 ) && (!YadamuError.lostConnection(cause))){
+			// Split the Batch in two and retry
             batches.push(nextBatch.splice(0,(Math.ceil(batchRowCount/2)*columnCount)),nextBatch)			  
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
+			this.dbi.resetExceptionTracking()
 		  }
 		  else {
 			if ((cause instanceof SnowflakeError) && cause.spatialInsertFailed()) {
@@ -154,8 +159,10 @@ class SnowflakeWriter extends YadamuWriter {
         } catch (cause) {
           this.dbi.SQL_TRACE.disable()
 	      if ((nextBatch.length > 1) && (!YadamuError.lostConnection(cause))) {
+			// Split the Batch in two and retry
             batches.push(nextBatch.splice(0,Math.ceil(nextBatch.length/2)),nextBatch)
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
+			this.dbi.resetExceptionTracking()
 		  }
 		  else {
 			if ((cause instanceof SnowflakeError) && cause.spatialInsertFailed()) {
@@ -172,7 +179,7 @@ class SnowflakeWriter extends YadamuWriter {
       }
     }
 
-    // this.LOGGER.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.COPY_METRICS.skipped],`Binary insert required ${operationCount} operations`)
+    // this.LOGGER.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.PIPELINE_STATE.skipped],`Binary insert required ${operationCount} operations`)
 	this.dbi.SQL_TRACE.enable()
 	
     this.endTime = performance.now();

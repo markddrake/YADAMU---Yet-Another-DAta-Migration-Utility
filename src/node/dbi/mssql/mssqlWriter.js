@@ -11,8 +11,8 @@ import MsSQLConstants from './mssqlConstants.js'
 
 class MsSQLWriter extends YadamuWriter {
    	
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
     this.dbi.CANCEL_REQUESTED = false
   }
    
@@ -25,8 +25,8 @@ class MsSQLWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
-	  	  
-    // console.log(this.constructor.name,'writeBatch()',this.tableInfo.insertMode)
+	    
+    // console.log(this.constructor.name,'writeBatch()',this.tableInfo.insertMode,rowCount)
     // console.dir(batch,{depth:null})
     
     if (this.tableInfo.insertMode === 'BCP') {
@@ -38,17 +38,20 @@ class MsSQLWriter extends YadamuWriter {
 		this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
+		// console.log(cause)
         if (this.dbi.isExpectedCancellation(cause)) {
 	      await this.dbi.restoreSavePoint(cause);
           this.endTime = performance.now();
           this.releaseBatch(batch)
           return this.skipTable          
 	    }
+		
         // Reminder Report Batch Error throws cause if there are lost rows
 		this.reportBatchError(batch,`INSERT MANY`,cause)
 	    await this.dbi.restoreSavePoint(cause);
 		await this.dbi.verifyTransactionState()
 	  	this.LOGGER.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
+		this.dbi.resetExceptionTracking()
         this.tableInfo.insertMode = 'Iterative';
       }
     }
@@ -100,7 +103,7 @@ class MsSQLWriter extends YadamuWriter {
   }
 
   async doFinal() {
-    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost],'doFinal()')
+    // this.LOGGER.trace([this.constructor.name,this.PIPELINE_STATE.displayName,this.dbi.getWorkerNumber(),this.PIPELINE_STATE.received,this.PIPELINE_STATE.cached,this.PIPELINE_STATE.written,this.PIPELINE_STATE.skipped,this.PIPELINE_STATE.lost],'doFinal()')
     await this.dbi.clearCachedStatement()
 	await super.doFinal()
   }

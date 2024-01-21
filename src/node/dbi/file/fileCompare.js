@@ -9,6 +9,7 @@ import {
 import YadamuCompare       from '../base/yadamuCompare.js'
 
 import JSONParser          from '../../../node/dbi/file/jsonParser.js';
+import DBIConstants                   from '../base/dbiConstants.js'
 
 import StatisticsCollector from './statisticsCollector.js';
 
@@ -50,7 +51,7 @@ class FileCompare extends YadamuCompare {
 
   async getContentMetadata(file,sort) {
       
-    const jsonParser  = new JSONParser(this.LOGGER, 'COMPARE', file)
+    const jsonParser  = new JSONParser('COMPARE', file, DBIConstants.PIPELINE_STATE, this.LOGGER)
     let readStream
     try {
       readStream = fs.createReadStream(file);         

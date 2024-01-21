@@ -70,6 +70,12 @@ class SnowflakeConstants {
     return this._CONTENT_TOO_LARGE_ERROR
   }
   
+  static get REQUEST_TOO_LARGE_ERROR() {
+	/*  code: '401002' */
+    this._REQUEST_TOO_LARGE_ERROR = this._REQUEST_TOO_LARGE_ERROR || Object.freeze([401002])
+    return this._REQUEST_TOO_LARGE_ERROR
+  }
+  
   static get CONTENT_TOO_LARGE_STATE() {
 	/*  errorCode: '100078', sqlState: '22000' */
     this._CONTENT_TOO_LARGE_STATE = this._CONTENT_TOO_LARGE_STATE || Object.freeze(['22000'])

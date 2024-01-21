@@ -12,7 +12,6 @@ class DBIConstants {
     , "BATCH_SIZE"                 : 10000
     , "BATCH_LIMIT"                : 5
     , "COMMIT_RATIO"               : 1    
-	, "PARSE_DELAY"                : 0
 	, "INFINITY_MANAGEMENT"        : "REJECT"
 	, "LOCAL_STAGING_AREA"         : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "REMOTE_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
@@ -22,39 +21,33 @@ class DBIConstants {
     return this._STATIC_PARAMETERS;
   }
 
-  static get NEW_COPY_METRICS() {
-	this._EMPTY_COPY_METRICS = this._EMPTY_COPY_METRICS || Object.freeze({
-      pipeStartTime     : undefined
-    , readerStartTime   : undefined
-    , readerEndTime     : undefined
-	, parserStartTime   : undefined
-    , parserEndTime     : undefined
-	, managerStartTime  : undefined
-	, managerEndTime    : undefined
-	, writerStartTime   : undefined
-	, writerEndTime     : undefined
-	, pipeEndTime       : undefined
-	, failed            : false
-	, readerError       : undefined
-	, parserError       : undefined
-	, managerError      : undefined
-	, writerError       : undefined
+  static get INPUT_STREAM_ID()           { return 'InputStream'  }
+  static get PARSER_STREAM_ID()          { return 'Parser'       }
+  static get TRANSFORMATION_STREAM_ID()  { return 'Transformer'  }
+  static get OUTPUT_STREAM_ID()         { return 'OutputStream' }
+  
+  static get PIPELINE_STATE() {
+	this._EMPTY_PIPELINE_STATE = this._EMPTY_PIPELINE_STATE || Object.freeze({
+	  failed            : false
+    , startTime     : undefined
+	, endTime       : undefined
 	, read              : 0 // Rows read by the reader. Some Readers may not be able to supply a count. Cummulative
 	, parsed            : 0 // Rows recieved he parser. Cummulative
 	, received          : 0 // Rows encounted by the Output Manager. Cummulative
-    , cached            : 0 // Rows cached in the current batch.
-    , written           : 0 // Rows written to the database during the current transaction. Cummulative. Reset on each New Transaction
     , committed         : 0 // Rows written to the databsase and committed. Cummulative
+    , cached            : 0 // Rows cached in the current batch. Maintianed by the Output Manager
+	, pending           : 0 // Rows cached in batches that have not yet been written to disk. Incremented by the Output Manager when pushing a batch and decremented by Writer when a batch is written.
+    , written           : 0 // Rows written to the database during the current transaction. Cummulative. Reset on each New Transaction
     , skipped           : 0 // Rows not written due to unrecoverable write errors, eg Row is not valid per the target database. Includes any rows in-flight when a fatal error is reported
-    , lost              : 0 // Rows written to the database but not yet committed when a rollback tooks place.
+    , lost              : 0 // Rows written to the database but not yet committed when a rollback takes place or a write connection is lost.
+	, idleTime          : 0 // Time writer was not actively engaged in writing a batch E.g.Time between calls to processBatch()
     , batchNumber       : 0 // Batch Number
     , batchWritten      : 0 // Batches Writen 
-	, pending           : 0 // Rows cached in batches that have not yet been written to disk
-	, idleTime          : 0 // Time writer was not actively engaged in writing a batch E.g.Time between calls to processBatch()
-    })
-    return Object.assign({},this._EMPTY_COPY_METRICS);
-  }
 
+    })
+    return Object.assign({},this._EMPTY_PIPELINE_STATE);
+  }
+  
   static #_DBI_PARAMETERS
 
   static get DBI_PARAMETERS()      { 
@@ -65,7 +58,6 @@ class DBIConstants {
   static get MODE()                       { return this.DBI_PARAMETERS.MODE }
 
   static get ON_ERROR()                   { return this.DBI_PARAMETERS.ON_ERROR }
-  static get PARSE_DELAY()                { return this.DBI_PARAMETERS.PARSE_DELAY };
   static get TABLE_MAX_ERRORS()           { return this.DBI_PARAMETERS.TABLE_MAX_ERRORS };
   static get TOTAL_MAX_ERRORS()           { return this.DBI_PARAMETERS.TOTAL_MAX_ERRORS };
   static get BATCH_SIZE()                 { return this.DBI_PARAMETERS.BATCH_SIZE };

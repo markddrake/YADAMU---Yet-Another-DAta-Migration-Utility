@@ -65,7 +65,8 @@ class CockroachQA extends YadamuQALibrary.qaMixin(CockroachDBI) {
 		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		}
       }).catch((e) => {
-        this.yadamu.LOGGER.handleException(tags,new CockroachError(this.DRIVER_ID,e,stack,operation));
+		const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,operation)
+        this.LOGGER.handleException(tags,cause)
       })
 	}
 

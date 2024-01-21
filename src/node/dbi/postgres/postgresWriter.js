@@ -7,8 +7,8 @@ import YadamuWriter from '../base/yadamuWriter.js';
 
 class PostgresWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   reportBatchError(operation,cause,batch) {
@@ -37,6 +37,7 @@ class PostgresWriter extends YadamuWriter {
 		this.reportBatchError(`INSERT MANY`,cause,batch)
         await this.dbi.restoreSavePoint(cause);
 		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		this.dbi.resetExceptionTracking()
         this.tableInfo.insertMode = 'Iterative' 
       }
     } 

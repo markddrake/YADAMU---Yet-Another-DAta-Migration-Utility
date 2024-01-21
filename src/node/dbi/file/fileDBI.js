@@ -41,10 +41,6 @@ import Yadamu from '../../core/yadamu.js'
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  YadamuError
-}                                     from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 
 import YadamuDBI                      from '../base/yadamuDBI.js'
@@ -199,6 +195,16 @@ class FileDBI extends YadamuDBI {
   
   set FILE(v)            { this._FILE = v }
   
+  get OUTPUT_FORMAT()    { return 'JSON' }
+  
+
+  get CHECK_POINT()         { return  this._CHECK_POINT }
+  set CHECK_POINT(v)        { this._CHECK_POINT = this.OUTPUT_STREAM_OFFSET + v.bytesWritten + v.writableLength}
+  
+  get OUTPUT_STREAK_SIZE()  { return this._OUTPUT_STREAM_OFFSET}
+  set OUTPUT_STREAK_SIZE(v) { this._OUTPUT_STREAM_OFFSET = v }
+  
+
   constructor(yadamu,connectionSettings,parameters) {
 	super(yadamu,null,connectionSettings,parameters)
 	this.outputStream = undefined;
@@ -346,6 +352,7 @@ class FileDBI extends YadamuDBI {
 	
 	const ws = await new Promise((resolve,reject) => {
       const ws = fs.createWriteStream(this.FILE,{flags :"w"})
+	  this.OUTPUT_STREAM_OFFSET = 0;
 	  const stack = new Error().stack
       ws.on('open',() => {resolve(ws)})
 	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
@@ -404,7 +411,6 @@ class FileDBI extends YadamuDBI {
 	this.EXPORT_FILE_HEADER = exportFileHeader
 	const initializeExport = new ExportWriter(this.EXPORT_FILE_HEADER)
 	await pipeline(initializeExport,this.outputStream,{end: false})
-  
   }	
 	
   traceStreamEvents(streams) {
@@ -523,7 +529,7 @@ class FileDBI extends YadamuDBI {
     }
   }
 
-  getInputStream() {  
+  _getInputStream() {  
     // Return the inputStream and the transform streams required to process it.
     const stats = fs.statSync(this.FILE)
     const fileSizeInBytes = stats.size
@@ -548,23 +554,29 @@ class FileDBI extends YadamuDBI {
 	
   }	
 	  
-  getInputStreams() {
+  async getInputStreams(pipelineState) {
+
+    this.PIPELINE_STATE = pipelineState
+	pipelineState.readerState = this.ERROR_STATE
+	this.resetExceptionTracking()
+
 	const streams = []
-	const metrics = DBIConstants.NEW_COPY_METRICS
-	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
-    const is = this.getInputStream()
-	is.COPY_METRICS = metrics
-	is.once('readable',() => {
-	  metrics.pipeStartTime   = performance.now()
-	  metrics.readerStartTime = performance.now()
-	}).on('error',(err) => { 
-	  metrics.failed          = true
-      metrics.readerEndTime   = performance.now()
-	  metrics.readerError     = err
+
+    const inputStream = await this.getInputStream(null,pipelineState)
+	const inputStreamState = inputStream.STREAM_STATE
+	
+	inputStream.once('readable',() => {
+      inputStreamState.startTime    = performance.now()
     }).on('end',() => {
-      metrics.readerEndTime   = performance.now()
-    })
-	streams.push(is)
+      inputStreamState.endTime = performance.now()
+	}).on('error',(err) => { 
+  	  inputStreamState.endTime = performance.now()
+      pipelineState.failed = true;
+  	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.INPUT_STREAM_ID
+      inputStreamState.error = err
+	})
+	
+	streams.push(inputStream)
 	
 	if (this.ENCRYPTED_FILE) {
 	  streams.push(new IVReader(this.IV_LENGTH))
@@ -577,58 +589,102 @@ class FileDBI extends YadamuDBI {
       streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
-	const jsonParser = new JSONParser(this.LOGGER, this.MODE, this.FILE)
-    jsonParser.COPY_METRICS = metrics
-	jsonParser.once('readable',() => {
-	  metrics.parserStartTime = performance.now()
-	}).on('error',(err) => { 
-	  metrics.failed          = true
-      metrics.parserEndTime   = performance.now()
-	  metrics.parserError     = err
+	const jsonParser = new JSONParser(this.MODE, this.FILE, pipelineState, this.LOGGER)
+	const parserStreamState = jsonParser.STREAM_STATE
+    jsonParser.on('error',(err) => {
+      parserStreamState.endTime = performance.now()
+      pipelineState.failed = true;
+	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.PARSER_STREAM_ID
+      parserStreamState.pipelineError = err
     })
+
 	streams.push(jsonParser)
 	
-	const streamSwitcher = new StreamSwitcher(this.yadamu,metrics)
-    streamSwitcher.on('error',(err) => { 
-	  metrics.failed          = true
-      metrics.parserEndTime   = performance.now()
-	  metrics.parserError     = err
-    }).on('end',() => {
-      metrics.parserEndTime   = performance.now()
+	const streamSwitcher = new StreamSwitcher(this,this.yadamu,pipelineState)
+	const streamSwitcherState = streamSwitcher.STREAM_STATE
+    streamSwitcher.on('end',() => {
+      streamSwitcherState.endTime = performance.now()
+    }).on('error',(err) => { 
+      streamSwitcherState.endTime = performance.now()
+      pipelineState.failed = true;
+	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.PARSER_STREAM_ID
+      streamSwitcherState.pipelineError = err
     })
+	
 	streams.push(streamSwitcher)
-
     // console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
+
 	return streams;
   }
 
-  getOutputStream(tableName,metrics) {
+  getOutputManager(tableName,pipelineState) {
     // Override parent method to allow output stream to be passed to worker
-    // this.LOGGER.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
-	const jw =  new JSONOutputManager(this,tableName,metrics,this.firstTable,this.status,this.LOGGER)
+    // s.LOGGER.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
+	const jw =  new JSONOutputManager(this,tableName,pipelineState,this.firstTable,this.status,this.LOGGER)
 	return jw
   }
+  
+  getOutputStream(pipelineState) {  
+	this.outputStream.PIPELINE_STATE = pipelineState
+	this.outputStream.STREAM_STATE = { 
+	  vendor : this.DATABASE_VENDOR 
+	}
+    pipelineState[DBIConstants.OUTPUT_STREAM_ID] = this.outputStream.STREAM_STATE
+    return this.outputStream
+  }
       
-  getOutputStreams(tableName,metrics) {
+  getOutputStreams(tableName,pipelineState) {
+
+    this.PIPELINE_STATE = pipelineState
+	pipelineState.writerState = this.ERROR_STATE
+	this.resetExceptionTracking()
 
     const outputStreams = []
 
-    // Create a JSON Writer
-    const jsonWriter = this.getOutputStream(tableName,metrics)
+	// Create a JSON Writer
+	
+	// For the purposes of tracking pipeline operation the JSON Writer (which transforms the data into JSON for output) is a proxy
+	// for the Writer. This is necessary as the file writer is used to handle multiple pipeline operations. 
+
+	const jsonWriter = this.getOutputManager(tableName,pipelineState)
+	const transformationStreamState = jsonWriter.STREAM_STATE
+    
 	jsonWriter.once('readable',() => {
-	  metrics.writerStartTime = performance.now()
-	}).on('finish',() => { 
- 	  metrics.writerEndTime = performance.now()
-      metrics.lost += jsonWriter.writableLength
-	}).on('error',(err) => {
- 	  metrics.writerEndTime = performance.now()
-	  metrics.failed = true;
-	  metrics.writerError = YadamuError.prematureClose(err) ? null : err
-      metrics.lost += jsonWriter.writableLength
-    })    
+      transformationStreamState.startTime = performance.now()
+    }).on('finish',() => { 
+      transformationStreamState.endTime = performance.now()
+      transformationStreamState.endTime = performance.now()
+      pipelineState.lost += jsonWriter.writableLength
+    }).on('error',(err) => {
+      transformationStreamState.endTime = performance.now()
+      pipelineState.failed = true;
+	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.TRANSFORMATION_STREAM_ID
+      pipelineState.lost += jsonWriter.writableLength
+      transformationStreamState.pipelineError = err
+    })
+	
 	outputStreams.push(jsonWriter)
-	 
-	outputStreams.push(this.outputStream)
+
+    const outputStream = this.getOutputStream(pipelineState)
+	this.CHECK_POINT = outputStream.bytesWritten+outputStream.writableLength
+    const outputStreamState = outputStream.STREAM_STATE
+	
+	outputStream.once('pipe',() => {
+      outputStreamState.startTime = performance.now()
+    }).once('finish',() => { 
+      outputStreamState.endTime = performance.now()
+      pipelineState.lost += jsonWriter.writableLength
+    }).on('error',(err) => {
+      outputStreamState.endTime = performance.now()
+      pipelineState.failed = true;
+	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.OUTPUT_STREAM_ID
+      pipelineState.lost += jsonWriter.writableLength
+      outputStreamState.pipelineError = err
+    })
+
+    this.CHECK_POINT = outputStream
+	outputStreams.push(outputStream)
+    
 	this.firstTable = false;
     // console.log(outputStreams.map((s) => { return s.constructor.name }).join(' ==> '))
     return outputStreams	
@@ -683,6 +739,27 @@ class FileDBI extends YadamuDBI {
   async getComparator(configuration) {
 	 await this.initialize()
 	 return new FileCompare(this,configuration)
+  }
+  
+  async truncateTable() {
+	  
+	if (this.COMPRESSED_FILE || this.ENCRYPTED_FILE) {
+      throw new Error('Error recovery not supported with compressed and/or encypted output')
+	}
+	  
+	await new Promise((resolve,reject) => {
+	  this.outputStream.close(() => {
+		resolve()
+	  })
+	})
+	await fsp.truncate(this.outputStream.path,this.CHECK_POINT);
+    this.OUTPUT_STREAM_OFFSET = this.CHECK_POINT;
+	this.outputStream = await new Promise((resolve,reject) => {
+      const ws = fs.createWriteStream(this.outputStream.path,{flags :"a"})
+	  const stack = new Error().stack
+      ws.on('open',() => {resolve(ws)})
+	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
+	})
   }
 	  
 }

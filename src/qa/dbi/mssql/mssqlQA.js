@@ -104,7 +104,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
               this.LOGGER.log(tags,`Worker finished prior to termination.`)
             }
             else {
-              const cause = new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement)
+              const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,sqlStatement)
               this.LOGGER.handleException(tags,cause)
             }
           } 

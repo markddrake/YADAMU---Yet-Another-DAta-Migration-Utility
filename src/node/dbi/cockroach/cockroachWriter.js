@@ -7,8 +7,8 @@ import YadamuWriter from '../base/yadamuWriter.js';
 
 class CockroackWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
   reportBatchError(operation,cause,batch) {
@@ -42,6 +42,7 @@ class CockroackWriter extends YadamuWriter {
         // await this.dbi.restoreSavePoint(cause);
 		this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
+		this.dbi.resetExceptionTracking()
         repackBatch = true;
       }
     } 
@@ -58,7 +59,7 @@ class CockroackWriter extends YadamuWriter {
         await this.dbi.releaseSavePoint();
 		this.adjustRowCounts(1);
       } catch(cause) {
-		console.log(cause)
+		// console.log(cause)
         await this.dbi.restoreSavePoint(cause);
         this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
         if (this.skipTable) {

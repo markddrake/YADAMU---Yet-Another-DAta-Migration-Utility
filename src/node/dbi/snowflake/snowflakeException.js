@@ -27,8 +27,11 @@ class SnowflakeError extends DatabaseError {
 	const spatialErrorCodes = Object.freeze(['100217','100205'])
     return (this.cause.code && spatialErrorCodes.includes(this.cause.code))
   }
-
  
+  requestTooLarge() {
+	return ((this.cause.code && SnowflakeConstants.REQUEST_TOO_LARGE_ERROR.includes(this.cause.code)) && (this.cause?.response?.status && (this.cause.response.status === 413)))
+  }
+
   contentTooLarge() {
     return ((this.cause.code && SnowflakeConstants.CONTENT_TOO_LARGE_ERROR.includes(this.cause.code)) && (this.cause.sqlState && SnowflakeConstants.CONTENT_TOO_LARGE_STATE.includes(this.cause.sqlState)))
   }

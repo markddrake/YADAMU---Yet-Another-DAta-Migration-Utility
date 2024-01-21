@@ -51,12 +51,10 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
@@ -82,10 +80,12 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
     ;;	
   
   loader)
@@ -237,6 +237,15 @@ case $YADAMU_TEST_NAME  in
   ;;
 
   copy) 
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
+  ;;
+
+  copy2) 
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy

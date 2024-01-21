@@ -12,11 +12,6 @@ import {
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import {
-  CopyOperationAborted,
-  UnimplementedMethod
-}                                     from '../../core/yadamuException.js'
-
 /* Yadamu DBI */                                    
 
 import YadamuDBI                      from '../base/yadamuDBI.js'
@@ -76,6 +71,10 @@ class ExampleDBI extends YadamuDBI {
   **
   */
   
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new ExampleError(driverId,cause,stack,sql)
+  }
+
   async testConnection() {   
     // Validate the supplied connection properties
     throw new UnimplementedMethod('testConnection()',`YadamuDBI`,this.constructor.name)
@@ -134,7 +133,7 @@ class ExampleDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(this.DRIVER_ID,e,stack,sqlStatement)))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -417,15 +416,11 @@ class ExampleDBI extends YadamuDBI {
      return queryInfo;
   }   
 
-  createParser(queryInfo,parseDelay) {
-    return new ExampleParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new ExampleParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
   
-  inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
-  
-  async getInputStream(queryInfo) {
+  async _getInputStream(queryInfo) {
 
     // Either return the databases native readable stream or use the ExampleReader to create a class that wraps a cursor or event stream in a Readable
 
@@ -444,7 +439,7 @@ class ExampleDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.trackExceptions(new ExampleError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -472,14 +467,14 @@ class ExampleDBI extends YadamuDBI {
     return await super.generateStatementCache(ExampleStatementGenerator, schema)
   }
 
-  getOutputStream(tableName,metrics) {
+  getOutputStream(tableName,pipelineState) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(ExampleWriter,tableName,metrics)
+	 return super.getOutputStream(ExampleWriter,tableName,pipelineState)
   }
 
-  getOutputManager(tableName,metrics) {
+  getOutputManager(tableName,pipelineState) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(ExampleOutputManager,tableName,metrics)
+	 return super.getOutputStream(ExampleOutputManager,tableName,pipelineState)
   }
 
   classFactory(yadamu) {

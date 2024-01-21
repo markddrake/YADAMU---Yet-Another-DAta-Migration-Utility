@@ -22,6 +22,7 @@ import YadamuConstants    from '../../node/lib/yadamuConstants.js';
 import YadamuLibrary      from '../../node/lib/yadamuLibrary.js';
 import JSONParser         from '../../node/dbi/file/jsonParser.js';
 import LoaderDBI          from '../../node/dbi/loader/loaderDBI.js';
+import DBIConstants       from '../../node/dbi/base/dbiConstants.js';
 
 import {
   ConfigurationFileError
@@ -56,7 +57,7 @@ class YadamuExportParser extends Transform {
       const inputStream = fs.createReadStream(inputFile);
       inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
     })
-    this.jsonParser =  new JSONParser(this.LOGGER,'DDL_ONLY',inputFile);
+    this.jsonParser =  new JSONParser('DDL_ONLY',inputFile,DBIConstants.PIPELINE_STATE,this.LOGGER);
     try {
       await pipeline([this.inputStream,this.jsonParser,this]);
     } catch (e) {

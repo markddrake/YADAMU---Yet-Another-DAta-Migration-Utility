@@ -17,8 +17,8 @@ import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class MySQLOutputManager extends YadamuOutputManager {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
    
   generateTransformations(dataTypes) {
@@ -147,7 +147,7 @@ class MySQLOutputManager extends YadamuOutputManager {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
-    // this.LOGGER.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
+    // this.LOGGER.trace([this.constructor.name,'YADAMU WRITER',this.PIPELINE_STATE.cached],'cacheRow()')    
 	
 	try {
 	  
@@ -163,13 +163,13 @@ class MySQLOutputManager extends YadamuOutputManager {
 	   this.batch.push(row)
       }
 
-      this.COPY_METRICS.cached++
+      this.PIPELINE_STATE.cached++
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
         this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
         this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
-		this.COPY_METRICS.skipped++
+		this.PIPELINE_STATE.skipped++
         return
 	  }
 	  throw e

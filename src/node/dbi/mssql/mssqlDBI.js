@@ -16,8 +16,7 @@ import {
 import {
   pipeline
 }                                     from 'stream/promises';
-
-							 
+				 
 /* Database Vendors API */                                    
 
 import sql                            from 'mssql';
@@ -40,10 +39,6 @@ import sql                            from 'mssql';
 							          
 import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
-
-import {
-  CopyOperationAborted
-}                                     from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
 							          							          
@@ -145,6 +140,19 @@ class MsSQLDBI extends YadamuDBI {
 	this.BEGIN_TRANSACTION_ISSUE   = false
   }
   
+  createDatabaseError(driverId,cause,stack,sql) {
+	return new MsSQLError(driverId,cause,stack,sql)
+  }
+  
+  getDatabaseException(driverId,cause,stack,sql) {
+    const err = this.createDatabaseError(driverId,cause,stack,sql)
+	if (err.cancelledOperation() && this.CANCEL_REQUESTED) {
+	  this.CANCEL_REQUESTED = false
+	  return err
+	}
+    return this.trackExceptions(err)
+  }
+  
   initializeManager() {
 	super.initializeManager()
 	this.StatementGenerator = MsSQLStatementGenerator
@@ -206,7 +214,7 @@ class MsSQLDBI extends YadamuDBI {
   
   reportTransactionState(operation) {
     const e = new Error(`Unexpected ${operation} operation`)
-    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
+    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],this.createDatabaseError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
   }
 
   getTransactionManager() {
@@ -244,7 +252,7 @@ class MsSQLDBI extends YadamuDBI {
       })
       return this.request;
     } catch (e) {
-      throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,`sql.Request(${this.requestProvider.constuctor.name})`))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,`sql.Request(${this.requestProvider.constuctor.name})`)
     }
   }
   
@@ -444,7 +452,7 @@ class MsSQLDBI extends YadamuDBI {
       try {
         await statement.unprepare()
       } catch (e) {}
-      throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,`sql.PreparedStatement(${sqlStatement}`))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,`sql.PreparedStatement(${sqlStatement}`)
     }
   }
 
@@ -463,7 +471,7 @@ class MsSQLDBI extends YadamuDBI {
       operation = 'sql.connectionPool()'
       this.pool = new sql.ConnectionPool(this.vendorProperties)
       this.pool.on('error',(err, p) => {
-        const cause = err instanceof MsSQLError ? err : this.trackExceptions(new MsSQLError(this.DRIVER_ID,err,stack,`${operation}.onError()`))
+        const cause = err instanceof MsSQLError ? err : this.getDatabaseException(this.DRIVER_ID,err,stack,`${operation}.onError()`)
         if (!cause.suppressedError())  {
           this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,`sql.ConnectionPool.onError()`],cause)
           if (!this.RECONNECT_IN_PROGRESS) {
@@ -480,7 +488,7 @@ class MsSQLDBI extends YadamuDBI {
       this.transaction = this.getTransactionManager()
       
     } catch (e) {
-      throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,operation))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
     }       
 
     await this.configureConnection()
@@ -500,17 +508,25 @@ class MsSQLDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.TRANSACTION_IN_PROGRESS})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.TRANSACTION_IN_PROGRESS})`)
     
-    if (this.preparedStatement !== undefined ) {
-      await this.clearCachedStatement()
-    }   
-    
+    await this.clearCachedStatement()
+	
+	if (this.ACTIVE_INPUT_STREAM === true) {
+	  await this.cancelRequest(true)	
+	}
+	
     if (this.TRANSACTION_IN_PROGRESS) {
-      await this.rollbackTransaction()
+	  // If there is a Transaction Rollback, even if the connection has been lost, else the pool will hang on close.
+      const latestError = this.ERROR_STATE.LATEST_ERROR
+	  try {
+	    // await this.rollbackTransaction(this.ERROR_STATE.LATEST_ERROR)	
+	    await this.rollbackTransaction()	
+	  } catch(e) {
+	    this.ERROR_STATE.LATEST_ERROR = latestError || e
+	  }
     }
 	
-	await this.cancelRequest(true)
   }
   
   unhandledRejectionHandler(err,p) {
@@ -521,7 +537,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async closePool(options) {
     
-    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,,'CLOSE POOL'],`closePool(${(this.pool !== undefined)})`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`closePool(${(this.pool !== undefined)})`)
 	
 	/*
 	**
@@ -531,7 +547,7 @@ class MsSQLDBI extends YadamuDBI {
 	
     if (this.pool !== undefined) {
      
-	 /*
+	  /*
 	  **
  	  ** Set a timer to deal with pool.close() hanging
 	  **
@@ -539,19 +555,20 @@ class MsSQLDBI extends YadamuDBI {
 		
 	  const timerAbort = new AbortController()
       setTimeout(1000,null,{ref: false, signal: timerAbort.signal}).then(() => {
-        this.LOGGER.warning([this.DATABASE_VENDOR,this.ROLE,,'CLOSE POOL',this.BEGIN_TRANSACTION_ISSUE],`Close pool operation timed out`)
-		  // console.dir(this.pool.pool.used,{depth:null})
-		 return
-	  }).catch((e) => { /* console.log(e) */ })
+        this.LOGGER.warning([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL',this.BEGIN_TRANSACTION_ISSUE],`Close pool operation timed out`)
+		// console.dir(this.pool.pool.used,{depth:null})
+	  }).catch((e) => { 
+	    /* Swallow the Abort */
+	  })
 	 	 		  
       let stack
       let psudeoSQL
       try {
 		if (this.request) {
 		  try {
-    		this.cancelRequest(true)
+    		await this.cancelRequest(true)
 		  } catch(e) {
-			this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,,'CLOSE POOL'],e)
+			this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],e)
 		  }
 		}
 			  
@@ -569,19 +586,22 @@ class MsSQLDBI extends YadamuDBI {
 		process.prependOnceListener('unhandledRejection',this.unhandledRejectionHandler)		
 		// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`Closing pool`)
 		await this.pool.close()
+		this.pool = undefined
 		timerAbort.abort()
-        // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`Pool Closed`)
+		// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`Pool Closed`)
 		process.removeListener('unhandledRejection',this.unhandledRejectionHandler)
 
+
+		// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`Closing SQL`)
         stack = new Error().stack
         psudeoSQL = 'MsSQL.close()'
         await sql.close()
+        // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`SQL Closed`)
         
         /*
 		**
 		** Setting pool to undefined seems to cause Error: No connection is specified for that request if a new pool is created.. ### Makes no sense
         
-		this.pool = undefined;
 		 
 		**
 		*/
@@ -590,7 +610,7 @@ class MsSQLDBI extends YadamuDBI {
 		timerAbort.abort()
         // this.pool = undefined
         this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE],`Error Closing Pool`)
-        throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,psudeoSQL))
+        throw this.getDatabaseException(this.DRIVER_ID,e,stack,psudeoSQL)
       }
 	} 
   }
@@ -614,12 +634,15 @@ class MsSQLDBI extends YadamuDBI {
   }
    
   async cancelRequest(expected) {
-	if (this.request) {
+	
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CANCEL REQUEST'],`cancelRequest(${(expected)}),${this.request.canceled}`)
+    
+	if (this.request.canceled === false) {
 	  let stack
       try {
 		if (!expected) {
 	      const e = new Error(`Unexpected Cancel Request`)
-          this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'REQUEST MANAGER'],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
+          this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'REQUEST MANAGER'],this.createDatabaseError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
         }
         const sqlStartTime = performance.now()
         stack = new Error().stack;
@@ -627,19 +650,29 @@ class MsSQLDBI extends YadamuDBI {
         await this.request.cancel()
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       } catch (e) {
-        const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.request.cancel()'))
+        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.request.cancel()')
         throw cause
       }
     }
   }  
    
   isExpectedCancellation (e) {
+	// console.log(this.CANCEL_REQUESTED)
     if (this.CANCEL_REQUESTED && (e instanceof MsSQLError) && e.cancelledOperation()) {
 	  this.CANCEL_REQUESTED = false
       return true
 	}
 	else {
 	  return false
+	}
+  }
+  
+  trackExceptions(err) {
+	if (!this.isExpectedCancellation(err)) {
+      return super.trackExceptions(err)
+	}
+	else {
+	  return err
 	}
   }
   
@@ -856,7 +889,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,sqlStatment))
+        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatment)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -885,7 +918,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,psuedoSQL))
+        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,psuedoSQL)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -921,7 +954,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,this.preparedStatement.sqlStatement))
+        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,this.preparedStatement.sqlStatement)
         if (attemptReconnect && cause.lostConnection()) {
           this.preparedStatement === undefined;
           attemptReconnect = false;
@@ -975,7 +1008,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-		const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,operation))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -1005,7 +1038,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-		const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -1030,8 +1063,7 @@ class MsSQLDBI extends YadamuDBI {
         // May need to use executeBatch if we support SQL Server 2000.
         results.push(await this.executeSQL(ddlStatement))
       } catch (e) {
-		console.log(e)
-        await this.rollbackTransaction()   
+		await this.rollbackTransaction()   
   	    this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	    return e
       } 
@@ -1151,7 +1183,7 @@ class MsSQLDBI extends YadamuDBI {
         }
         break;
       } catch (e) {
-        const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.begin()'))
+        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.begin()')
 		
         if (attemptReconnect && cause.lostConnection()) {
 
@@ -1166,7 +1198,7 @@ class MsSQLDBI extends YadamuDBI {
 	      } catch (e) {
 			if (e.code && (e.code !== 'EINVALIDSTATE')) {
               stack = new Error().stack
-  		      this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()'))
+  		      this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],this.createDatabaseError(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()'))
 			}
 	      }
 
@@ -1208,13 +1240,13 @@ class MsSQLDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
     } catch (e) {
-      const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.commit()'))
+      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.commit()')
       if (attemptReconnect && cause.lostConnection()) {
         attemptReconnect = false;
         // reconnect() throws cause if it cannot reconnect...
         await this.reconnect(cause,'COMMIT TRANSACTION')
       }
-      throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.commit()'))
+      throw this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.commit()')
     }
     
   }
@@ -1262,7 +1294,7 @@ class MsSQLDBI extends YadamuDBI {
 		return
       } catch (e) {
         this.EXPECTED_ROLLBACK = false;
-        let newIssue = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()'))
+        let newIssue = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()')
         if (attemptReconnect && newIssue.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -1281,7 +1313,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async createSavePoint() {
 
-    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber(),this.COPY_METRICS.written,this.COPY_METRICS.cached],``)
+    // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber(),this.PIPELINE_STATE.written,this.PIPELINE_STATE.cached],``)
 
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
@@ -1377,7 +1409,6 @@ class MsSQLDBI extends YadamuDBI {
 
 
   async processFile(hndl) {
-    try {
     
 	const typeMappings = await this.getVendorDataTypeMappings(MsSQLStatementGenerator)
     
@@ -1396,7 +1427,6 @@ class MsSQLDBI extends YadamuDBI {
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
 	 super.processLog(log,'OPENJSON',this.status, this.LOGGER)
      return log
-    } catch(e) {console.log(e)}
   }
   
   /*
@@ -1462,16 +1492,18 @@ class MsSQLDBI extends YadamuDBI {
     return results.recordsets[0]
   }
   
-  createParser(queryInfo,parseDelay) {
-    return new MsSQLParser(this,queryInfo,this.LOGGER,parseDelay)
+  _getParser(queryInfo,pipelineState) {
+    return new MsSQLParser(this,queryInfo,pipelineState,this.LOGGER)
   }  
-  
-  inputStreamError(cause,sqlStatement) {
-     return this.trackExceptions(((cause instanceof MsSQLError) || (cause instanceof CopyOperationAborted)) ? cause : new MsSQLError(this.DRIVER_ID,cause,new Error().stack,sqlStatement))
-  }
+       
+  async _getInputStream(queryInfo) {
 
-  async getInputStream(queryInfo) {
-
+    // if the previous pipleline operation failed, there will be a pending request that needs to cleared otherwise the close pool will hang
+	
+    if (this.ACTIVE_INPUT_STREAM === true) {
+	  await this.cancelRequest(true)
+	}
+	
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
     
@@ -1487,6 +1519,8 @@ class MsSQLDBI extends YadamuDBI {
 		if (typeof request.toReadableStream === 'function') {
           request.query(queryInfo.SQL_STATEMENT)
   	      is = request.toReadableStream()
+		  is.on('error',(err) => {
+		  })
 	    }
 		else {
 		  is = new MsSQLReader(request,queryInfo.SQL_STATEMENT,queryInfo.TABLE_NAME,this.LOGGER)
@@ -1494,7 +1528,7 @@ class MsSQLDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return is;
       } catch (e) {
-		const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement))
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -1506,7 +1540,7 @@ class MsSQLDBI extends YadamuDBI {
     } 	
 
   }      
-
+ 
   /*
   **
   ** The following methods are used by the YADAMU DBReader class
@@ -1521,12 +1555,12 @@ class MsSQLDBI extends YadamuDBI {
 	return this.statementCache
   }
 
-  getOutputStream(tableName,metrics) {
-     return super.getOutputStream(MsSQLWriter,tableName,metrics)
+  getOutputStream(tableName,pipelineState) {
+     return super.getOutputStream(MsSQLWriter,tableName,pipelineState)
   }
   
-  getOutputManager(tableName,metrics) {
-	 return super.getOutputManager(MsSQLOutputManager,tableName,metrics)
+  getOutputManager(tableName,pipelineState) {
+	 return super.getOutputManager(MsSQLOutputManager,tableName,pipelineState)
   }
   
   async setWorkerConnection() {

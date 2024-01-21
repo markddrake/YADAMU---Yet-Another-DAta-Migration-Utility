@@ -42,8 +42,8 @@ class OracleWriter extends YadamuWriter {
   **
   */
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
 	this.tempLobCount = 0;
 	this.cachedLobCount = 0;
 	this.partitionInfo = undefined;
@@ -138,6 +138,7 @@ class OracleWriter extends YadamuWriter {
 	  sqlStatement = sqlStatement.replace(/DESERIALIZE_GEOJSON/g,'DESERIALIZE_WKTGEOMETRY')
       const results = await this.dbi.executeSQL(sqlStatement,boundRow)
       this.adjustRowCounts(1)
+  	  this.dbi.resetExceptionTracking()
     } catch (cause) {
 	  this.handleIterativeError('INSERT ONE',cause,rowNumber,batch[0]);
     }
@@ -154,6 +155,7 @@ class OracleWriter extends YadamuWriter {
 	  sqlStatement = sqlStatement.replace(/DESERIALIZE_WKBGEOMETRY/g,'DESERIALIZE_WKTGEOMETRY')
       const results = await this.dbi.executeSQL(sqlStatement,boundRow)
       this.adjustRowCounts(1)
+	  this.dbi.resetExceptionTracking()
     } catch (cause) {
 	  this.handleIterativeError('INSERT ONE',cause,rowNumber,batch[0]);
     }
@@ -236,8 +238,8 @@ end;`
     // So we have to free the current tempLob Cache and create a new one for each batch
 	
     // console.log(this.tableInfo,batch)
-
-    let rows = undefined;
+	
+	let rows = undefined;
     let binds = undefined;
     const rowCount = batch.rows.length + batch.lobRows.length
 	
@@ -273,7 +275,7 @@ end;`
 	    await this.dbi.restoreSavePoint(cause);
 		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
-          this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
+          this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
           this.dml = this.avoidMutatingTable(this.dml);
           try {
             rows = batch.rows
@@ -294,12 +296,14 @@ end;`
           } catch (cause) {
   		    await this.reportBatchError(batch,`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
-            this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+            this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		    this.dbi.resetExceptionTracking()
             this.tableInfo.insertMode = 'Iterative';
           }
         } 
         else {  
-          this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+          this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+   		  this.dbi.resetExceptionTracking()
           this.tableInfo.insertMode = 'Iterative';
         }
 	  }
@@ -346,7 +350,7 @@ end;`
 
   async doDestroy(err) {
 	  
-    // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost],'doDestroy()')
+    // this.LOGGER.trace([this.constructor.name,this.PIPELINE_STATE.displayName,this.dbi.getWorkerNumber(),this.PIPELINE_STATE.received,this.PIPELINE_STATE.cached,this.PIPELINE_STATE.written,this.PIPELINE_STATE.skipped,this.PIPELINE_STATE.lost],'doDestroy()')
 
     if (this.triggersDisabled && (!this.PARTITIONED_TABLE  || (this.tableInfo.partitionsRemaining === 0))) {
 	  // this.LOGGER.trace([this.constructor.name,'doDestory()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')

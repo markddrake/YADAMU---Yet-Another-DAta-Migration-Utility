@@ -18,34 +18,33 @@ class YadamuCopyManager {
 	this.DEBUGGER = this.dbi.DEBUGGER
   } 
   
-  async reportCopyResults(tableName,metrics) {
+  async reportCopyResults(tableName,copyState) {
 
-    const elapsedTime = metrics.writerEndTime - metrics.writerStartTime
-	const throughput = Math.round((metrics.read/elapsedTime) * 1000)
+    const elapsedTime = copyState.endTime - copyState.startTime
+	const throughput = Math.round((copyState.read/elapsedTime) * 1000)
     const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${throughput} rows/s.`
    
     let rowCountSummary
-    switch (metrics.skipped) {
+    switch (copyState.skipped) {
 	  case 0:
-	    rowCountSummary = `Rows ${metrics.read}.`
+	    rowCountSummary = `Rows ${copyState.read}.`
         this.LOGGER.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
         break
       default:
-	    rowCountSummary = `Read ${metrics.read}. Written ${metrics.read - metrics.skipped}.`
+	    rowCountSummary = `Read ${copyState.read}. Written ${copyState.read - copyState.skipped}.`
         this.LOGGER.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        await this.dbi.reportCopyErrors(tableName,metrics)
+        await this.dbi.reportCopyErrors(tableName,copyState)
 	}
 	
 	/*
 	if (copyStatements.hasOwnProperty('partitionCount')) {
-	  this.dbi.yadamu.recordPartitionMetrics(tableName,metrics);  
+	  this.dbi.yadamu.recordPartitioncopyState(tableName,copyState);  
 	}   
 	else {
 	}
 	*/
 	
-    metrics.pipeStartTime = metrics.writerStartTime
-	this.dbi.yadamu.recordMetrics(tableName,metrics);  
+	this.dbi.yadamu.recordMetrics(tableName,copyState);  
   }
   
   async copyOperation(taskList,worker,mode,sourceVendor) {
@@ -57,10 +56,10 @@ class YadamuCopyManager {
     try {
       while (taskList.length > 0) {
 	    const task = taskList.shift();
-		const metrics = DBIConstants.NEW_COPY_METRICS
-	    metrics.insertMode = 'COPY'
-	    const results = await worker.copyOperation(task.TABLE_NAME,task.copyOperation,metrics)
-		this.reportCopyResults(task.TABLE_NAME,metrics)
+		const copyState = DBIConstants.PIPELINE_STATE
+	    copyState.insertMode = 'COPY'
+	    const results = await worker.copyOperation(task.TABLE_NAME,task.copyOperation,copyState)
+		this.reportCopyResults(task.TABLE_NAME,copyState)
       }
 	} catch (cause) {
 	  result = cause

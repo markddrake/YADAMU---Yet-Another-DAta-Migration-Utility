@@ -20,7 +20,7 @@ class MsSQLReader extends Readable {
 	  
 	  this.streamPaused = false;
 	  this.streamFailed = false;
-	  this.streamCanceled = false;
+	  this.streamCancelled = false;
 	  this.streamComplete = false;
 	  
 	  this.request.stream = true
@@ -39,7 +39,7 @@ class MsSQLReader extends Readable {
 		}
 	  }).on('error',(err, p) => {
         // this.LOGGER.trace([this.constructor.name,this.tableName,`sql.Request(stream).error()`],err)
-		if (this.streamCanceled && (err.code && (err.code === 'ECANCEL'))) {
+		if (this.streamCancelled && (err.code && (err.code === 'ECANCEL'))) {
 		  this.destroy();
 		  return;
 		}
@@ -82,7 +82,7 @@ class MsSQLReader extends Readable {
 	   if (!this.streamComplete) {
 		 try {
 		   await this.request.cancel();
-		   this.streamCanceled = true;
+		   this.streamCancelled = true;
 		 } catch (e) {
 	     }
 	   }

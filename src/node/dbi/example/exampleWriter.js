@@ -7,8 +7,8 @@ import YadamuWriter         from '../base/yadamuWriter.js';
 
 class ExampleWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,metrics,status,yadamuLogger) {
-    super(dbi,tableName,metrics,status,yadamuLogger)
+  constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
+    super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
      
   /*
@@ -36,6 +36,7 @@ class ExampleWriter extends YadamuWriter {
   		this.reportBatchError(`INSERT MANY`,cause,batch[0],batch[batch.length-1])
         await this.dbi.restoreSavePoint(cause);
         this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		this.dbi.resetExceptionTracking()
         this.tableInfo.insertMode = 'Iterative'    
       }
     }
