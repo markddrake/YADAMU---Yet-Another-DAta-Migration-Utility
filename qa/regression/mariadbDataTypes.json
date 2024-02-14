@@ -12,7 +12,7 @@
     "operation"       : "import"
   , "source"          : "file-staging"
   , "targets"         : [
-       "mariadb#1
+       "mariadb#1"
 	]
   , "verifyOperation" : true
   , "parameters"      : {

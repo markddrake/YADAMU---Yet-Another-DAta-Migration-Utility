@@ -21,7 +21,8 @@ import {
   YadamuError, 
   BatchInsertError, 
   IterativeInsertError, 
-  DatabaseError}         from '../../core/yadamuException.js'
+  DatabaseError
+}                        from '../../core/yadamuException.js'
 
 
 class YadamuWriter extends Writable {
@@ -467,6 +468,7 @@ class YadamuWriter extends Writable {
       this.PIPELINE_STATE.failed = true
       this.PIPELINE_STATE.errorSource = this.PIPELINE_STATE.errorSource || DBIConstants.OUTPUT_STREAM_ID
       this.STREAM_STATE.error = this.STREAM_STATE.error || (this.PIPELINE_STATE.errorSource === DBIConstants.OUTPUT_STREAM_ID) ? err : this.STREAM_STATE.error
+	  err.pipelineState = YadamuError.clonePipelineState(this.PIPELINE_STATE)
       
       try {
         // this.LOGGER.trace([this.constructor.name,'doDestroy()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')

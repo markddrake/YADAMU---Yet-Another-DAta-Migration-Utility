@@ -16,7 +16,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.441.0",
     "@aws-sdk/lib-storage": "^3.441.0",
-    "@azure/storage-blob": "12.16",
+    "@azure/storage-blob": "^12.17.0",
     "@electron/remote": "^2.0.12",
     "bootstrap": "^5.3.2",
     "bootstrap-icons": "^1.11.1",

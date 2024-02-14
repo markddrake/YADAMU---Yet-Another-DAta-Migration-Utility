@@ -1122,7 +1122,7 @@ class YadamuDBI extends EventEmitter {
     */
  
     if (this.IS_WRITER === true) {
-      if (this.PIPELINE_STATE.written > 0) {
+      if (this.PIPELINE_STATE?.written > 0) {
         this.LOGGER.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.PIPELINE_STATE.written} uncommitted rows discarded when connection lost.`)
         this.PIPELINE_STATE.lost += this.PIPELINE_STATE.written;
         this.PIPELINE_STATE.written = 0;

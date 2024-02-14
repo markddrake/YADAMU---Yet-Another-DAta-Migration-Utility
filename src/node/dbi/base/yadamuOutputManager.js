@@ -1,16 +1,29 @@
 
-import fs              from 'fs'
-import assert          from 'assert'
-import { performance } from 'perf_hooks';
+import fs                from 'fs'
+import assert            from 'assert'
+import { 
+  performance 
+}                        from 'perf_hooks';
 
-import {Readable, Writable, Transform, pipeline } from 'stream'
+import {
+  Readable, 
+  Writable, 
+  Transform, 
+  pipeline 
+}                        from 'stream'
 
-import YadamuLibrary   from '../../lib/yadamuLibrary.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary     from '../../lib/yadamuLibrary.js';
+import YadamuConstants   from '../../lib/yadamuConstants.js';
 
-import DBIConstants    from './dbiConstants.js'
+import DBIConstants      from './dbiConstants.js'
 
-import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError, InvalidMessageSequence} from '../../core/yadamuException.js'
+import {
+  YadamuError, 
+  BatchInsertError, 
+  IterativeInsertError, 
+  DatabaseError, 
+  InvalidMessageSequence
+}                        from '../../core/yadamuException.js'
 
 class YadamuOutputManager extends Transform {
 
@@ -430,6 +443,7 @@ class YadamuOutputManager extends Transform {
 	  this.PIPELINE_STATE.failed = true
       this.PIPELINE_STATE.errorSource = this.PIPELINE_STATE.errorSource || DBIConstants.TRANSFORMATION_STREAM_ID
 	  this.STREAM_STATE.error = this.STREAM_STATE.error || (this.PIPELINE_STATE.errorSource === DBIConstants.TRANSFORMATION_STREAM_ID) ? err : this.STREAM_STATE.error
+	  err.pipelineState = YadamuError.clonePipelineState(this.PIPELINE_STATE)
     }
 	
 	try {

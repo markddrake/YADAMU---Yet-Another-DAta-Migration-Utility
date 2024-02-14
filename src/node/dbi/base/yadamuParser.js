@@ -1,17 +1,21 @@
 
 import { 
   performance
-}                       from 'perf_hooks';
+}                        from 'perf_hooks';
 
 import {
   setTimeout 
-}                       from 'timers/promises'
+}                        from 'timers/promises'
 
 import { 
   Transform 
-}                       from 'stream';
+}                        from 'stream';
 
 import DBIConstants      from './dbiConstants.js';
+
+import {
+  YadamuError
+}                        from '../../core/yadamuException.js'
 
 class YadamuParser extends Transform {
 
@@ -140,6 +144,7 @@ class YadamuParser extends Transform {
       this.PIPELINE_STATE.failed = true
       this.PIPELINE_STATE.errorSource = this.PIPELINE_STATE.errorSource || DBIConstants.PARSER_STREAM_ID
 	  this.STREAM_STATE.error = this.STREAM_STATE.error || (this.PIPELINE_STATE.errorSource === DBIConstants.PARSER_STREAM_ID) ? err : this.STREAM_STATE.error
+	  err.pipelineState = YadamuError.clonePipelineState(this.PIPELINE_STATE)
     }  
 
   }

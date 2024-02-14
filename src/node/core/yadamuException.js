@@ -17,6 +17,28 @@ class YadamuError extends Error {
 	return ((e instanceof DatabaseError) && e.missingTable())
   }
      
+  // Create a simple clone of the pipeline state that ensures there are no recursive structures when appending currrent pipeline state to an error
+  
+  static clonePipelineState(state) {
+	 return {
+	   failed            : state.failed       
+	 , startTime         : state.startTime    
+     , endTime           : state.endTime      
+ 	 , read              : state.read         
+	 , parsed            : state.parsed       
+	 , received          : state.received     
+     , committed         : state.committed    
+     , cached            : state.cached       
+	 , pending           : state.pending      
+     , written           : state.written      
+     , skipped           : state.skipped      
+     , lost              : state.lost         
+	 , idleTime          : state.idleTime     
+     , batchNumber       : state.batchNumber  
+     , batchWritten      : state.batchWritten 
+	}
+  }	  
+	 
   static createIterativeException(dbi,tableInfo,cause,batchSize,rowNumber,row,info) {
 
 	const tableName = tableInfo.tableName

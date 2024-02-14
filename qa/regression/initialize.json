@@ -5,7 +5,6 @@
 , "recreateSchema"     : true
 , "targetSchemaSuffix" : ""
 , "parameters": {
-	   "SQL_TRACE" : "trace.sql"
   }
 , "tests"                  : [{
     "source": "oracle18c"

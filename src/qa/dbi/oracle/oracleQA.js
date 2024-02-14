@@ -47,7 +47,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
           await this.executeSQL(dropUser,{});      
 		  break;
         } catch (e) {
-		  if (e.lockingError() && (retryCount > 0)) {
+		  if ((e instanceof OracleError) && e.lockingError() && (retryCount > 0)) {
 			await setTimeout(1000)
 			retryCount--
 			continue
