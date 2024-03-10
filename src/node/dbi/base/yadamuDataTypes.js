@@ -56,6 +56,24 @@ class YadamuDataTypes {
     })()
     return this._TYPE_CONFIGURATION
   }
+  
+   get UNBOUNDED_TYPES() { 
+    this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([
+      this.TINYINT_TYPE, 
+	  this.SMALLINT_TYPE, 
+	  this.INTEGER_TYPE,
+	  this.BIGINT_TYPE,
+	  this.FLOAT_TYPE,
+	  this.DOUBLE_TYPE,
+	  this.BLOB_TYPE,
+	  this.CLOB_TYPE,
+	  this.NCLOB_TYPE,
+	  this.XML_TYPE,
+	  this.JSON_TYPE
+	])
+    return this._UNBOUNDED_TYPES;
+  }
+	
 
   constructor() {
     Object.assign(this,this.TYPE_CONFIGURATION.mappings)
@@ -681,9 +699,9 @@ class YadamuDataTypes {
                                                    
   set NCHAR_LENGTH(v)                       { YadamuDataTypes.redefineProperty(this,'NCHAR_LENGTH',v) }
                                                    
-  get NVACHAR_LENGTH()                      { return this.CHAR_LENGTH }    
+  get NVARCHAR_LENGTH()                     { return this.CHAR_LENGTH }    
                                                    
-  set NVACHAR_LENGTH(v)                     { YadamuDataTypes.redefineProperty(this,'NVACHAR_LENGTH',v) }
+  set NVARCHAR_LENGTH(v)                    { YadamuDataTypes.redefineProperty(this,'NVARCHAR_LENGTH',v) }
                                                    
   get BINARY_LENGTH()                       { return this.CHAR_LENGTH }    
                                                    
@@ -1005,14 +1023,9 @@ class YadamuDataTypes {
   }
 
   static recomposeDataType(typeDefinition) {
-      
-    // NUMBER(n,m) => {type:"NUMBER", length:n, scale:m}
-    // VARCHAR(n)  => {type:"VARCHAR", length:n}
-    // LONG VARCHAR(n) => {type:"LONG VARCHAR", length:n}
-    // TIMETSTAMP(n) WITH TIME ZONE => {type:"TIMESTAMP WITH TIME ZONE": length:n}
-    
-    // ### Need to test with "interval year(4) to month (2)"
-    
+     
+    // Reverse the mappings in decomposeDataTypes	 
+	      
 	switch (true) {
 	  case typeDefinition.hasOwnProperty('scale'):
          return `${typeDefinition.type}(${typeDefinition.length},${typeDefinition.scale})`

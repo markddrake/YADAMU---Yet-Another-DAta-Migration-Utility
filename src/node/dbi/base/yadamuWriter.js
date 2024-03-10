@@ -82,10 +82,8 @@ class YadamuWriter extends Writable {
       })
     })
     
-    this.dbi.activeWriters.add(writeOperation)  
-    
-    
-    
+    this.dbi.activeWriters.add(writeOperation)   
+        
     this.on('pipe',(src) => {
       this.batchManager = src
     })
@@ -112,6 +110,10 @@ class YadamuWriter extends Writable {
     })
   }       
   
+  rowsLost() {
+	return this.PIPELINE_STATE.lost > 0
+  }
+
   async initializeTable() {
     this.setTableInfo(this.tableName)   
 

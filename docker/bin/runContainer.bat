@@ -11,11 +11,10 @@ goto :eof
 :linuxContainer
   @set MAX_MEMORY="16g"
   @set SECURITY_OPTION="seccomp:unconfined"
-  @set HOSTS=
-  REM echo %HOSTS%
-  if defined MSSQL14 set HOST_LIST="MSSQL14-01:%MSSQL14%"
-  if defined HOST_LIST set HOSTS=--add-host=%HOST_LIST%
-  docker run --name %CONTAINER_NAME% --network YADAMU-NET --memory %MAX_MEMORY%  --security-opt %SECURITY_OPTION% -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt -e YADAMU_TEST_NAME=%YADAMU_TEST_NAME% %HOSTS% -e TESTNAME=%CONFIGURATION_FILE% -d %TARGET_IMAGE%
+  @set ADD_HOST=
+  if defined MSSQL12 set ADD_HOST=%ADD_HOST% --add-host=MSSQL12-01:%MSSQL12%
+  if defined MSSQL14 set ADD_HOST=%ADD_HOST% --add-host=MSSQL14-01:%MSSQL14%
+  docker run --name %CONTAINER_NAME% --network YADAMU-NET --memory %MAX_MEMORY%  --security-opt %SECURITY_OPTION% -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt -e YADAMU_TEST_NAME=%YADAMU_TEST_NAME% %ADD_HOST% -e TESTNAME=%CONFIGURATION_FILE% -d %TARGET_IMAGE%
   exit /b
 :end
 

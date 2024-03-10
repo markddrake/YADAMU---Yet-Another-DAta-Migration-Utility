@@ -61,6 +61,19 @@
             }
         }
     },
+    "mssql12": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL12-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
     "mssql14": {
         "mssql": {
             "user": "sa",

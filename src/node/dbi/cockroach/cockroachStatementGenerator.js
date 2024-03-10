@@ -62,9 +62,7 @@ class CockroachStatementGenerator extends YadamuStatementGenerator {
     const insertOperators = []
     
 	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
-	const columnDataTypes = targetDataTypes.map((targetDataType)  => {
-	  return targetDataType
-	})
+    const columnDataTypes = [...targetDataTypes]
 	const sizeConstraints = [...tableMetadata.sizeConstraints]
 	
 	// this.debugStatementGenerator(null,null)

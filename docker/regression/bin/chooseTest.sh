@@ -162,6 +162,12 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
   ;;
 
+  mssql12)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2012ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2012DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2012TestSuite
+  ;;
+
   db2)
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh db2ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh db2DataTypes

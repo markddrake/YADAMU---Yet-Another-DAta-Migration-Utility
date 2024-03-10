@@ -254,6 +254,13 @@ switch ($ENV:YADAMU_TEST_NAME) {
     break
   }
 
+  "mssql12" {
+	runRegressionTest "mssql2012ShortRegression"
+    runRegressionTest "mssql2012DataTypes"
+    runRegressionTest "mssql2012TestSuite"
+    break
+  }
+
   "db2" {
 	runRegressionTest "db2ShortRegression"
     runRegressionTest "db2DataTypes"

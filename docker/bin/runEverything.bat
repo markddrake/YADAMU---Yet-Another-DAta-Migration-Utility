@@ -5,10 +5,10 @@ for /f "tokens=1,2" %%i in ('docker info ^| findstr OSType') do set DOCKER_ENGIN
 if "%DOCKER_ENGINE%" == "linux" ( call :linuxContainer ) else ( call :windowsContainer)
 goto :eof
 :linuxContainer
-  if defined %1 set  MSSQL14=%1
+  if not defined MSSQL12 set /p MSSQL12="SQL Server 2012 IP Address :"
   if not defined MSSQL14 set /p MSSQL14="SQL Server 2014 IP Address :"
   docker rm %CONTAINER_NAME%
-  docker run --security-opt=seccomp:unconfined --name %CONTAINER_NAME% --memory="16g" -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt --network YADAMU-NET -e YADAMU_TEST_NAME=everything --add-host="MSSQL14-01:%MSSQL14%" -d yadamu/secure:latest
+  docker run --security-opt=seccomp:unconfined --name %CONTAINER_NAME% --memory="16g" -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt --network YADAMU-NET -e YADAMU_TEST_NAME=everything  --add-host="MSSQL12-01:%MSSQL12%" --add-host="MSSQL14-01:%MSSQL14%" -d yadamu/secure:latest
   docker logs %CONTAINER_NAME%
   exit /b
 :end
