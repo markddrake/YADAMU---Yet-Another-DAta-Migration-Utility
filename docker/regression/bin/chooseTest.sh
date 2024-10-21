@@ -51,11 +51,9 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
@@ -80,9 +78,6 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
@@ -102,13 +97,13 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oraclecCopy
   ;;
 
-  oracle23c)
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cShortRegression
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cDataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cTestSuite
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cLostConnection
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cCopy
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23cCopy
+  oracle23ai)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23aiShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23aiDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23aiTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23aiLostConnection
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23aiCopy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracle23aiCopy
   ;;
 
   oracle21c)
@@ -160,6 +155,14 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
+  ;;
+
+  mariadb)
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbTestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
   ;;
 
   mssql12)

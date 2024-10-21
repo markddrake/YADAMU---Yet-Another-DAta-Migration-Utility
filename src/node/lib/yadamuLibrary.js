@@ -1,11 +1,25 @@
 
-import fs from 'fs';
-import path from 'path';
-import url from 'url';
-import {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} from '../core/yadamuException.js';
-import {FileNotFound} from '../dbi/file/fileException.js';1
+import fs                 from 'fs';
+import path               from 'path';
+import url                from 'url';
+import util               from 'util';
+
+import {
+  YadamuError
+, UserError
+, CommandLineError
+, ConfigurationFileError
+, ConnectionError 
+}                         from '../core/yadamuException.js';
+import {
+  FileNotFound
+}                         from '../dbi/file/fileException.js';1
+
+import StringWriter       from '../util/stringWriter.js'
 
 class YadamuLibrary {
+	
+  static NOOP = () => {}
 
   static stringifyDuration(duration) {
   
@@ -67,12 +81,15 @@ class YadamuLibrary {
     }             
     return metadata
   }
+  
+  /*
 
   static pathSubstitutions(path) {
     return path.replace(/%date%/g,).replace(/%time%/g,).replace(/%isoDateTime%/,new Date().toISOString().replace(/:/g,'.'))
   }
 
-
+  */
+  
   static bfileToJSON(bfile) {
     return {dir: bfile.substr(bfile.indexOf("'"),bfile.indexOf(',')-2), file: bfile.substr(bfile.indexOf(',')+2,bfile.length-2)}
   }
@@ -202,6 +219,18 @@ class YadamuLibrary {
   }	
   
   static macroSubstitions(string,macros) {
+	
+	// Handle %date%,%time% and %timestamp% 
+
+    let date = new Date().toISOString()
+	
+	let re = new RegExp(`%date%`,'g')
+	string = string.replace(re,date.substring(0,10))
+	re = new RegExp(`%time%`,'g')	
+	string = string.replace(re,date.substring(12,17).replace(/:/g,'.'))
+	re = new RegExp(`%timestamp%`,'g')	
+	string = string.replace(re,date.replace(/:/g,'.'))
+	  
 	Object.keys(macros).forEach((macro) => {
       const re = new RegExp(`%${macro}%`,'g')
 	  string = string.replace(re,macros[macro])
@@ -209,7 +238,6 @@ class YadamuLibrary {
 	return string
   }
   
-
   static reportError(e) {
 	if ((e instanceof UserError) || (e instanceof FileNotFound) || (e instanceof CommandLineError)) {
       console.log(e.message);
@@ -442,6 +470,37 @@ class YadamuLibrary {
     return numericValue;
 	*/
   }
+  
+  /*
+  **
+  
+  static serialistatizeException(e) {
+    try {
+      const out = new StringWriter();
+      const err = new StringWriter();
+      const con = new console.Console(out,err);
+      con.dir(e, { depth: null });
+      const serialization = out.toString();
+      return serialization
+      this.os.write(`cause: ${strCause}\n`)
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  static serializeException(e) {
+    const stringWriter = new StringWriter()
+    stringWriter.write(e)
+    return stringWriter.toString()
+  }
+
+  ** 
+  */
+  
+  static serializeException(e) {
+    return util.inspect(e,{depth:null})
+  }
+
 }
 
 export { YadamuLibrary as default}

@@ -18,11 +18,11 @@ class VerticaConstants {
     return this._STATIC_PARAMETERS;
   }
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS() { 
-    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-    return this.#_DBI_PARAMETERS
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#DBI_PARAMETERS
   }
 
   static get COPY_TRIM_WHITEPSPACE()  { return this.DBI_PARAMETERS.COPY_TRIM_WHITEPSPACE === true }
@@ -36,3 +36,8 @@ class VerticaConstants {
 }
 
 export { VerticaConstants as default }
+
+const PGOID_DATE         = 1082; 
+const PGOID_TIMESTAMP    = 1114;
+const PGOID_TIMESTAMP_TZ = 1118;
+

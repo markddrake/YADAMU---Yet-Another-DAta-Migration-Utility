@@ -134,7 +134,12 @@ class OracleWriter extends YadamuWriter {
 	YadamuSpatialLibrary.recodeSpatialColumns('GeoJSON','WKT',this.tableInfo.targetDataTypes,batch,true)
     try {
 	  // Create a bound row by cloning the current set of binds and adding the column value.
-	  const boundRow = batch[0].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
+	  const boundRow = batch[0].map((col,idx) => {
+		return {
+		   ...binds[idx]
+		 , val: col
+		}
+	  })
 	  sqlStatement = sqlStatement.replace(/DESERIALIZE_GEOJSON/g,'DESERIALIZE_WKTGEOMETRY')
       const results = await this.dbi.executeSQL(sqlStatement,boundRow)
       this.adjustRowCounts(1)
@@ -149,7 +154,12 @@ class OracleWriter extends YadamuWriter {
 	YadamuSpatialLibrary.recodeSpatialColumns('WKB','WKT',this.tableInfo.targetDataTypes,batch,true)
     try {
 	  // Create a bound row by cloning the current set of binds and adding the column value.
-	  const boundRow = batch[0].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
+	  const boundRow = batch[0].map((col,idx) => {
+		 return {
+		   ...binds[idx]
+		 , val: col
+		 }
+	  })
       const spatialColumnList = this.tableInfo.targetDataTypes.reduce((columnList,dataType,idx) => { if (YadamuDataTypes.isSpatial(dataType)) columnList.push(idx); return columnList},[])        
       spatialColumnList.forEach((colIdx) => {boundRow[colIdx] = {type : oracledb.DB_TYPE_CLOB, maxSize : boundRow[colIdx].val.length, val:boundRow[colIdx].val}})
 	  sqlStatement = sqlStatement.replace(/DESERIALIZE_WKBGEOMETRY/g,'DESERIALIZE_WKTGEOMETRY')
@@ -270,8 +280,13 @@ end;`
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-		// Report Batch Error throws cause if there are lost rows.
-		await this.reportBatchError(`INSERT MANY`,cause,rows) 
+		if (cause.spatialWKBPolygonError()) {
+		  this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`"${cause.message}" encountered while peforming batch operation with WKB content. Switching to Iterative mode.`);          
+		}
+		else {
+		  // Report Batch Error throws cause if there are lost rows.
+		  await this.reportBatchError(`INSERT MANY`,cause,rows) 
+		}
 	    await this.dbi.restoreSavePoint(cause);
 		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
@@ -302,7 +317,9 @@ end;`
           }
         } 
         else {  
-          this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+          if (!cause.spatialWKBPolygonError()) {
+		    this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+		  }
    		  this.dbi.resetExceptionTracking()
           this.tableInfo.insertMode = 'Iterative';
         }
@@ -318,7 +335,12 @@ end;`
         try {
 		  // Create a bound row by cloning the current set of binds and adding the column value.
 		  // boundRow = await Promise.all([... new Array(rows[row].length).keys()].map(async (i) => {const bind = Object.assign({},binds[i]); bind.val=await rows[row][i]; return bind}))
-		  const boundRow = rows[row].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
+		  const boundRow = rows[row].map((col,idx) => {
+			return {
+			  ...binds[idx]
+			, val: col
+			}
+		  })
           const results = await this.dbi.executeSQL(this.dml,boundRow)
 		  this.adjustRowCounts(1)
         } catch (cause) {

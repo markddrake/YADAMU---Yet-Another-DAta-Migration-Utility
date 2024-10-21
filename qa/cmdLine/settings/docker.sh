@@ -33,7 +33,7 @@ unset MSSQL22_DBNAME
 # MySQL Connection Information
 unset MYSQL_USER
 unset MYSQL_PWD
-export MYSQL_HOST=MYSQL81-01
+export MYSQL_HOST=MYSQL90-01
 unset MYSQL_PORT
 unset MYSQL_DBNAME
 # Oracle 19c Connection Information
@@ -55,7 +55,7 @@ unset ORACLE11G_PWD
 # Postgres Connection Information
 unset POSTGRES_USER
 unset POSTGRES_PWD
-export POSTGRES_HOST=PGSQL16-01
+export POSTGRES_HOST=PGSQL17-01
 unset POSTGRES_PORT
 unset POSTGRES_DBNAME
 # Relative location of export files to be used for testing

@@ -39,7 +39,7 @@ class TeradataWorker {
             const results = this._executeSQL(message.sql, message.args)
             parentPort.postMessage({action:action, sql: message.sql, success: true, rows: results})
           } catch(e) {
-            parentPort.postMessage({action: action, sql: message.sql, success: false, cause: Object.assign({},e),  name : e.constructor.name})
+            parentPort.postMessage({action: action, sql: message.sql, success: false, cause: {...e},  name : e.constructor.name})
           }  
           break;
         case 'connect': 

@@ -3,20 +3,20 @@ import {
   setTimeout 
 }                       from "timers/promises"
 
-import MariadbDBI       from '../../../node/dbi//mariadb/mariadbDBI.js';
-import MariadbError     from '../../../node/dbi//mariadb/mariadbException.js'
-import MariadbConstants from '../../../node/dbi//mariadb/mariadbConstants.js';
+import MariadbDBI       from '../../../node/dbi/mariadb/mariadbDBI.js';
+import MariadbError     from '../../../node/dbi/mariadb/mariadbException.js'
+import MariadbConstants from '../../../node/dbi/mariadb/mariadbConstants.js';
 
 import Yadamu           from '../../core/yadamu.js';
 import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 
 class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
 
-	static #_DBI_PARAMETERS
+	static #DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
-	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MariadbConstants.DATABASE_KEY] || {},{RDBMS: MariadbConstants.DATABASE_KEY}))
-	   return this.#_DBI_PARAMETERS
+	   this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MariadbConstants.DATABASE_KEY] || {},{RDBMS: MariadbConstants.DATABASE_KEY}))
+	   return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {

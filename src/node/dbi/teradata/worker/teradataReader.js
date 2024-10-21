@@ -3,6 +3,8 @@ import {
   Readable
 }                      from 'stream';
 
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
 import { 
   TeradataError 
 }                                     from '../teradataException.js'
@@ -13,7 +15,7 @@ class TeradataReader extends Readable {
     constructor(worker,connectionProperties,sqlStatement,tableName,fetchSize) {
       super({objectMode:true}) 
       this.worker = worker
-      this.vendorProperties = connectionProperties
+      this.CONNECTION_PROPERTIES = connectionProperties
       this.sqlStatement = sqlStatement
       this.tableName = tableName
       this.readPending = false;
@@ -50,7 +52,7 @@ class TeradataReader extends Readable {
  
   async doConstruct() {
       
-    // const result = await this.enqueueTask({action : "connect", connectionProperties : this.vendorProperties})
+    // const result = await this.enqueueTask({action : "connect", connectionProperties : this.CONNECTION_PROPERTIES})
     const response = await this.enqueueTask({action : "query", sql: this.sqlStatement, batchSize: this.fetchSize})
     this.stagingArea.push(...response.rows)
 	this.recordsRead+=response.rows.length
@@ -98,7 +100,7 @@ class TeradataReader extends Readable {
   }
     
   _read() {
-    this.doRead().then(() => {}).catch((e) => {this.destroy(e)})
+    this.doRead().then(YadamuLibrary.NOOP).catch((e) => {this.destroy(e)})
   }
   
   async doDestroy(e) {

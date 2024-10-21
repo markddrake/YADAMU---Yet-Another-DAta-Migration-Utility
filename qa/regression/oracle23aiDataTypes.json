@@ -13,7 +13,7 @@
 		{
 			"operation": "import",
 			"source": "file-staging",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"verifyOperation": true,
 			"parameters": {
 				"DIRECTORY": "export/json/%location%"
@@ -23,78 +23,78 @@
 			]
 		},
 		{
-			"source": "oracle23c",
-			"target": "oracle23c",
+			"source": "oracle23ai",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "oracle#1",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "oracle18c",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "oracle12c",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "oracle11g",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "mssql#1",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "mssql19",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "postgres#1",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "mysql#1",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "mariadb#1",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"tasks": [
 				"postgresDataTypes"
 			]
 		},
 		{
 			"source": "mongodb#1",
-			"target": "oracle23c",
+			"target": "oracle23ai",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
@@ -103,7 +103,7 @@
 			]
 		},
 		{
-			"source": "oracle23c",
+			"source": "oracle23ai",
 			"targets": [
 				"oracle#1",
 				"oracle18c",

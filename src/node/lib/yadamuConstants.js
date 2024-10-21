@@ -47,7 +47,10 @@ class YadamuConstants {
   }
 
   static get YADAMU_PARAMETERS() { 
-    this._YADAMU_PARAMETERS = this._YADAMU_PARAMETERS || Object.freeze(Object.assign({},this.STATIC_PARAMETERS,this.YADAMU_CONFIGURATION.yadamu))
+    this._YADAMU_PARAMETERS = this._YADAMU_PARAMETERS || Object.freeze({
+	  ...this.STATIC_PARAMETERS
+	, ...this.YADAMU_CONFIGURATION.yadamu
+	})
 	return this._YADAMU_PARAMETERS
   }
   
@@ -133,10 +136,19 @@ class YadamuConstants {
   }
   
   static get MACROS() {
-	this._MACROS = this._MACROS || Object.freeze({ timestamp: new Date().toISOString().replace(/:/g,'.')})
+	this._MACROS = this._MACROS || Object.freeze({ 
+	  startTimestamp: new Date().toISOString().replace(/:/g,'.')
+    , startDate: new Date().toLocaleString('en-SE').substring(0,10)
+	, startTime: new Date().toLocaleString('en-SE').substring(12,17).replace(/:/g,'.')
+	})
 	return this._MACROS
   }
 
+  static get FILE_BASED_DRIVERS() {
+   this._FILE_BASED_DRIVERS = this._FILE_BASED_DRIVERS || Object.freeze(['file','awsS3File'])
+   return this._FILE_BASED_DRIVERS
+  } 
+  
 }
 
 export { YadamuConstants as default}

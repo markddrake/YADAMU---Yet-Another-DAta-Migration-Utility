@@ -8,11 +8,11 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
   
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AWSS3Constants.DATABASE_KEY] || {},{RDBMS: AWSS3Constants.DATABASE_KEY}))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AWSS3Constants.DATABASE_KEY] || {},{RDBMS: AWSS3Constants.DATABASE_KEY}))
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -23,6 +23,7 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
     super(yadamu,manager,connectionSettings,parameters)
   }
 
+
   async initializeImport() {
     if (this.options.recreateSchema === true) {
  	  await this.recreateSchema();
@@ -30,14 +31,6 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
     await super.initializeImport();
   }	
 
-  setConnectionProperties(connectionProperties) {
-    if (connectionProperties.hasOwnProperty('yadamuOptions')) {
-	  Object.assign(this.s3Options,connectionProperties.yadamuOptions)
-	  delete connectionProperties.yadamuOptions
-	}
-    super.setConnectionProperties(connectionProperties)
-  }
-  
   classFactory(yadamu) {
     return new AWSS3QA(yadamu,this,this.connectionParameters,this.parameters)
   }}

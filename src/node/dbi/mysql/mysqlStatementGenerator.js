@@ -45,6 +45,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 		const tableName = tableMetadata.tableName;
         const tableInfo = statementCache[tableName];
 		tableInfo.columnNames = tableMetadata.columnNames
+        tableInfo.columnMappings = tableMetadata.source?.columnMappings || {}
 		
 		const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		

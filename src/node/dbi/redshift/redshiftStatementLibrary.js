@@ -3,28 +3,28 @@ import YadamuConstants from '../../lib/yadamuConstants.js';
 
 class RedshiftStatementLibrary {
     
-  static get SQL_CONFIGURE_CONNECTION()       { return _SQL_CONFIGURE_CONNECTION }
-  static get SQL_SYSTEM_INFORMATION()         { return _SQL_SYSTEM_INFORMATION }
-  static get SQL_SCHEMA_INFORMATION()         { return _SQL_SCHEMA_INFORMATION }
-  static get SQL_GET_DLL_STATEMENTS()         { return _SQL_GET_DLL_STATEMENTS }
-  static get SQL_BEGIN_TRANSACTION()          { return _SQL_BEGIN_TRANSACTION }
-  static get SQL_COMMIT_TRANSACTION()         { return _SQL_COMMIT_TRANSACTION }
-  static get SQL_ROLLBACK_TRANSACTION()       { return _SQL_ROLLBACK_TRANSACTION }
-  static get SQL_CREATE_SAVE_POINT()          { return _SQL_CREATE_SAVE_POINT }  
-  static get SQL_RESTORE_SAVE_POINT()         { return _SQL_RESTORE_SAVE_POINT }
-  static get SQL_RELEASE_SAVE_POINT()         { return _SQL_RELEASE_SAVE_POINT }
+  static get SQL_CONFIGURE_CONNECTION()       { return SQL_CONFIGURE_CONNECTION }
+  static get SQL_SYSTEM_INFORMATION()         { return SQL_SYSTEM_INFORMATION }
+  static get SQL_SCHEMA_INFORMATION()         { return SQL_SCHEMA_INFORMATION }
+  static get SQL_GET_DLL_STATEMENTS()         { return SQL_GET_DLL_STATEMENTS }
+  static get SQL_BEGIN_TRANSACTION()          { return SQL_BEGIN_TRANSACTION }
+  static get SQL_COMMIT_TRANSACTION()         { return SQL_COMMIT_TRANSACTION }
+  static get SQL_ROLLBACK_TRANSACTION()       { return SQL_ROLLBACK_TRANSACTION }
+  static get SQL_CREATE_SAVE_POINT()          { return SQL_CREATE_SAVE_POINT }  
+  static get SQL_RESTORE_SAVE_POINT()         { return SQL_RESTORE_SAVE_POINT }
+  static get SQL_RELEASE_SAVE_POINT()         { return SQL_RELEASE_SAVE_POINT }
   
-  static get SQL_COPY_STATUS()                { return _SQL_COPY_STATUS }
-  static get SQL_COPY_ERRORS()                { return _SQL_COPY_ERRORS }
-  static get SQL_COPY_ERROR_SUMMARY()         { return _SQL_COPY_ERROR_SUMMARY }
-  static get SQL_SUPER_ERROR_SUMMARY()        { return _SQL_SUPER_ERROR_SUMMARY }
+  static get SQL_COPY_STATUS()                { return SQL_COPY_STATUS }
+  static get SQL_COPY_ERRORS()                { return SQL_COPY_ERRORS }
+  static get SQL_COPY_ERROR_SUMMARY()         { return SQL_COPY_ERROR_SUMMARY }
+  static get SQL_SUPER_ERROR_SUMMARY()        { return SQL_SUPER_ERROR_SUMMARY }
 }
 
 export { RedshiftStatementLibrary as default }
 
-const _SQL_CONFIGURE_CONNECTION = `SET timezone to 'UTC'; SET extra_float_digits to 2; SET enable_case_sensitive_identifier TO true;`
+const SQL_CONFIGURE_CONNECTION = `SET timezone to 'UTC'; SET extra_float_digits to 2; SET enable_case_sensitive_identifier TO true;`
 
- const _SQL_SCHEMA_INFORMATION  =
+const SQL_SCHEMA_INFORMATION  =
 `           select t.table_schema as "TABLE_SCHEMA"
                  ,t.table_name as "TABLE_NAME"
 	             ,c.column_name as "COLUMN_NAME"
@@ -47,24 +47,24 @@ const _SQL_CONFIGURE_CONNECTION = `SET timezone to 'UTC'; SET extra_float_digits
              and t.table_schema =  $1
             order by t.table_schema, t.table_name, c.ORDINAL_POSITION`
 			
-const _SQL_SYSTEM_INFORMATION   = `select current_database() as database_name,current_user, session_user, version() as database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSOF')::char(39),6) as timezone, YADAMU_INSTANCE_ID() as YADAMU_INSTANCE_ID, YADAMU_INSTALLATION_TIMESTAMP() as YADAMU_INSTALLATION_TIMESTAMP`;
+const SQL_SYSTEM_INFORMATION   = `select current_database() as database_name,current_user, session_user, version() as database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSOF')::char(39),6) as timezone, YADAMU_INSTANCE_ID() as YADAMU_INSTANCE_ID, YADAMU_INSTALLATION_TIMESTAMP() as YADAMU_INSTALLATION_TIMESTAMP`;
 
-const _SQL_BEGIN_TRANSACTION    = `begin transaction`
+const SQL_BEGIN_TRANSACTION    = `begin transaction`
 
-const _SQL_COMMIT_TRANSACTION   = `commit transaction`
+const SQL_COMMIT_TRANSACTION   = `commit transaction`
 
-const _SQL_ROLLBACK_TRANSACTION = `rollback transaction`
+const SQL_ROLLBACK_TRANSACTION = `rollback transaction`
 
-const _SQL_CREATE_SAVE_POINT    = `savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
+const SQL_CREATE_SAVE_POINT    = `savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
-const _SQL_RESTORE_SAVE_POINT   = `rollback to savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
+const SQL_RESTORE_SAVE_POINT   = `rollback to savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
-const _SQL_RELEASE_SAVE_POINT   = `release savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
+const SQL_RELEASE_SAVE_POINT   = `release savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
-const _SQL_COPY_STATUS          = `select lines_scanned from stl_load_commits where query = pg_last_copy_id()`
+const SQL_COPY_STATUS          = `select lines_scanned from stl_load_commits where query = pg_last_copy_id()`
 
-const _SQL_COPY_ERRORS          = `select count(*) from stl_load_errors where query = pg_last_copy_id()`
+const SQL_COPY_ERRORS          = `select count(*) from stl_load_errors where query = pg_last_copy_id()`
 
-const _SQL_COPY_ERROR_SUMMARY   = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where query = pg_last_copy_id()` 
+const SQL_COPY_ERROR_SUMMARY   = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where query = pg_last_copy_id()` 
 
-const _SQL_SUPER_ERROR_SUMMARY  = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where starttime = (select max(starttime) from stl_load_errors where session = pg_backend_pid()) and session = pg_backend_pid()` 
+const SQL_SUPER_ERROR_SUMMARY  = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where starttime = (select max(starttime) from stl_load_errors where session = pg_backend_pid()) and session = pg_backend_pid()` 

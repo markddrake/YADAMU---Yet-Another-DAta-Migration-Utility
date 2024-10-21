@@ -12,11 +12,11 @@ import FileDBI             from '../../../node/dbi/file/fileDBI.js';
 
 class FileQA extends FileDBI {
    
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 	
   static get DBI_PARAMETERS()  { 
-	 this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,FileDBI.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[FileDBI.DATABASE_KEY] || {},{RDBMS: FileDBI.DATABASE_KEY}))
-	 return this.#_DBI_PARAMETERS
+	 this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,FileDBI.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[FileDBI.DATABASE_KEY] || {},{RDBMS: FileDBI.DATABASE_KEY}))
+	 return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {

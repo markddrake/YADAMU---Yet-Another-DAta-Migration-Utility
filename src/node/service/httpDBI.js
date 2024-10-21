@@ -1,6 +1,7 @@
 "use strict" 
 
-import FileDBI from '../dbi/file/fileDBI.js';
+import FileDBI                        from '../dbi/file/fileDBI.js';
+import YadamuLibrary                  from '../lib/yadamuLibrary.js'
 
 /*
 **
@@ -33,6 +34,9 @@ class HttpDBI extends FileDBI {
 
   async initializeImport() {
 	this.outputStream = this.httpStream;
+	this.osErrorHandler = YadamuLibrary.NOOP
+	this.outputStream.on('error',this.osErrorHandler)
+
   }
 
   closeInputStream() {      

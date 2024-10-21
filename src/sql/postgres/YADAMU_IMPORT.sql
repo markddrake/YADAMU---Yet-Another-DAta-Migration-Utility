@@ -1134,7 +1134,7 @@ begin
 
   return JSONB_BUILD_OBJECT(
                     'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(10) || '   ' || V_COLUMNS_CLAUSE || CHR(10) || ')'
-                    ,'dml', 'INSERT into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '"(' || V_COLUMN_LIST || ')' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')'
+                    ,'dml', 'INSERT into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '"(' || V_COLUMN_LIST || ') OVERRIDING SYSTEM VALUE ' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')'
                     ,'targetDataTypes', V_TARGET_DATA_TYPES
                );
 end;  

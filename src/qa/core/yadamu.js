@@ -31,21 +31,31 @@ const YadamuDefaults          = JSON.parse(fs.readFileSync(join(__dirname,'../cf
 
 class Yadamu extends _Yadamu {
   
-  static #_YADAMU_PARAMETERS
-  static #_DBI_PARAMETERS
+  static #YADAMU_PARAMETERS
+  static #DBI_PARAMETERS
+  
+  #TERMINATION_CONFIGURATION = undefined
     
   static get QA_CONFIGURATION()   { return YadamuDefaults };    
   static get QA_DRIVER_MAPPINGS() { return this.QA_CONFIGURATION.drivers }
   
   static get YADAMU_PARAMETERS() { 
-    this.#_YADAMU_PARAMETERS = this.#_YADAMU_PARAMETERS || Object.freeze(Object.assign({},{MODE: DBIConstants.MODE},_Yadamu.YADAMU_PARAMETERS,this.QA_CONFIGURATION.yadamu))
-	return this.#_YADAMU_PARAMETERS
+    this.#YADAMU_PARAMETERS = this.#YADAMU_PARAMETERS || Object.freeze({
+	  MODE: DBIConstants.MODE
+	, ..._Yadamu.YADAMU_PARAMETERS
+	, ...this.QA_CONFIGURATION.yadamu
+	})
+	return this.#YADAMU_PARAMETERS
   }
   
   // YADAMU_PARAMETERS merged with the yadamuDBI section of the Master Configuration File and the yadamuDBI section of the QA Master Configuration File
   static get DBI_PARAMETERS()  {
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},this.YADAMU_PARAMETERS,DBIConstants.DBI_PARAMETERS,this.QA_CONFIGURATION.yadamuDBI))
-    return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+	  ...this.YADAMU_PARAMETERS
+	, ...DBIConstants.DBI_PARAMETERS
+    , ...this.QA_CONFIGURATION.yadamuDBI
+    })
+    return this.#DBI_PARAMETERS
   }
 
   get LOGGER() {
@@ -68,10 +78,10 @@ class Yadamu extends _Yadamu {
    
   get MODE()                  { return this.parameters.MODE  || this.DBI_PARAMETERS.MODE }
 
-  get KILL_READER()           { return this.killConfiguration.process  === 'READER' }
-  get KILL_WRITER()           { return this.killConfiguration.process  === 'WRITER' }
-  get KILL_WORKER()           { return this.killConfiguration.worker }
-  get KILL_DELAY()            { return this.killConfiguration.delay }
+  get KILL_READER()           { return this.#TERMINATION_CONFIGURATION.process  === 'READER' }
+  get KILL_WRITER()           { return this.#TERMINATION_CONFIGURATION.process  === 'WRITER' }
+  get KILL_WORKER()           { return this.#TERMINATION_CONFIGURATION.worker }
+  get KILL_DELAY()            { return this.#TERMINATION_CONFIGURATION.delay }
 
   get IDENTIFIER_MAPPINGS()   { return super.IDENTIFIER_MAPPINGS }
   set IDENTIFIER_MAPPINGS(v)  { this._IDENTIFIER_MAPPINGS = v || this.IDENTIFIER_MAPPINGS }
@@ -121,13 +131,15 @@ class Yadamu extends _Yadamu {
     return metrics;
   }
 		
-  configureTermination(configuration) {
-    // Kill Configuration is added by YADAMU-QA
-    this.killConfiguration = configuration
+  set TERMINATION_CONFIGURATION(configuration) {
+    // Termination Configuration is added by YADAMU-QA
+	this.#TERMINATION_CONFIGURATION = configuration
   }
-
-  terminateConnection(role,workerNumber) {
-    return (this.killConfiguration && (this.killConfiguration.process === role) && ((this.killConfiguration.worker === workerNumber )  || ((this.killConfiguration.worker === undefined) && (workerNumber === 'Manager'))))
+ 
+  get TERMINATION_CONFIGURATION() { return this.#TERMINATION_CONFIGURATION }
+  
+  scheduleLostConnectionTest(role,workerNumber) {
+	return (this.TERMINATION_CONFIGURATION && (this.TERMINATION_CONFIGURATION.process === role) && ((this.TERMINATION_CONFIGURATION.worker === workerNumber )  || ((this.TERMINATION_CONFIGURATION.worker === undefined) && (workerNumber === 'Manager'))))
   } 
   
   invalidParameter(parameterName) {
@@ -147,8 +159,8 @@ class Yadamu extends _Yadamu {
 
     if (metrics.read - metrics.committed - metrics.lost - metrics.skipped !== 0) {
 	  const tags = []
-	  if (this.killConfiguration) {
-		 tags.push('KILL',this.killConfiguration.process, this.PARALLEL ? 'SEQUENTIAL' : 'PARALLEL', this.ON_ERROR)
+	  if (this.TERMINATION_CONFIGURATION) {
+		 tags.push('KILL',this.TERMINATION_CONFIGURATION.process, this.PARALLEL ? 'SEQUENTIAL' : 'PARALLEL', this.ON_ERROR)
 	  }
 	  this.LOGGER.qaWarning([...tags,`${tableName}`,`${metrics.insertMode}`,`INCONSISTENT METRICS`],`read: ${metrics.read}, parsed: ${metrics.parsed}, received:  ${metrics.received}, committed: ${metrics.committed}, skipped: ${metrics.skipped}, lost: ${metrics.lost}, pending: ${metrics.pending}, written: ${metrics.written}, cached: ${metrics.cached}.`)  
     } 

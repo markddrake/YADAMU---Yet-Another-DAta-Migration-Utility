@@ -14,11 +14,11 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class DB2QA extends YadamuQALibrary.qaMixin(DB2DBI) {
 
-	static #_DBI_PARAMETERS
+	static #DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
-	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,DB2Constants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[DB2Constants.DATABASE_KEY] || {},{RDBMS: DB2Constants.DATABASE_KEY}))
-	   return this.#_DBI_PARAMETERS
+	   this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,DB2Constants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[DB2Constants.DATABASE_KEY] || {},{RDBMS: DB2Constants.DATABASE_KEY}))
+	   return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {

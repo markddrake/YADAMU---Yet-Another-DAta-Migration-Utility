@@ -131,11 +131,24 @@ class LoaderDBI extends YadamuDBI {
   static get SOFTWARE_VENDOR()       { return LoaderConstants.SOFTWARE_VENDOR};
   static get PROTOCOL()              { return LoaderConstants.PROTOCOL }
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_DBI_PARAMETERS
+	// Delete FILE iherited from YADAMU_CONFIGURATION
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(
+	  (() => {
+  	    const parms = {
+          ...DBIConstants.DBI_PARAMETERS
+        , ...YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}
+	    }
+	    delete parms.FILE
+	    delete parms.CIPHER
+	    delete parms.ENCRYPTION
+	    delete parms.SALT
+	    return parms
+	  })()
+	)
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -150,7 +163,9 @@ class LoaderDBI extends YadamuDBI {
   get PROTOCOL()                   { return LoaderDBI.PROTOCOL };
   
   get DBI_PARAMETERS()    { 
-	this._DBI_PARAMETERS = this._DBI_PARAMETERS || Object.freeze(Object.assign({},super.DBI_PARAMETERS,{}))
+	this._DBI_PARAMETERS = this._DBI_PARAMETERS || Object.freeze({
+	  ...super.DBI_PARAMETERS
+	})
 	return this._DBI_PARAMETERS
   }
   
@@ -176,7 +191,7 @@ class LoaderDBI extends YadamuDBI {
 	*/
 	
     return this._BASE_DIRECTORY || (() => {
-	  let baseDirectory =  this.vendorProperties.directory || ""
+	  let baseDirectory =  this.CONNECTION_PROPERTIES.directory || ""
 	  if (this.DIRECTORY) {
         if (path.isAbsolute(this.DIRECTORY)) {
 	      baseDirectory = this.DIRECTORY
@@ -244,8 +259,8 @@ class LoaderDBI extends YadamuDBI {
 	return this._FILE_EXTENSION
   }
 
-  get COMPRESSED_CONTENT()     { return (this.COMPRESSION_FORMAT !== 'NONE') }
-  get ENCRYPTED_CONTENT()      { return this.yadamu.ENCRYPTION && this.yadamu.ENCRYPTION !== 'NONE' }
+  get USE_COMPRESSION()        { return this.COMPRESSION !== 'NONE' }
+  get USE_ENCRYPTION()         { return this.parameters.hasOwnProperty('ENCRYPTION') ? (this.parameters.ENCRYPTION !== false) : this.yadamu.ENCRYPTION !== false }
 
   get COMPRESSED_INPUT()       { return this.controlFile.settings.compression !== "NONE" }
   get COMPRESSION_FORMAT()     { return this.controlFile.settings.compression }
@@ -255,11 +270,17 @@ class LoaderDBI extends YadamuDBI {
   get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR }
   get IV_LENGTH()              { return 16 }  
   
+  addVendorExtensions(connectionProperties) {
+
+    // connectionProperties.directory   = this.parameters.DIRECTORY || connectionProperties.directory 
+    return connectionProperties
+
+  }
   
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
 	this.yadamuProperties = {}
-	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
+	this.baseDirectory = path.resolve(this.CONNECTION_PROPERTIES.directory || "")
 	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }    	
  
@@ -281,12 +302,6 @@ class LoaderDBI extends YadamuDBI {
   
   makeCloudPath(target) {
 	return target
-  }
-  
-  updateVendorProperties(vendorProperties) {
-
-  // vendorProperties.directory   = this.parameters.DIRECTORY || vendorProperties.directory 
-	
   }
   
   isDatabase() {
@@ -349,7 +364,12 @@ class LoaderDBI extends YadamuDBI {
 	  , SPATIAL_FORMAT        : this.INBOUND_SPATIAL_FORMAT
 	  } 
       if (this.yadamu.PARALLEL_ENABLED && this.PARTITION_LEVEL_OPERATIONS && Array.isArray(this.controlFile.data[tableName].files)) {
-	    const partitionInfo = this.controlFile.data[tableName].files.map((fileName,idx) => { return Object.assign({}, tableInfo, { PARTITION_COUNT: this.controlFile.data[tableName].files.length, PARTITION_NUMBER: idx+1 })})
+	    const partitionInfo = this.controlFile.data[tableName].files.map((fileName,idx) => { 
+		  return {
+		    ...tableInfo
+		  , PARTITION_COUNT: this.controlFile.data[tableName].files.length, PARTITION_NUMBER: idx+1 
+		  }
+        })
 		return partitionInfo
 	  }
       return tableInfo
@@ -369,7 +389,7 @@ class LoaderDBI extends YadamuDBI {
   	  settings : {
   	    contentType        : this.OUTPUT_FORMAT
       , compression        : this.yadamu.COMPRESSION
-	  , encryption         : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
+	  , encryption         : this.USE_ENCRYPTION ? this.CIPHER : 'NONE'
 	  , baseFolder         : this.IMPORT_FOLDER
       },
 	}
@@ -383,7 +403,7 @@ class LoaderDBI extends YadamuDBI {
   
   dataRelativePath(tableName) {
      let filename = `${tableName}.${this.FILE_EXTENSION}`
-	 filename = this.COMPRESSED_CONTENT ? `${filename}.gz` : filename
+	 filename = this.USE_COMPRESSION ? `${filename}.gz` : filename
 	 return path.relative(this.CONTROL_FILE_FOLDER,path.join(this.DATA_FOLDER,filename))
   }
   
@@ -460,6 +480,15 @@ class LoaderDBI extends YadamuDBI {
 	this.CONTROL_FILE_PATH  = `${path.join(controlFileFolder,schema)}.json`
 	this.setDescription(this.CONTROL_FILE_FOLDER)
   }      
+
+  async initialize() {
+    await super.initialize()
+	this.ENCRYPTION_KEY = this.parameters.PASSPHRASE 
+	                    ? await this.yadamu.generateCryptoKey(this.parameters)
+				  	    : this.yadamu.ENCRYPTION_KEY_AVAILABLE  
+				 	    ? this.yadamu.ENCRYPTION_KEY
+				 	    : undefined
+  }
   
   async initializeImport() {
 	 
@@ -541,14 +570,14 @@ class LoaderDBI extends YadamuDBI {
 	})
 	streams.push(transformationManager)
 	
-	if (this.COMPRESSED_CONTENT) {
+	if (this.USE_COMPRESSION) {
       streams.push(this.COMPRESSION_FORMAT === 'GZIP' ? createGzip() : createDeflate())
     }
 	
-	if (this.ENCRYPTED_CONTENT) {
+	if (this.USE_ENCRYPTION) {
 	  const iv = await this.createInitializationVector()
-	  // console.log('Cipher',this.getDataFileName(tableName),this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
-	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
+	  // console.log('Cipher',this.getDataFileName(tableName),this.CIPHER,this.ENCRYPTION_KEY,iv)
+	  const cipherStream = crypto.createCipheriv(this.CIPHER,this.ENCRYPTION_KEY,iv)
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(iv))
 	}
@@ -649,8 +678,8 @@ class LoaderDBI extends YadamuDBI {
 	if (this.ENCRYPTED_INPUT) {
 	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',filename,this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv)
-	  const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+  	  // console.log('Decipher',filename,this.controlFile.settings.encryption,this.ENCRYPTION_KEY,iv)
+	  const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.ENCRYPTION_KEY,iv)
 	  streams.push(decipherStream)
 	}
 
@@ -731,6 +760,7 @@ class LoaderDBI extends YadamuDBI {
     this.CONTROL_FILE_PATH = this.manager.CONTROL_FILE_PATH
 	this.controlFile = this.manager.controlFile
 	this.statementCache = this.manager.statementCache
+	this.ENCRYPTION_KEY = this.manager.ENCRYPTION_KEY
   }
   
   reloadControlFile() {
@@ -772,8 +802,8 @@ class LoaderDBI extends YadamuDBI {
     if (this.ENCRYPTED_INPUT) {
       const iv = await this.loadInitializationVector(filename)
       streams.push(new IVReader(this.IV_LENGTH))
-      // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
-      const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+      // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.ENCRYPTION_KEY,iv);
+      const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.ENCRYPTION_KEY,iv)
       streams.push(decipherStream);
     }
    

@@ -151,7 +151,9 @@ async function createWindow (operation,configuration) {
 
 async function validateConnection(dbiClassPath,connectionSettings,parameters) {
   const DBI = await import(dbiClassPath)
-  const connectionInfo = Object.assign({}, connectionSettings);
+  const connectionInfo = {
+    ...connectionSettings
+  }
   const dbi = new DBI.default(yadamu,null,connectionInfo,parameters);
   await dbi.testConnection()
   return dbi

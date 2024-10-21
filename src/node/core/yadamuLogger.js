@@ -1,7 +1,6 @@
 
 import fs            from 'fs';
 import path          from 'path';
-import util          from 'util';
 
 import {Readable}    from 'stream'
 import {pipeline}    from 'stream/promises'
@@ -70,10 +69,10 @@ class YadamuLogger {
     **
     */
     let exceptionFolderPath = value
-    let exceptionFolderRoot = this.FILE_LOGGER ? path.dirname(this.os.path) : process.cwd() 
+    let exceptionFolderRoot = this.FILE_BASED_LOGWRITER ? path.dirname(this.os.path) : process.cwd() 
     
     exceptionFolderPath = ((exceptionFolderPath === null) || (exceptionFolderPath === undefined)) ? YadamuLogger.EXCEPTION_FOLDER : exceptionFolderPath
-    exceptionFolderPath = YadamuLibrary.pathSubstitutions(exceptionFolderPath)
+    exceptionFolderPath = YadamuLibrary.macroSubstitions(exceptionFolderPath,[])
     exceptionFolderPath = exceptionFolderPath === '' ? exceptionFolderRoot : exceptionFolderPath
     exceptionFolderPath = (!path.isAbsolute(exceptionFolderPath)) ? path.join(exceptionFolderRoot,exceptionFolderPath) : exceptionFolderPath
     this._EXCEPTION_FOLDER_PATH = exceptionFolderPath;
@@ -93,24 +92,30 @@ class YadamuLogger {
   set EXCEPTION_FILE_PREFIX(value) {
     let exceptionFilePrefix = value
     exceptionFilePrefix = ((exceptionFilePrefix === null) || (exceptionFilePrefix === undefined)) ? YadamuLogger.EXCEPTION_FILE_PREFIX : exceptionFilePrefix
-    exceptionFilePrefix = YadamuLibrary.pathSubstitutions(exceptionFilePrefix)
+    exceptionFilePrefix = YadamuLibrary.macroSubstitions(exceptionFilePrefix,[])
     this._EXCEPTION_FILE_PREFIX = exceptionFilePrefix
   }
   
-  get EXCEPTION_FILE_PREFIX() { return this._EXCEPTION_FILE_PREFIX || YadamuLibrary.pathSubstitutions(YadamuLogger.EXCEPTION_FILE_PREFIX) }
+  get EXCEPTION_FILE_PREFIX() { return this._EXCEPTION_FILE_PREFIX || YadamuLibrary.macroSubstitions(YadamuLogger.EXCEPTION_FILE_PREFIX,[]) }
   
   get YADAMU_STACK_TRACE() {
      return process.env.YADAMU_STACK_TRACE && process.env.YADAMU_STACK_TRACE.trim().toUpperCase() === 'TRUE' 
   }
   
-  get FILE_LOGGER() {
-     return this._FILE_LOGGER
+  get FILE_BASED_LOGGER() {
+    switch (true) {
+      case (this.os === NullWriter.NULL_WRITER):
+      case (this.os === process.stdout):
+         return false
+      default:
+        return true
+	}
   }
   
-  set FILE_LOGGER(v) {
-     this._FILE_LOGGER = v;
+  get CONSOLE_BASED_LOGGER() {
+	 return (this.os === process.stdout)
   }
-   
+  
   static fileLogger(logFilePath,state,exceptionFolder,exceptionFilePrefix) {
 	if ((logFilePath === undefined) || (logFilePath === '') || (logFilePath === null)) {
 	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER]: Invalid value supplied for parameter LOG_FILE (${logFilePath}). Logging to console`); 
@@ -121,7 +126,7 @@ class YadamuLogger {
       const os = fs.createWriteStream(absolutePath,{flags : "a"})
       return new this.LOGGER_CLASS(os,state,exceptionFolder,exceptionFilePrefix)
     } catch (e) {
-	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER]: Unable to create log file "${absolutePath}". Logging to console`); 
+	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER][FILE]: Unable to create log file "${absolutePath}". Logging to console`); 
       return this.console.Logger(state,exceptionFolder,exceptionFilePrefix)
     }
   }
@@ -130,6 +135,15 @@ class YadamuLogger {
     return new this.LOGGER_CLASS(process.stdout,state,exceptionFolder,exceptionFilePrefix)
   }
   
+  static streamLogger(os,state,exceptionFolder,exceptionFilePrefix) {
+    try {
+      return new this.LOGGER_CLASS(os,state,exceptionFolder,exceptionFilePrefix)
+    } catch (e) {
+	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER][STREAM]: Unable to create log file from supplied stream". Logging to console`); 
+      return this.console.Logger(state,exceptionFolder,exceptionFilePrefix)
+    }
+  }
+
   constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
    
     this.os = outputStream !== undefined ? outputStream : process.out
@@ -137,14 +151,6 @@ class YadamuLogger {
     this.EXCEPTION_FOLDER_PATH = exceptionFolder
     this.EXCEPTION_FILE_PREFIX = exceptionFilePrefix
     this.resetMetrics();
-    switch (true) {
-      case (this.os === NullWriter.NULL_WRITER):
-      case (this.os === process.stdout):
-         this.FILE_LOGGER = false;
-         break;
-      default:
-        this.FILE_LOGGER = true;
-    }
   }
   
   switchOutputStream(os) {
@@ -220,24 +226,6 @@ class YadamuLogger {
     return this.log(args,msg)
   }
 
-  serializeException(e) {
-    return util.inspect(e,{depth:null})
-  }
-
-  serializeException1(e) {
-    try {
-      const out = new StringWriter();
-      const err = new StringWriter();
-      const con = new console.Console(out,err);
-      con.dir(e, { depth: null });
-      const serialization = out.toString();
-      return serialization
-      this.os.write(`cause: ${strCause}\n`)
-    } catch (e) {
-      console.log(e);
-    }
-  }
-
   logDatabaseError(e) {
     this.os.write(`${e.message}\n`);
     this.os.write(`${e.stack}\n`)
@@ -246,7 +234,7 @@ class YadamuLogger {
       this.logOracleError(e)
     }
     if (e.cause instanceof Error) {
-      this.os.write(`cause: ${this.serializeException(e.cause)}\n`)
+      this.os.write(`cause: ${YadamuLibrary.serializeException(e.cause)}\n`)
     }
   }
   
@@ -267,7 +255,7 @@ class YadamuLogger {
       this.logDatabaseError(e);
     }
     else {
-      this.os.write(`${this.serializeException(e)}\n`)
+      this.os.write(`${YadamuLibrary.serializeException(e)}\n`)
     }
     e.yadamuAlreadyReported = true;
   }
@@ -293,7 +281,7 @@ class YadamuLogger {
 
     const errorLog = this.createLogFile(exceptionFile)
     fs.writeSync(errorLog,`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${e.message}\n`)
-    fs.writeSync(errorLog,this.serializeException(e));
+    fs.writeSync(errorLog,YadamuLibrary.serializeException(e));
     fs.closeSync(errorLog)
   }
   
@@ -457,7 +445,9 @@ class YadamuLogger {
   }
   
   getMetrics(reset) {
-    const metrics = Object.assign({},this.metrics)
+    const metrics = {
+		...this.metrics
+    }
     if (reset) this.resetMetrics();
     return metrics
   }
@@ -475,7 +465,7 @@ class YadamuLogger {
   
   async close() {
 
-    if (this.FILE_LOGGER) {
+    if (this.FILE_BASED_LOGWRITER) {
       await this.closeStream()
       this.os = process.stdout
     }    

@@ -115,6 +115,10 @@ class MariadbOutputManger extends YadamuOutputManger {
 	  
       this.rowTransformation(row)
 
+     
+	  /*
+	  **
+	  
       // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
 
       if (this.tableInfo.insertMode === 'Iterative') {
@@ -124,7 +128,14 @@ class MariadbOutputManger extends YadamuOutputManger {
         this.batch.push(...row);
   
 	  }
-    
+	  
+	  **
+	  */
+	  
+      // V3 Driver supports array based multi-row inserts using 'Batch'
+
+      this.batch.push(row);
+
       this.PIPELINE_STATE.cached++
 	  return this.skipTable;
 	} catch (e) {

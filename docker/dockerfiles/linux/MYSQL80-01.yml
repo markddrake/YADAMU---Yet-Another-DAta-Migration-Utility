@@ -3,7 +3,7 @@ services:
 
   MYSQL80-01: 
     container_name: MYSQL80-01
-    image:  mysql:8.0
+    image:  mysql:8.0.37
     command: --secure-file-priv=/mnt/shared  
     mem_limit: '10gb'
     shm_size: '4gb'
@@ -30,3 +30,4 @@ volumes:
   YADAMU_01-SHARED:
     name: YADAMU_01-SHARED
   MYSQL80-01-VOLUME:
+

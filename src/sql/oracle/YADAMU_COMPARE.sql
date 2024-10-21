@@ -391,8 +391,23 @@ $END
 				 else 
 				   't."' || atc.COLUMN_NAME || '"'
 			   end
-			   || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
-			 
+			   $IF DBMS_DB_VERSION.VERSION < 23 $THEN
+			      /*
+				  ** 23ai Suprise of the day
+				  **
+				  ** SQL> select case when t."WAREHOUSE_SPEC" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."WAREHOUSE_SPEC"  AS CLOB),4) end from OE.WAREHOUSES t
+                  ** 2  /
+                  ** select when t."WAREHOUSE_SPEC" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."WAREHOUSE_SPEC"  AS CLOB),4) end from OE.WAREHOUSES t
+                  ** ERROR at line 1:
+                  ** ORA-28817: PL/SQL function returned an error.
+                  ** ORA-06512: at "SYS.DBMS_CRYPTO_FFI", line 632
+                  ** ORA-06512: at "SYS.DBMS_CRYPTO", line 289
+				  **
+				  */
+			      || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   $ELSE 
+			      || '  AS BLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   $END
 			 /*
 			 **
 			 ** Order JSON when required. Ordering is typically required when the JSON has been stored in an engine that uses a binary format which does not preserve the order of the keys inside an object

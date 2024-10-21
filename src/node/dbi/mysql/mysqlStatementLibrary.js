@@ -1,20 +1,23 @@
 
-import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuConstants                from '../../lib/yadamuConstants.js';
+import MySQLConstants                 from './mysqlConstants.js'
 
 class MySQLStatementLibrary {
-    
-  // Until we have static constants
 
-  static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
-  static get SQL_GET_CONNECTION_INFORMATION()                 { return _SQL_GET_CONNECTION_INFORMATION }
-  static get SQL_SHOW_SYSTEM_VARIABLES()                      { return _SQL_SHOW_SYSTEM_VARIABLES }
-  static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
-  static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
-  static get SQL_INFORMATION_SCHEMA_FROM_CLAUSE()             { return _SQL_INFORMATION_SCHEMA_FROM_CLAUSE }
-  static get SQL_CREATE_SAVE_POINT()                          { return _SQL_CREATE_SAVE_POINT }  
-  static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
-  static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
+  static get SQL_CONFIGURE_CONNECTION()                       { return SQL_CONFIGURE_CONNECTION }
+  static get SQL_GET_CONNECTION_INFORMATION()                 { return SQL_GET_CONNECTION_INFORMATION }
+  static get SQL_SHOW_SYSTEM_VARIABLES()                      { return SQL_SHOW_SYSTEM_VARIABLES }
+  static get SQL_SYSTEM_INFORMATION()                         { return SQL_SYSTEM_INFORMATION }
+  static get SQL_INFORMATION_SCHEMA_FROM_CLAUSE()             { return SQL_INFORMATION_SCHEMA_FROM_CLAUSE }
+  static get SQL_CREATE_SAVE_POINT()                          { return SQL_CREATE_SAVE_POINT }  
+  static get SQL_RESTORE_SAVE_POINT()                         { return SQL_RESTORE_SAVE_POINT }
+  static get SQL_RELEASE_SAVE_POINT()                         { return SQL_RELEASE_SAVE_POINT }
 
+  static get SQL_GET_MAX_ALLOWED_PACKET()                     { return SQL_GET_MAX_ALLOWED_PACKET }
+  static get SQL_SET_MAX_ALLOWED_PACKET()                     { return SQL_SET_MAX_ALLOWED_PACKET }
+
+  static get SQL_MYSQL2_DOUBLE_ISSUE()                        { return SQL_MYSQL2_DOUBLE_ISSUE }
+   
   get SCHEMA_INFORMATION_SELECT_CLAUSE() {
     this._SCHEMA_INFORMATION_SELECT_CLAUSE = this._SCHEMA_INFORMATION_SELECT_CLAUSE || (() => {       
       return `select c.table_schema "TABLE_SCHEMA"
@@ -72,6 +75,11 @@ class MySQLStatementLibrary {
                             when data_type = 'float' then
                               -- Render Floats with greatest possible precision 
                              concat('cast("',column_name,'" as DOUBLE) "',column_name,'"')
+						    ${ this.dbi.MYSQL2_DOUBLE_ISSUE ? 
+                            `when data_type = 'double' then
+                              -- Render Double as CHAR
+							concat('cast("',column_name,'" as char(64)) "',column_name,'"')` : ''
+							}
                             else
                               concat('"',column_name,'"')
                           end
@@ -93,19 +101,21 @@ class MySQLStatementLibrary {
   constructor(dbi) {
     this.dbi = dbi
   }
+  
+
 }  
 
 export { MySQLStatementLibrary as default }
 
-const _SQL_CONFIGURE_CONNECTION       = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESSION INTERACTIVE_TIMEOUT = 600000, WAIT_TIMEOUT = 600000, SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH', GROUP_CONCAT_MAX_LEN = 1024000, GLOBAL LOCAL_INFILE = 'ON'`
+const SQL_CONFIGURE_CONNECTION       = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESSION INTERACTIVE_TIMEOUT = 600000, WAIT_TIMEOUT = 600000, SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH', GROUP_CONCAT_MAX_LEN = 1024000, GLOBAL LOCAL_INFILE = 'ON'`
 
-const _SQL_GET_CONNECTION_INFORMATION = `select version() "DATABASE_VERSION"`
+const SQL_GET_CONNECTION_INFORMATION = `select version() "DATABASE_VERSION"`
 
-const _SQL_SHOW_SYSTEM_VARIABLES      = `show variables where Variable_name='lower_case_table_names'`;
+const SQL_SHOW_SYSTEM_VARIABLES      = `show variables where Variable_name='lower_case_table_names'`;
 
-const _SQL_SYSTEM_INFORMATION         = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET", YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP"`;                     
+const SQL_SYSTEM_INFORMATION         = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET", YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP"`;                     
 
-const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE =
+const SQL_INFORMATION_SCHEMA_FROM_CLAUSE =
 `   from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name 
     and c.extra <> 'VIRTUAL GENERATED'
@@ -114,8 +124,14 @@ const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE =
     and t.table_schema = ?
       group by t.table_schema, t.table_name`;
      
-const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+ const SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+ const SQL_RESTORE_SAVE_POINT = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RELEASE_SAVE_POINT = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+ const SQL_RELEASE_SAVE_POINT = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+
+ const SQL_GET_MAX_ALLOWED_PACKET = `SELECT @@MAX_ALLOWED_PACKET`
+
+ const SQL_SET_MAX_ALLOWED_PACKET = `SET GLOBAL MAX_ALLOWED_PACKET=${MySQLConstants.MAX_ALLOWED_PACKET}`
+    
+ const SQL_MYSQL2_DOUBLE_ISSUE = `select ? as "DOUBLE_VALUE"`

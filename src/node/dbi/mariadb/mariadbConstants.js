@@ -1,11 +1,12 @@
 
-import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js'
 
 class MariadbConstants {
 
   static get DATABASE_KEY()               { return 'mariadb' };
   static get SOFTWARE_VENDOR()            { return 'MariaDB Corporation AB' };
   static get DATABASE_VENDOR()            { return 'MariaDB' };
+  static get MAX_ALLOWED_PACKET()         { return 1 * 1024 * 1024 * 1024 };
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
@@ -17,11 +18,11 @@ class MariadbConstants {
     return this._STATIC_PARAMETERS;
   }
   
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS() { 
-    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-    return this.#_DBI_PARAMETERS
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#DBI_PARAMETERS
   }
 
   static get BOOLEAN_STORAGE_OPTION()     { return this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION}
@@ -40,6 +41,7 @@ class MariadbConstants {
     , dateStrings       : true
     , rowsAsArray       : true
     , trace             : true
+	, maxAllowedPacket  : MariadbConstants.MAX_ALLOWED_PACKET
     })
    return this._CONNECTION_PROPERTY_DEFAULTS;
   }

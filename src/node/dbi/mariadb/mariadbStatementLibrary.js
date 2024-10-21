@@ -1,5 +1,6 @@
 
-import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuConstants                from '../../lib/yadamuConstants.js';
+import MariadbConstants               from './mariadbConstants.js'
 
 class MariadbStatementLibrary {
     
@@ -13,7 +14,10 @@ class MariadbStatementLibrary {
   static get SQL_CREATE_SAVE_POINT()                          { return _SQL_CREATE_SAVE_POINT }  
   static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
-  
+
+  static get SQL_GET_MAX_ALLOWED_PACKET()                     { return _SQL_GET_MAX_ALLOWED_PACKET }
+  static get SQL_SET_MAX_ALLOWED_PACKET()                     { return _SQL_SET_MAX_ALLOWED_PACKET }
+
   get SQL_SCHEMA_INFORMATION() {
      this._SQL_SCHEMA_INFORMATION = this._SQL_SCHEMA_INFORMATION || (() => { 
        return `select c.table_schema "TABLE_SCHEMA"   
@@ -136,3 +140,7 @@ const _SQL_CREATE_SAVE_POINT          = `SAVEPOINT ${YadamuConstants.SAVE_POINT_
 const _SQL_RESTORE_SAVE_POINT         = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
 const _SQL_RELEASE_SAVE_POINT         = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+
+const _SQL_GET_MAX_ALLOWED_PACKET = `SELECT @@MAX_ALLOWED_PACKET`
+
+const _SQL_SET_MAX_ALLOWED_PACKET = `SET GLOBAL MAX_ALLOWED_PACKET=${MariadbConstants.MAX_ALLOWED_PACKET}`

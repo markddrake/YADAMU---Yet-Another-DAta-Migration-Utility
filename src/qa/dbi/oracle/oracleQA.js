@@ -23,11 +23,11 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
     static get SQL_FAILED()                { return _SQL_FAILED }
     static get SQL_GATHER_SCHEMA_STATS()   { return _SQL_GATHER_SCHEMA_STATS }
 
-	static #_DBI_PARAMETERS
+	static #DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
-	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[OracleConstants.DATABASE_KEY] || {},{RDBMS: OracleConstants.DATABASE_KEY}))
-	   return this.#_DBI_PARAMETERS
+	   this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[OracleConstants.DATABASE_KEY] || {},{RDBMS: OracleConstants.DATABASE_KEY}))
+	   return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {
@@ -58,7 +58,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 		 throw e
        }
 	 }
-     const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.vendorProperties.password}`;
+     const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.CONNECTION_PROPERTIES.password}`;
      await this.executeSQL(createUser,{});      
    }  
      

@@ -25,7 +25,7 @@ class DBWriter extends Writable {
     this.transactionManager = this.dbi
     this.currentTable   = undefined;
     this.ddlCompleted   = false;
-    this.deferredCallback = () => {}
+    this.deferredCallback = YadamuLibrary.NOOP
   }  
   
   getOutputStream() {
@@ -61,9 +61,38 @@ class DBWriter extends Writable {
     const ddlStatements = this.dbi.analyzeStatementCache(statementCache,startTime)
     if (!this.ddlCompleted) {
       // Execute DDL Statements Asynchronously - Emit dllComplete when ddl execution is finished. 
-      this.executeDDL(ddlStatements).then(() => {}).catch((e) => {console.log(e)})
+      this.executeDDL(ddlStatements).then(YadamuLibrary.NOOP).catch((e) => {console.log(e)})
     }
   }   
+
+  compareMetadata(source,target) {
+	  
+	if (source.skipColumnReordering) {
+	  return {}
+	}
+	  
+    let columnMappings = source.columnNames.reduce((columnMappings,columnName,idx) => {
+      if (target.columnNames[idx] !== source.columnNames[idx]) {
+        const targetIdx = target.columnNames.indexOf(columnName) 
+          columnMappings[columnName] = {
+            source : idx
+          , target : targetIdx 
+          } 
+      }
+      return columnMappings
+    },{})
+    columnMappings = target.columnNames.reduce((columnMappings,columnName,idx) => {
+      const sourceIdx = source.columnNames.indexOf(columnName) 
+      if (sourceIdx < 0) {
+        columnMappings[columnName] = {
+          source : sourceIdx
+        , target : idx 
+        } 
+      }
+      return columnMappings
+    },columnMappings)
+    return columnMappings
+  }
 
   async setMetadata(sourceMetadata) {
     /*
@@ -88,8 +117,7 @@ class DBWriter extends Writable {
 
       // Generate the target metadata
       const targetMetadata = this.generateMetadata(targetSchemaInfo,false)
-	  
-      // Apply table Mappings 
+	  // Apply table Mappings 
       if (this.dbi.tableMappings !== undefined)  {
         targetMetadata = this.dbi.applyTableMappings(targetMetadata,this.dbi.tableMappings)     
       }
@@ -126,15 +154,16 @@ class DBWriter extends Writable {
       }   
 	    
 	  sourceTableNames.forEach((sourceTableName,sourceIdx) => {
-	  if (targetTableNames.includes(sourceTableName)) {
-	      const tableMetadata = Object.assign({},sourceMetadataArray[sourceIdx])
+	    if (targetTableNames.includes(sourceTableName)) {
+          const tableMetadata = {...sourceMetadataArray[sourceIdx]}
+          tableMetadata.columnMappings = this.compareMetadata(sourceMetadataArray[sourceIdx],targetMetadataArray[targetTableNames.indexOf(sourceTableName)])
           Object.assign(sourceMetadataArray[sourceIdx],targetMetadataArray[targetTableNames.indexOf(sourceTableName)])
           sourceMetadataArray[sourceIdx].source = tableMetadata
 		  sourceMetadataArray.vendor = this.DATABASE_VENDOR
 		}
       })
     }
-	await this.generateStatementCache(sourceMetadata)
+    await this.generateStatementCache(sourceMetadata)
   }      
   
   async initialize() {

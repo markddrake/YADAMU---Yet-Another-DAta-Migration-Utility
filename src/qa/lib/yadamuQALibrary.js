@@ -59,7 +59,7 @@ class YadamuQALibrary {
     
     async initialize() {
 	  await super.initialize();
-      if (this.yadamu.terminateConnection(this.ROLE,this.getWorkerNumber())) {
+	  if (this.yadamu.scheduleLostConnectionTest(this.ROLE,this.getWorkerNumber())) {
         const pid = await this.getConnectionID();
         this.scheduleTermination(pid,this.getWorkerNumber());
       }
@@ -69,7 +69,7 @@ class YadamuQALibrary {
       await super.initializeWorker(manager);
       const idx = this.getWorkerNumber()
       // Manager needs to schedule termination of worker.
-      if (this.yadamu.terminateConnection(this.ROLE,idx)) {
+	  if (this.yadamu.scheduleLostConnectionTest(this.ROLE,idx)) {
         const pid = await this.getConnectionID();
         this.manager.scheduleTermination(pid,idx);
       }
@@ -83,7 +83,7 @@ class YadamuQALibrary {
     }   
 	
     getTerminationTags(workerId,processId) {
-	  return ['KILL',this.DATABASE_VENDOR,this.yadamu.killConfiguration.process,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.killConfiguration.delay,processId]
+	  return ['KILL',this.DATABASE_VENDOR,this.ROLE,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.TERMINATION_CONFIGURATION.delay,processId]
     }
 
     async compareResultSets(tableName, sourceSQL, targetSQL) {

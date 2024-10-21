@@ -39,11 +39,14 @@ class AzureDBI extends CloudDBI {
   **
   */
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...AzureConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -65,17 +68,24 @@ class AzureDBI extends CloudDBI {
   }
   
   get STORAGE_ID() { return this.CONTAINER }
-													
-  constructor(yadamu,manager,connectionSettings,parameters) {
-    // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu,manager,connectionSettings,parameters)
-  }   
-  
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new AzureError(driverId,cause,stack,sql)
+ 
+  redactPasswords() {
+   
+    const connectionProperties = structuredClone(this.CONNECTION_PROPERTIES)
+	
+	const keyValues =  connectionProperties.connection.split(';') 
+  	
+    const keyValue = keyValues[2].split('=')
+	keyValue[1] = '#REDACTED'
+	keyValues[2] = keyValue.join('=')
+
+    connectionProperties.connection = keyValues.join(';')
+	connectionProperties.password = '#REDACTED'
+	return connectionProperties
+	
   }
-  
-  getVendorProperties() {
+   
+  addVendorExtensions(connectionProperties) {
 
     /*
 	**
@@ -89,8 +99,9 @@ class AzureDBI extends CloudDBI {
 	** BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
 	**
 	*/
-	
-	const keyValues = this.vendorProperties = typeof this.vendorProperties  === 'string' ? this.vendorProperties.split(';') : ['DefaultEndpointsProtocol=','AccountName=','AccountKey=','BlobEndpoint=']
+		
+
+	const keyValues = typeof connectionProperties.connection  === 'string' ? connectionProperties.connection.split(';') : ['DefaultEndpointsProtocol=','AccountName=','AccountKey=','BlobEndpoint=']
 	
 	let keyValue = keyValues[0].split('=')
 	keyValue[1] = this.parameters.PROTOCOL || keyValue[1]
@@ -98,10 +109,12 @@ class AzureDBI extends CloudDBI {
 	
 	keyValue = keyValues[1].split('=')
 	keyValue[1] = this.parameters.USERNAME || keyValue[1]
+	connectionProperties.user = keyValue[1]
 	keyValues[1] = keyValue.join('=')
 	
     keyValue = keyValues[2].split('=')
 	keyValue[1] = this.parameters.PASSWORD || keyValue[1]
+	connectionProperties.password = keyValue[1]
 	keyValues[2] = keyValue.join('=')
 
     keyValue = keyValues[3].split('=')
@@ -110,26 +123,50 @@ class AzureDBI extends CloudDBI {
 	try {
 	  url = new URL(url ? url : 'http://0.0.0.0')
 	} catch (e) {
-      this.logger.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${vendorProperties.endpoint}"`)
+      this.logger.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${connectionProperties}"`)
 	  this.LOGGER.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
 	  url = new URL('http://0.0.0.0')
 	}
 
     url.protocol                      = this.parameters.PROTOCOL  || url.protocol 
+    connectionProperties.protocol     = url.protocol 
 	url.hostname                      = this.parameters.HOSTNAME || url.hostname
+    connectionProperties.host         = url.hostname
 	url.port                          = this.parameters.PORT || url.port
+    connectionProperties.port         = url.port
+    connectionProperties.database     = url.pathname
 	url                               = url.toString()
+
 	
 	keyValue[1] = url
 	keyValues[3] = keyValue.join('=')
+	  
 
-	return keyValues.join(';');
-
+	const connectionInfo = { 
+	  connection : keyValues.join(';')
+	}
+	
+	connectionProperties = { 
+	   ...connectionProperties,
+	   ...connectionInfo
+	}
+	
+	return connectionProperties
+	
   }
-
+  
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    // Export File Path is a Directory for in Load/Unload Mode
+    super(yadamu,manager,connectionSettings,parameters)
+  }   
+  
+  createDatabaseError(driverId,cause,stack,sql) {
+    return new AzureError(driverId,cause,stack,sql)
+  }
+  
   async createConnectionPool() {
 	// this.LOGGER.trace([this.constructor.name],`BlobServiceClient.fromConnectionString()`)
-    this.cloudConnection = BlobServiceClient.fromConnectionString(this.vendorProperties);
+    this.cloudConnection = BlobServiceClient.fromConnectionString(this.CONNECTION_PROPERTIES.connection);
 	this.cloudService = new AzureStorageService(this,{})
   }
   

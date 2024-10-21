@@ -470,6 +470,8 @@ class YadamuWriter extends Writable {
       this.PIPELINE_STATE.failed = true
       this.PIPELINE_STATE.errorSource = this.PIPELINE_STATE.errorSource || DBIConstants.OUTPUT_STREAM_ID
       this.STREAM_STATE.error = this.STREAM_STATE.error || (this.PIPELINE_STATE.errorSource === DBIConstants.OUTPUT_STREAM_ID) ? err : this.STREAM_STATE.error
+	  err.pipelineComponents = [...err.pipelineComponents || [], this.constructor.name]
+	  err.pipelineIgnoreErrors = true
 	  err.pipelineState = YadamuError.clonePipelineState(this.PIPELINE_STATE)
       
       try {

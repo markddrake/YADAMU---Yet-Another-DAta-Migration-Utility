@@ -40,11 +40,14 @@ class AWSS3DBI extends CloudDBI {
   **
   */
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...AWSS3Constants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -63,17 +66,65 @@ class AWSS3DBI extends CloudDBI {
 	})();
 	return this._BUCKET
   }
-  
+
+  /*
   set REGION(v) { this._REGION = v }
   get REGION() {
     this._REGION = this._REGION || (() => { 
-	  const region = this.parameters.REGION || this.vendorProperties.region   
+	  const region = this.parameters.REGION || this.CONNECTION_PROPERTIES.region   
 	  return region
 	})();
 	return this._REGION
   }
+  */
   
   get STORAGE_ID()            { return this.BUCKET }
+  
+  redactPasswords() {
+	 const connectionProperties = super.redactPasswords()
+	 connectionProperties.connection.credentials.secretAccessKey = '#REDACTED'
+     return connectionProperties
+  }
+  
+  addVendorExtensions(connectionProperties) {
+	
+	let url = connectionProperties.endpoint
+	url = url && url.indexOf('://') < 0 ? `http://${url}` : url
+	try {
+	  url = new URL(url ? url : 'http://0.0.0.0')
+	} catch (e) {
+      this.LOGGER.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${connectionProperties.endpoint}"`)
+	  this.LOGGER.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
+	  url = new URL('http://0.0.0.0')
+	}
+
+    url.protocol                          = this.parameters.PROTOCOL  || url.protocol 
+	url.hostname                          = this.parameters.HOSTNAME  || url.hostname
+	url.port                              = this.parameters.PORT      || url.port
+	url                                   = url.toString()
+	
+	connectionProperties.accessKeyId      = this.parameters.USERNAME  || connectionProperties.accessKeyId 
+    connectionProperties.secretAccessKey  = this.parameters.PASSWORD  || connectionProperties.secretAccessKey	
+	connectionProperties.region           = this.parameters.REGION    || connectionProperties.region	         // this.REGION
+    connectionProperties.s3ForcePathStyle = true
+    connectionProperties.signatureVersion = "v4"
+    connectionProperties.endpoint         = url
+	
+	
+	connectionProperties.connection = {
+      region             : connectionProperties.region
+	, forcePathStyle     : connectionProperties.s3ForcePathStyle
+	, endpoint           : connectionProperties.endpoint
+	, signatureVersion   : connectionProperties.signatureVersion
+	, credentials        : {
+	    accessKeyId      : connectionProperties.accessKeyId
+	  , secretAccessKey  : connectionProperties.secretAccessKey  
+	  }
+	}
+	
+	return connectionProperties
+
+  }
   
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
@@ -83,37 +134,11 @@ class AWSS3DBI extends CloudDBI {
     return new AWSS3Error(driverId,cause,stack,sql)
   }
   
-  updateVendorProperties(vendorProperties) {
-	
-	let url = vendorProperties.endpoint
-	url = url && url.indexOf('://') < 0 ? `http://${url}` : url
-	try {
-	  url = new URL(url ? url : 'http://0.0.0.0')
-	} catch (e) {
-      this.LOGGER.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${vendorProperties.endpoint}"`)
-	  this.LOGGER.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
-	  url = new URL('http://0.0.0.0')
-	}
-
-    url.protocol                      = this.parameters.PROTOCOL  || url.protocol 
-	url.hostname                      = this.parameters.HOSTNAME  || url.hostname
-	url.port                          = this.parameters.PORT      || url.port
-	url                               = url.toString()
-	
-	vendorProperties.accessKeyId      = this.parameters.USERNAME     || vendorProperties.accessKeyId 
-    vendorProperties.secretAccessKey  = this.parameters.PASSWORD     || vendorProperties.secretAccessKey	
-	vendorProperties.region           = this.REGION
-    vendorProperties.s3ForcePathStyle = true
-    vendorProperties.signatureVersion = "v4"
-    vendorProperties.endpoint         = url
-	
-  }
-
   getCredentials(vendorKey) {
 	 
 	switch (vendorKey) {
 	  case 'snowflake':
-	    return `AWS_KEY_ID = '${this.vendorProperties.accessKeyId}'  AWS_SECRET_KEY = '${this.vendorProperties.secretAccessKey}'`;
+	    return `AWS_KEY_ID = '${this.CONNECTION_PROPERTIES.accessKeyId}'  AWS_SECRET_KEY = '${this.CONNECTION_PROPERTIES.secretAccessKey}'`;
 	}
 	return ''
   }
@@ -121,18 +146,7 @@ class AWSS3DBI extends CloudDBI {
   async createConnectionPool() {
 	// this.LOGGER.trace([this.constructor.name],`new S3Client()`)
 	
-	const s3ClientConfig = {
-      region             : this.vendorProperties.region
-	, forcePathStyle     : this.vendorProperties.s3ForcePathStyle
-	, endpoint           : this.vendorProperties.endpoint
-	, signatureVersion   : this.vendorProperties.signatureVersion
-	, credentials        : {
-	    accessKeyId      : this.vendorProperties.accessKeyId
-	  , secretAccessKey  : this.vendorProperties.secretAccessKey  
-	  }
-	}
-	
-	this.cloudConnection = await new S3Client(s3ClientConfig)
+	this.cloudConnection = await new S3Client(this.CONNECTION_PROPERTIES.connection)
 	this.cloudService = new AWSS3StorageService(this,{})
   }
 
@@ -155,7 +169,7 @@ class AWSS3DBI extends CloudDBI {
 	 
 	switch (vendorKey) {
 	  case 'snowflake':
-	     return `AWS_KEY_ID = '${this.vendorProperties.accessKeyId}'  AWS_SECRET_KEY = '${this.vendorProperties.secretAccessKey}'`;
+	     return `AWS_KEY_ID = '${this.CONNECTION_PROPERTIES.accessKeyId}'  AWS_SECRET_KEY = '${this.CONNECTION_PROPERTIES.secretAccessKey}'`;
 	}
 	return ''
   }

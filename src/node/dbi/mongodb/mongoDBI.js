@@ -62,11 +62,14 @@ import MongoCompare                  from './mongoCompare.js'
 
 class MongoDBI extends YadamuDBI {
     
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...MongoConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -131,6 +134,13 @@ class MongoDBI extends YadamuDBI {
     return this._WRITE_TRANSFORMATION 
   }
       
+  addVendorExtensions(connectionProperties) {
+
+    connectionProperties.connection = `mongodb://${connectionProperties.host}:${connectionProperties.port}/${connectionProperties.database !== undefined ? connectionProperties.database : ''}`;
+    return connectionProperties
+
+  }
+
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
     this.DATA_TYPES = MongoDataTypes
@@ -163,13 +173,7 @@ class MongoDBI extends YadamuDBI {
   }
    
    traceMongo(apiCall) {
-    return `MongoClient.db(${this.connection?.databaseName || this.vendorProperties.database }).${apiCall}\n`
-  }
-
-  getMongoURL() {
-    
-    return `mongodb://${this.vendorProperties.host}:${this.vendorProperties.port}/${this.vendorProperties.database !== undefined ? this.vendorProperties.database : ''}`;
-    
+    return `MongoClient.db(${this.connection?.databaseName || this.CONNECTION_PROPERTIES.database }).${apiCall}\n`
   }
 
   /*
@@ -183,12 +187,12 @@ class MongoDBI extends YadamuDBI {
     // Wrapper for client.db()
 	let stack
     options.useUnifiedTopology = true
-    const operation = `new MongoClient.connect(${this.getMongoURL()}))\n`
+    const operation = `new MongoClient.connect(${this.CONNECTION_PROPERTIES.connection}))\n`
     try {   
       this.SQL_TRACE.trace(operation)
       let sqlStartTime = performance.now()
 	  stack = new Error().stack
-      this.client = new MongoClient(this.getMongoURL(),options)
+      this.client = new MongoClient(this.CONNECTION_PROPERTIES.connection,options)
       await this.client.connect()   
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
@@ -485,17 +489,17 @@ class MongoDBI extends YadamuDBI {
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`createConnectionPool()`)
     this.logConnectionProperties()
     const poolSize = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 5
-    this.vendorProperties.options = typeof this.vendorProperties.options === 'object' ? this.vendorProperties.options : {}
+    this.CONNECTION_PROPERTIES.options = typeof this.CONNECTION_PROPERTIES.options === 'object' ? this.CONNECTION_PROPERTIES.options : {}
     if (poolSize > 5) {
-      this.vendorProperties.options.poolSize = poolSize
+      this.CONNECTION_PROPERTIES.options.poolSize = poolSize
     }
-    await this.connect(this.vendorProperties.options)
+    await this.connect(this.CONNECTION_PROPERTIES.options)
 	// The client object is the source of connections.
 	this.pool = this.client
   }
   
   async getConnectionFromPool() {
-	 return await this.use(this.CURRENT_SCHEMA || this.vendorProperties.database || this.DEFAULT_DATABASE)
+	 return await this.use(this.CURRENT_SCHEMA || this.CONNECTION_PROPERTIES.database || this.DEFAULT_DATABASE)
   } 
   
   async configureConnection() {
@@ -552,14 +556,7 @@ class MongoDBI extends YadamuDBI {
       throw this.getDatabaseException(this.DRIVER_ID,e,stack,this.traceMongo(operation))
     }
   }
-    
-  updateVendorProperties(vendorProperties) {
-
-    vendorProperties.host             = this.parameters.HOSTNAME || vendorProperties.host 
-    vendorProperties.port             = this.parameters.PORT     || vendorProperties.port
-
-  }
-  
+      
   /*  
   **
   **  Connect to the database. Set global setttings
@@ -700,51 +697,7 @@ class MongoDBI extends YadamuDBI {
         let stack
         let operation
         try {
-			
-		  /*
-		  **
-		  
-          operation = `${collection.collectionName}.mapReduce()`;
-          this.SQL_TRACE.trace(this.traceMongo(operation))    
-          let sqlStartTime = performance.now()
-    	  stack =  new Error().stack
-          const collectionMetadata = await collection.mapReduce(
-            // ### Do not try to use arrow functions or other ES2015+ features here...
-            function () { 
-              // Emit 2 entries for this collection to force the reduce function to be invoked for this key..
-              if (Object.keys(keys).length === 0) {
-                emit('metadata',null)
-                emit('metadata',null)
-              }
-              Object.keys(this).forEach(function(key) { 
-                if (!keys.hasOwnProperty(key)) {
-                  // Add an entry for this key to the set of known keys. There will be on entry for each key found in the collection.
-                  // The value associated with the dataType key will be '' or the maximum length of the dataype based on the sample size.
-                  // The value for this key will be an objet containing one key for each possible data type
-                  keys[key] = []
-                }
-              },this)
-            },
-            function(collectionName,values) {
-              // Uncomment next line to debug map function results
-              // return JSON.stringify(keys," ",2)
-              const columnNames = []
-              Object.keys(keys).forEach(function(key) {
-                columnNames.push(key)
-              })
-              return {COLUMN_NAME_ARRAY : columnNames, DATA_TYPE_ARRAY: [], SIZE_CONSTRAINT_ARRAY: []}
-            },
-            {
-              out                : { inline: 1}
-             ,limit              : this.MONGO_SAMPLE_LIMIT === undefined ? 1000 : (this.MONGO_SAMPLE_LIMIT === 0 ? null : this.MONGO_SAMPLE_LIMIT)
-             ,scope              : {
-               keys              : {}
-            }
-          })
-		  
-		  **
-		  */
-         
+			         
 		  let sampleSize 
           switch (this.MONGO_SAMPLE_LIMIT) {
             case 0:
@@ -870,7 +823,10 @@ class MongoDBI extends YadamuDBI {
           tableInfo.SIZE_CONSTRAINT_ARRAY.splice(idx,1)
         }
       }
-      return tableInfo
+	  
+	  // Suppress Column Ordering
+	  tableInfo.SKIP_COLUMN_REORDERING = true
+	  return tableInfo
     }))
     // this.LOGGER.trace([`${this.constructor.name}.getSchemaMetadata()`,],`Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - loopStartTime)}s.`)
 	

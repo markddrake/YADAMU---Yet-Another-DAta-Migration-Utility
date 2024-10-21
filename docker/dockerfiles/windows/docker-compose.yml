@@ -205,9 +205,9 @@ services:
         - MSSQL14-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA
         - MSSQL14-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\LOG
       restart: always
-  MYSQL81-01:
+  MYSQL90-01:
   
-    container_name: MYSQL81-01
+    container_name: MYSQL90-01
     image:  yadamu/mysql:8.1
     isolation: hyperv
     mem_limit: 4096M
@@ -219,7 +219,7 @@ services:
       MYSQL_VERSION: 8.1
     volumes:
       - YADAMU_01-SHARED:c:\shared
-      - MYSQL81-01-VOLUME:C:\ProgramData\MySQL\8.1
+      - MYSQL90-01-VOLUME:C:\ProgramData\MySQL\8.1
     restart: always
 
   # MYSQL80-01: 33061
@@ -275,5 +275,5 @@ volumes:
   PGSQL16-01-VOLUME:
   MARIA11-01-CONF:
   MARIA11-01-DATA:
-  MYSQL81-01-VOLUME:
+  MYSQL90-01-VOLUME:
   MONGO70-01-VOLUME:

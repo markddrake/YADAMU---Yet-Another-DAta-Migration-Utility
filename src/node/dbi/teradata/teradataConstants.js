@@ -18,11 +18,11 @@ class TeradataConstants {
     return this._STATIC_DEFAULTS;
  }
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS() {
-    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_DEFAULTS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-    return this.#_DBI_PARAMETERS
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_DEFAULTS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#DBI_PARAMETERS
  }
 
   static get BOOLEAN_STORAGE_OPTION()              { return this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION}

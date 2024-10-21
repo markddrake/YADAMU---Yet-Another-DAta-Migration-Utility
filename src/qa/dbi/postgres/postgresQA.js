@@ -13,11 +13,11 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class PostgresQA extends YadamuQALibrary.qaMixin(PostgresDBI) {
     
-	static #_DBI_PARAMETERS
+	static #DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
-	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[PostgresConstants.DATABASE_KEY] || {},{RDBMS: PostgresConstants.DATABASE_KEY}))
-	   return this.#_DBI_PARAMETERS
+	   this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[PostgresConstants.DATABASE_KEY] || {},{RDBMS: PostgresConstants.DATABASE_KEY}))
+	   return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {

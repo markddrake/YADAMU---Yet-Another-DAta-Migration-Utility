@@ -18,6 +18,12 @@ class StringWriter extends Writable {
     return this.chunks.join('');
   }
   
+  toJSON() {
+	return this.chunks.map((chunk) => {
+	  return chunk.toString('utf-8')
+	})
+  }
+  
   reset() {
 	this.chunks = []
   }

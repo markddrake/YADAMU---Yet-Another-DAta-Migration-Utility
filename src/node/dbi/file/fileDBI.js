@@ -121,11 +121,24 @@ class FileDBI extends YadamuDBI {
   static get DATABASE_VENDOR()       { return 'YABASC' };
   static get SOFTWARE_VENDOR()       { return 'YABASC - Yet Another Bay Area Software Compsny'};
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  {
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_DBI_PARAMETERS
+	// Delete FILE iherited from YADAMU_CONFIGURATION
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(
+	  (() => {
+  	    const parms = {
+          ...DBIConstants.DBI_PARAMETERS
+        , ...YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}
+	    }
+	    delete parms.FILE
+	    delete parms.CIPHER
+	    delete parms.ENCRYPTION
+	    delete parms.SALT
+	    return parms
+	  })()
+	)
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -139,8 +152,9 @@ class FileDBI extends YadamuDBI {
   get PARALLEL_READ_OPERATIONS()   { return false };
   get PARALLEL_WRITE_OPERATIONS()  { return false }  
   
-  get COMPRESSED_FILE()            { return this.yadamu.COMPRESSION !== 'NONE' }
-  get ENCRYPTED_FILE()             { return this.yadamu.ENCRYPTION }
+  get USE_COMPRESSION()            { return this.COMPRESSION !== 'NONE' }
+  get USE_ENCRYPTION()             { return this.parameters.hasOwnProperty('ENCRYPTION') ? (this.parameters.ENCRYPTION !== false) : this.yadamu.ENCRYPTION !== false }
+  get CREATE_TARGET_DIRECTORY()    { return this.parameters.hasOwnProperty('CREATE_TARGET_DIRECTORY') ? this.parameters.CREATE_TARGET_DIRECTORY : this.yadamu.CREATE_TARGET_DIRECTORY }
 							      
   set EXPORT_FILE_HEADER(v)        { this._EXPORT_FILE_HEADER = v }
   get EXPORT_FILE_HEADER()         { return this._EXPORT_FILE_HEADER }
@@ -149,7 +163,13 @@ class FileDBI extends YadamuDBI {
   get INITIALIZATION_VECTOR()      { return this._INITIALIZATION_VECTOR }
   get IV_LENGTH()                  { return 16 }  
     
-  get DIRECTORY()  { return this._DIRECTORY }
+  get DIRECTORY()  { 
+     this._DIRECTORY  = this._DIRECTORY || (() => {
+	   const directory = this.parameters.DIRECTORY || this.yadamu.parameters.DIRECTORY || ""
+	   return directory
+	 })()
+	 return this._DIRECTORY
+  } 
   set DIRECTORY(v) { this._DIRECTORY = v };
     
   get FILE()                     {
@@ -172,46 +192,56 @@ class FileDBI extends YadamuDBI {
 	*/
 	
     return this._FILE || (() => {
-	  let file =  this.parameters.FILE || 'yadamu.json'
+	  let file =  this.parameters.FILE || super.FILE
       if (!path.isAbsolute(file)) {
-	  if (this.DIRECTORY) {
+	    if (this.DIRECTORY) {
           if (path.isAbsolute(this.DIRECTORY)) {
-			file = path.join(this.DIRECTORY,file)
+ 		    file = path.join(this.DIRECTORY,file)
           }
           else {
-            file = path.join(this.vendorProperties.directory,this.DIRECTORY,file)
+            file = path.join(this.CONNECTION_PROPERTIES.directory,this.DIRECTORY,file)
           }
-		}
+	    }
         else {
-          file = path.join(this.vendorProperties.directory  || '',file)
+          file = path.join(this.CONNECTION_PROPERTIES.directory  || '',file)
 		}
 	  }
-	  file = (this.COMPRESSED_FILE && (!file.endsWith('.gz'))) ? `${file}.gz` : file
+	  file = (this.USE_COMPRESSION && (!file.endsWith('.gz'))) ? `${file}.gz` : file
 	  file = YadamuLibrary.macroSubstitions(file,this.yadamu.MACROS)
+	  this._UNRESOLVED_FILE = file
 	  this._FILE = path.resolve(file)
 	  return this._FILE
     })()
   }
-  
-  set FILE(v)            { this._FILE = v }
-  
-  get OUTPUT_FORMAT()    { return 'JSON' }
-  
 
+  set FILE(v)               {this._FILE = v }   
+ 
+  get UNRESOLVED_FILE()     { return this._UNRESOLVED_FILE }   
+  
+  get OUTPUT_FORMAT()       { return 'JSON' }
+  
   get CHECK_POINT()         { return  this._CHECK_POINT }
   set CHECK_POINT(v)        { this._CHECK_POINT = this.OUTPUT_STREAM_OFFSET + v.bytesWritten + v.writableLength}
   
   get OUTPUT_STREAK_SIZE()  { return this._OUTPUT_STREAM_OFFSET}
   set OUTPUT_STREAK_SIZE(v) { this._OUTPUT_STREAM_OFFSET = v }
   
+  get IS_FILE_BASED()       { return true }
 
+  addVendorExtensions(connectionProperties) {
+
+  // connectionProperties.directory   = this.parameters.DIRECTORY || connectionProperties.directory 
+  return connectionProperties
+
+  }
+  
   constructor(yadamu,connectionSettings,parameters) {
 	super(yadamu,null,connectionSettings,parameters)
 	this.outputStream = undefined;
     this.inputStream = undefined;
 	this.firstTable = true;
 	this.ddl = undefined;
-	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
+	this.baseDirectory = path.resolve(this.CONNECTION_PROPERTIES.directory || "")
 	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }
 
@@ -225,13 +255,7 @@ class FileDBI extends YadamuDBI {
     this.emit(YadamuConstants.DDL_UNNECESSARY)
 	return ddl
   }
-  
-  updateVendorProperties(vendorProperties) {
-
-  // vendorProperties.directory   = this.parameters.DIRECTORY || vendorProperties.directory 
-
-  }
-  
+    
   exportComplete(message) {
 	this.eventManager.exportComplete(message)
   }
@@ -284,12 +308,15 @@ class FileDBI extends YadamuDBI {
   releaseConnection() {
   }
  
-  initialize() {
-    
-    super.initialize(false)
-	
+  async initialize() {
+    await super.initialize()
+	this.ENCRYPTION_KEY = this.parameters.PASSPHRASE 
+	                    ? await this.yadamu.generateCryptoKey(this.parameters)
+				 	    : this.yadamu.ENCRYPTION_KEY_AVAILABLE  
+				 	    ? this.yadamu.ENCRYPTION_KEY
+				 	    : undefined
   }
-
+ 
   async createInputStream() {
     return new Promise((resolve,reject) => {
 	  const stack = new Error().stack
@@ -308,7 +335,7 @@ class FileDBI extends YadamuDBI {
 	super.initializeExport()
 	this.setDescription(this.FILE)
 	
-	if (this.ENCRYPTED_FILE) {
+	if (this.USE_ENCRYPTION) {
       await this.loadInitializationVector()
     }
 
@@ -334,32 +361,45 @@ class FileDBI extends YadamuDBI {
     return this.outputStream
   }
 
-  async createOutputStream() {
-
-    const streams = []
-	
-    if (this.COMPRESSED_FILE) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
-    }
-	
-    if (this.ENCRYPTED_FILE) {
-      await this.createInitializationVector()
-      // console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
-	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
-	  streams.push(cipherStream)
-	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
-	}
-	
-	const ws = await new Promise((resolve,reject) => {
+  async createWriteStream() {
+   return new Promise((resolve,reject) => {
       const ws = fs.createWriteStream(this.FILE,{flags :"w"})
 	  this.OUTPUT_STREAM_OFFSET = 0;
 	  const stack = new Error().stack
       ws.on('open',() => {resolve(ws)})
 	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
 	})
+  }
+  
+  async createOutputStream() {
+
+    const streams = []
+	
+    if (this.USE_COMPRESSION) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+    }
+	
+    if (this.USE_ENCRYPTION) {
+      await this.createInitializationVector()
+      // console.log('Cipher',this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  const cipherStream = crypto.createCipheriv(this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  streams.push(cipherStream)
+	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
+	}
     
+	if (this.CREATE_TARGET_DIRECTORY) {
+      await fsp.mkdir(path.dirname(this.FILE),{recursive:true})
+	}
+	
+	const ws = await this.createWriteStream()
 	streams.push(ws)
 	const os = streams.length === 1 ? streams[0] : compose(...streams)
+	
+	
+	// Add a dummy Error Handler - it will be removed and replaced with real when the stream is used
+	
+	this.osErrorHandler = YadamuLibrary.NOOP
+	os.on('error',this.osErrorHandler)
 	return os;
 
   }
@@ -578,14 +618,14 @@ class FileDBI extends YadamuDBI {
 	
 	streams.push(inputStream)
 	
-	if (this.ENCRYPTED_FILE) {
+	if (this.USE_ENCRYPTION) {
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
-	  const decipherStream = crypto.createDecipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+  	  // console.log('Decipher',this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  const decipherStream = crypto.createDecipheriv(this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  streams.push(decipherStream)
 	}
 
-	if (this.COMPRESSED_FILE) {
+	if (this.USE_COMPRESSION) {
       streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
@@ -669,18 +709,22 @@ class FileDBI extends YadamuDBI {
 	this.CHECK_POINT = outputStream.bytesWritten+outputStream.writableLength
     const outputStreamState = outputStream.STREAM_STATE
 	
-	outputStream.once('pipe',() => {
-      outputStreamState.startTime = performance.now()
-    }).once('finish',() => { 
-      outputStreamState.endTime = performance.now()
-      pipelineState.lost += jsonWriter.writableLength
-    }).on('error',(err) => {
+	this.outputStream.removeListener('error',this.osErrorHandler)
+	
+	this.osErrorHandler = (err) => {
       outputStreamState.endTime = performance.now()
       pipelineState.failed = true;
 	  pipelineState.errorSource = pipelineState.errorSource || DBIConstants.OUTPUT_STREAM_ID
       pipelineState.lost += jsonWriter.writableLength
       outputStreamState.pipelineError = err
-    })
+    }
+	
+	outputStream.once('pipe',() => {
+      outputStreamState.startTime = performance.now()
+    }).once('finish',() => { 
+      outputStreamState.endTime = performance.now()
+      pipelineState.lost += jsonWriter.writableLength
+    }).on('error', this.osErrorHandler )
 
     this.CHECK_POINT = outputStream
 	outputStreams.push(outputStream)
@@ -700,7 +744,7 @@ class FileDBI extends YadamuDBI {
 	if (options.encryptedInput) {
 	  await this.loadInitializationVector()
 	  streams.push(new IVReader(this.IV_LENGTH))
-	  const decipherStream = crypto.createDecipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  const decipherStream = crypto.createDecipheriv(this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  streams.push(decipherStream)
 	}
 	
@@ -714,7 +758,7 @@ class FileDBI extends YadamuDBI {
 	
 	if (options.encryptedOutput) {
   	  await this.createInitializationVector()
-	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  const cipherStream = crypto.createCipheriv(this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
 	}
@@ -743,7 +787,7 @@ class FileDBI extends YadamuDBI {
   
   async truncateTable() {
 	  
-	if (this.COMPRESSED_FILE || this.ENCRYPTED_FILE) {
+	if (this.USE_COMPRESSION || this.USE_ENCRYPTION) {
       throw new Error('Error recovery not supported with compressed and/or encypted output')
 	}
 	  

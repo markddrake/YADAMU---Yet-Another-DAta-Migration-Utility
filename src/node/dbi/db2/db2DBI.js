@@ -50,11 +50,14 @@ import DB2Compare                     from './db2Compare.js'
 
 class DB2DBI extends YadamuDBI {
     
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,DB2Constants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...DB2Constants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -80,6 +83,20 @@ class DB2DBI extends YadamuDBI {
   
   get DB2GSE_INSTALLED()              { return false }
 
+  redactPasswords() {
+	
+	const connectionProperties = this.CONNECTION_PROPERTIES
+	connectionProperties.connection = `DATABASE=${connectionProperties.database};HOSTNAME=${connectionProperties.host};PORT=${connectionProperties.port || 50000};PROTOCOL=TCPIP;UID=${connectionProperties.user};PWD=#REDACTED`
+    return connectionProperties
+  }
+
+  addVendorExtensions(connectionProperties) {
+
+    connectionProperties.connection = `DATABASE=${connectionProperties.database};HOSTNAME=${connectionProperties.host};PORT=${connectionProperties.port || 50000};PROTOCOL=TCPIP;UID=${connectionProperties.user};PWD=${connectionProperties.password}`
+    return connectionProperties
+
+  }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
 	this.DATA_TYPES = DB2DataTypes
@@ -100,7 +117,7 @@ class DB2DBI extends YadamuDBI {
     const ibmdb = await ( import(process.versions.hasOwnProperty('electron') ? "ibm_db_electron" : "ibm_db"))
 	const stack = new Error().stack
 	const connection = await new Promise((resolve,reject) => {
-      ibmdb.open(this.createConnectionString(),(err,conn) => {
+      ibmdb.open(this.CONNECTION_PROPERTIES.connection,(err,conn) => {
 	    if (err) reject(this.createDatabaseError(this.DRIVER_ID,err,stack,'DB2.open()'))
 	    resolve(conn)
 	  })
@@ -111,10 +128,6 @@ class DB2DBI extends YadamuDBI {
   async createConnectionPool() {	
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
 	this.connectionPool = new this.ibmdb.Pool()
-  }
-  
-  createConnectionString() {
-    return `DATABASE=${this.vendorProperties.database};HOSTNAME=${this.vendorProperties.hostname};PORT=${this.vendorProperties.port || 50000};PROTOCOL=TCPIP;UID=${this.vendorProperties.username};PWD=${this.vendorProperties.password}`
   }
   
   async badConnection() {
@@ -154,7 +167,7 @@ class DB2DBI extends YadamuDBI {
 	  try  {
         const stack = new Error().stack
 	    const connection = await new Promise((resolve,reject) => {
-          this.connectionPool.open(this.createConnectionString(),(err,conn) => {
+          this.connectionPool.open(this.CONNECTION_PROPERTIES.connection,(err,conn) => {
 	        if (err) reject(this.createDatabaseError(this.DRIVER_ID,err,stack,'DB2.Pool.getConnection()'))
 	        resolve(conn)
 	      })
@@ -524,6 +537,20 @@ class DB2DBI extends YadamuDBI {
     return undefined
   }
   
+  async truncateTable(schema,tableName) {
+	 
+	if (this.TRANSACTION_IN_PROGRESS) {
+	  await this.rollbackTransaction()
+	}
+	
+	const sqlStatement = `${this.SQL_TRUNCATE_TABLE_OPERATION} "${schema}"."${tableName}" IMMEDIATE`
+	
+	await this.beginTransaction()
+	await this.executeSQL(sqlStatement)
+	await this.commitTransaction()
+	// await this.beginTransaction()
+  }
+	    
   generateTableInfo() {
     
     // Psuedo Code shown below..
@@ -567,11 +594,6 @@ class DB2DBI extends YadamuDBI {
           
     return await this.executeSQL(DB2StatementLibrary.SQL_SCHEMA_METADATA,[this.CURRENT_SCHEMA])
   }
-   
-  generateSQLQuery(tableMetadata) {
-     const queryInfo = super.generateSQLQuery(tableMetadata)
-     return queryInfo;
-  }   
 
   _getParser(queryInfo,pipelineState) {
     return new DB2Parser(this,queryInfo,pipelineState,this.LOGGER)

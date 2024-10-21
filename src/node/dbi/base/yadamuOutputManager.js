@@ -40,10 +40,10 @@ class YadamuOutputManager extends Transform {
   
   get BATCH_SIZE()         { return this.tableInfo._BATCH_SIZE }
   get SPATIAL_FORMAT()     { return this.tableInfo._SPATIAL_FORMAT }
-  get SOURCE_VENDOR()      { return this.PIPELINE_STATE[DBIConstants.INPUT_STREAM_ID].vendor || 'YABASC'  }
+  get SOURCE_VENDOR()      { return this.PIPELINE_STATE[DBIConstants.INPUT_STREAM_ID]?.vendor || 'YABASC'  }
   
-  get PIPELINE_STATE()       { return this._PIPELINE_STATE }
-  set PIPELINE_STATE(v)      { this._PIPELINE_STATE =  v }
+  get PIPELINE_STATE()     { return this._PIPELINE_STATE }
+  set PIPELINE_STATE(v)    { this._PIPELINE_STATE =  v }
 
   get PARTITIONED_TABLE()  { return this.tableInfo?.hasOwnProperty('partitionCount')}    
 
@@ -65,13 +65,14 @@ class YadamuOutputManager extends Transform {
 	this.DEBUGGER = this.dbi.DEBUGGER
 
     this.batchOperations = new Set()
-
     this.skipTable = this.dbi.MODE === 'DDL_ONLY';    
 	// this.processRow = this._invalidMessageSequence
 	this.processRow = this._cacheOutOfSequenceMessages
     this.outOfSequenceMessageCache = []
   }
   
+
+
   createBatch() {
 	return []
   }
@@ -108,12 +109,23 @@ class YadamuOutputManager extends Transform {
 	this.emit(DBIConstants.BATCH_RELEASED)
   }
 
+  getColumnOrderingTransformation(columnMappings) {
+    const mappings = Object.values(columnMappings)
+    return mappings.length === 0 ? (row) => {} : (row) => {
+      const clone = [...row]
+      mappings.forEach((mapping) => { 
+        row[mapping.target] = clone[mapping.source]
+      })
+    }
+  }
+
   async setTableInfo(tableName) {
     // this.LOGGER.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'WAITING')
     await this.dbi.cacheLoaded
     // this.LOGGER.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'PROCESSING')
     this.tableInfo = this.dbi.getTableInfo(tableName)
 	this.skipTable = this.dbi.MODE === 'DDL_ONLY';	
+    this.reorderColumns = this.tableInfo.columnMappings ? this.getColumnOrderingTransformation(this.tableInfo.columnMappings) : (row) => {}
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
     this.initializeBatchCache() 
     this.batch = await this.nextBatch()
@@ -230,6 +242,9 @@ class YadamuOutputManager extends Transform {
       this.handleIterativeError('CACHE',cause,this.PIPELINE_STATE.received,row,info);
     }
   }
+
+  reorderRow(row) {
+  }
               
   cacheRow(row) {
 	  
@@ -280,6 +295,7 @@ class YadamuOutputManager extends Transform {
   async _processRow(data) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
     this.PIPELINE_STATE.received++;
+    this.reorderColumns(data)
     this.checkColumnCount(data)
     this.cacheRow(data)
 	if (this.flushBatch()) {
@@ -288,7 +304,12 @@ class YadamuOutputManager extends Transform {
         this.LOGGER.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.PIPELINE_STATE.written}.`);
 	  }
 	  this.PIPELINE_STATE.pending+= this.PIPELINE_STATE.cached
-	  const pushResult = this.push({batch:this.batch, snapshot: Object.assign({}, this.PIPELINE_STATE)})
+	  const pushResult = this.push({
+		batch:this.batch
+	  , snapshot: {
+	      ...this.PIPELINE_STATE
+	    }
+	  })
 	  this.PIPELINE_STATE.cached = 0
       this.batch = await this.nextBatch();	
 	  }	  
@@ -394,6 +415,7 @@ class YadamuOutputManager extends Transform {
 	this.doTransform(messageType,obj).then(() => { 
 	  callback() 
 	}).catch((e) => { 
+	  console.log(e,this.PIPELINE_STATE,DBIConstants.INPUT_STREAM_ID)
       this.LOGGER.handleException([`PIPELINE`,`TRANSFORMER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
   	  this.STREAM_STATE.error = e
       callback(e) 
@@ -408,7 +430,12 @@ class YadamuOutputManager extends Transform {
     if (this.hasPendingRows()) {
       this.PIPELINE_STATE.pending+= this.PIPELINE_STATE.cached
  	  // Push the Final Batch and a copy of the current pipeline state.
-	  this.push({batch:this.batch, snapshot: Object.assign({}, this.PIPELINE_STATE)})
+	  this.push({
+		batch:this.batch
+	  , snapshot: {
+		  ...this.PIPELINE_STATE
+	    }
+	  })
 	  this.PIPELINE_STATE.cached = 0
  	}
 	else {
@@ -443,6 +470,8 @@ class YadamuOutputManager extends Transform {
 	  this.PIPELINE_STATE.failed = true
       this.PIPELINE_STATE.errorSource = this.PIPELINE_STATE.errorSource || DBIConstants.TRANSFORMATION_STREAM_ID
 	  this.STREAM_STATE.error = this.STREAM_STATE.error || (this.PIPELINE_STATE.errorSource === DBIConstants.TRANSFORMATION_STREAM_ID) ? err : this.STREAM_STATE.error
+	  err.pipelineComponents = [...err.pipelineComponents || [], this.constructor.name]
+	  err.pipelineIgnoreErrors = true
 	  err.pipelineState = YadamuError.clonePipelineState(this.PIPELINE_STATE)
     }
 	
@@ -470,8 +499,14 @@ class YadamuOutputManager extends Transform {
   _destroy (err,callback)  {
 	  
     // this.LOGGER.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.readableLength,this.writableLength],`YadamuOutputManager._destroy(${err ? err.message : 'Normal'})`)
-    this.doDestroy(err).then(() => { callback(err) }).catch((e) => { callback(e) })
-  }
+    
+	this.doDestroy(err).then(() => { 
+	  callback(err) 
+	}).catch((e) => { 
+	  e.rootCause = err; 
+	  callback(e) 
+    })
+   } 
 }
 
 export { YadamuOutputManager as default}

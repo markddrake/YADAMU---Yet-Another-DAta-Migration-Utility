@@ -104,7 +104,7 @@ class YadamuCLI {
     , "COPY"         : Object.freeze(['COPY'])
     , "TEST"         : Object.freeze(['TEST'])
     , "SERVICE"      : Object.freeze([])
-    , "COMPRARE"      : Object.freeze([])
+    , "COMPRARE"     : Object.freeze([])
     })
     return this._SUPPORTED_ARGUMENTS
   }
@@ -161,14 +161,69 @@ class YadamuCLI {
     return this._ARGUMENT_SYNONYMS
   }
 
+
+  #configuration
+  #connectionNames
+  #schemaNames
+  #jobNames
+  #batchNames
+  
+  get CONFIGURATION() {
+	 return this.#configuration
+  }
+  
+  set CONFIGURATION(v) {
+    this.#configuration = v
+	this.CONNECTION_NAMES = Object.keys(this.CONFIGURATION.connections)
+	this.SCHEMA_NAMES = Object.keys(this.CONFIGURATION.schemas)
+	this.JOB_NAMES = Object.keys(this.CONFIGURATION.jobs || {})
+	this.BATCH_NAMES = Object.keys(this.CONFIGURATION.batchOperations || {})
+  }
+  
+  set CONNECTION_NAMES(v) {
+	 this.#connectionNames = v
+  }
+  
+  get CONNECTION_NAMES() {
+	return this.#connectionNames
+  }
+  
+  set SCHEMA_NAMES(v) {
+	 this.#schemaNames = v
+  }
+  
+  get SCHEMA_NAMES() {
+	return this.#schemaNames
+  }
+  
+  set JOB_NAMES(v) {
+	 this.#jobNames = v
+  }
+  
+  get JOB_NAMES() {
+	return this.#jobNames
+  }
+  
+  set BATCH_NAMES(v) {
+	 this.#batchNames = v
+  }
+  
+  get BATCH_NAMES() {
+	return this.#batchNames
+  }
+  
   createYadamu() {	  
 	return new Yadamu(this.command);
   }
-
+  
   constructor() {  
 
     const className = this.constructor.name.toUpperCase()
 	switch (className) {
+	  case 'PUMP':
+	  case 'BATCH':
+	    this.command = this.getOperation('COPY')
+	    break;
 	  case 'EXPORT':
 	  case 'UNLOAD':
 	  case 'IMPORT':
@@ -190,7 +245,7 @@ class YadamuCLI {
     this.yadamuLogger = this.yadamu.LOGGER
 
 	try {
-	  this.validateParameters(this.command)	
+	  this.validateParameters(this.yadamu.OPERATION)	
 	} catch (e) {
       try {
 		// Should this be 'awaited'...
@@ -241,7 +296,6 @@ class YadamuCLI {
   }
 
   validateParameters(command) {
-	 
 	for (const synonym of Object.keys(YadamuCLI.ARGUMENT_SYNONYMS[command] || {})) {
       if (this.yadamu.COMMAND_LINE_PARAMETERS[synonym] !== undefined) {
 	    const argument = YadamuCLI.ARGUMENT_SYNONYMS[command][synonym] 
@@ -419,20 +473,23 @@ class YadamuCLI {
   }
   
   async getDatabaseInterface(yadamu,driver,connectionSettings,configurationParameters) {
-
     let dbi = undefined
     
-	const parameters = Object.assign({}, configurationParameters || {})
-    
-	// clone the connectionSettings
-	const connectionInfo = Object.assign({}, connectionSettings);
+	// Force parameter names to Upper Case.
 	
+	const parameters = Object.fromEntries(Object.entries(configurationParameters).map(([k, v]) => [k.toUpperCase(), v]));
+	
+	// clone the connectionSettings
+	const connectionInfo = {
+	  ...connectionSettings
+	}
+
     if (YadamuConstants.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
 	  const DBI = (await import(YadamuConstants.YADAMU_DRIVERS[driver])).default
-	  dbi = new DBI(this.yadamu,null,connectionInfo,parameters);
+	  dbi = YadamuConstants.FILE_BASED_DRIVERS.includes(driver) ? new DBI(yadamu,connectionInfo,parameters) : new DBI(yadamu,null,connectionInfo,parameters);
     }	
     else {   
-	  const message = `Unsupported database vendor "${driver}".`
+	  const message = `Unsupported database interface "${driver}".`
       this.yadamuLogger.info([`${this.constructor.name}.getDatabaseInterface()`],message);  
 	  const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: ${message}`);
 	  throw err
@@ -441,19 +498,94 @@ class YadamuCLI {
     dbi.setParameters(parameters);
 	return dbi;
   }
-  
-  getUser(vendor,schema) {
     
-     const user = vendor === 'mssql' ? schema.owner : schema.schema
+  getUser(vendor,schema) {
+     const user = vendor === 'file' || vendor === 'loader' 
+		       ? 'YADAMU'
+		       : vendor === 'mssql' 
+	           ? schema.owner
+		       : vendor === 'snowflake' 
+		       ? schema.snowflake.schema 
+		       : schema.schema
+	 
 	 assert.notStrictEqual(user,undefined,new ConfigurationFileError(`Incorrect schema specification for database vendor "${vendor}".`));
 	 return user
-     
+			   
   }
-  
+    
+  /*
   getDescription(db,connectionName,schemaInfo) {
     return `"${connectionName}"://"${db === 'mssql' ? `${schemaInfo.database}"."${schemaInfo.owner}` : schemaInfo.schema}"`
   }
+  */
   
+  getDescription(connectionName,dbi) {
+    return `${connectionName}://${dbi.DESCRIPTION}`
+  }
+  
+  addParameters(parameters,jobParameters) {
+    Object.keys(jobParameters || {}).forEach((parameterName) => {
+	  parameters[parameterName.toUpperCase()] = jobParameters[parameterName]
+	})
+  }
+  
+  async getSourceConnection(yadamu,job) {
+  
+  	assert(this.CONNECTION_NAMES.includes(job.source.connection),new ConfigurationFileError(`Source Connection "${job.source.connection}" not found. Valid connections: "${this.CONNECTION_NAMES}".`))
+    const sourceConnection = this.CONFIGURATION.connections[job.source.connection]
+
+    const sourceDatabase =   YadamuLibrary.getVendorName(sourceConnection)
+    const sourceParameters = {
+	  CONNECTION_NAME : job.source.connection
+	}
+	
+	if (!YadamuConstants.FILE_BASED_DRIVERS.includes(sourceDatabase)) {
+      assert(this.SCHEMA_NAMES.includes(job.source.schema),new ConfigurationFileError(`Source Schema: "${job.source.schema}" not found. Valid schemas: "${this.SCHEMA_NAMES}".`))
+      const sourceSchema = this.CONFIGURATION.schemas[job.source.schema]
+      sourceParameters.FROM_USER = this.getUser(sourceDatabase,sourceSchema)
+	
+      switch (sourceDatabase) {
+          case 'mssql':
+   	      case 'snowflake':
+            sourceParameters.YADAMU_DATABASE = sourceSchema.database
+           break;
+         default:
+      }
+	}
+
+    return await this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection,sourceParameters);
+	
+  }
+
+  async getTargetConnection(yadamu,job) {
+
+    assert(this.CONNECTION_NAMES.includes(job.target.connection),new ConfigurationFileError(`Target Connection "${job.target.connection}" not found. Valid connections: "${this.CONNECTION_NAMES}".`))
+	const targetConnection = this.CONFIGURATION.connections[job.target.connection]
+	
+    const targetDatabase = YadamuLibrary.getVendorName(targetConnection);
+	const targetParameters = {
+      CONNECTION_NAME : job.target.connection
+	}
+	
+	if (!YadamuConstants.FILE_BASED_DRIVERS.includes(targetDatabase)) {
+      assert(this.SCHEMA_NAMES.includes(job.target.schema),new ConfigurationFileError(`Target Schema: "${job.target.schema}" not found. Valid schemas: "${this.SCHEMA_NAMES}".`))
+      const targetSchema = this.CONFIGURATION.schemas[job.target.schema]
+	
+      targetParameters.TO_USER = this.getUser(targetDatabase,targetSchema)
+     
+  	   switch (targetDatabase) {
+         case 'mssql':
+	     case 'snowflake':
+           targetParameters.YADAMU_DATABASE = targetSchema.database
+           break;
+         default:
+      }
+	}
+	
+    return await this.getDatabaseInterface(yadamu,targetDatabase,targetConnection,targetParameters);
+	
+  }
+	    
   async doImport() {
 	await this.yadamu.initialize()
 	const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
@@ -527,64 +659,6 @@ class YadamuCLI {
     this.yadamuLogger.info([`YADAMU`,`DECRYPT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);  
   }
 
-  async executeJob(configuration,job) {
-    // Initialize constructor parameters with values from configuration file
-    const jobParameters = Object.assign({} , configuration.parameters ? configuration.parameters : {})
-    // Merge job specific parameters
-    Object.assign(jobParameters,job.parameters ? job.parameters : {})
-
-	const sourceConnection = configuration.connections[job.source.connection]
-    assert.notStrictEqual(sourceConnection,undefined,new ConfigurationFileError(`Source Connection "${job.source.connection}" not found. Valid connections: "${Object.keys( configuration.connections)}".`))
-	  
-    const sourceSchema = configuration.schemas[job.source.schema]
-	assert.notStrictEqual(sourceSchema,undefined,new ConfigurationFileError(`Source Schema: Named schema "${job.source.schema}" not found. Valid schemas: "${Object.keys( configuration.schemas)}".`))
-	  
-    const sourceDatabase =  YadamuLibrary.getVendorName(sourceConnection)
-    const sourceDescription = this.getDescription(sourceDatabase,job.source.connection,sourceSchema)
-
-    const targetConnection = configuration.connections[job.target.connection]
-	assert.notStrictEqual(targetConnection,undefined,new ConfigurationFileError(`Target Connection "${job.target.connection}" not found. Valid connections: "${Object.keys( configuration.connections)}".`))
-
-    const targetSchema = configuration.schemas[job.target.schema]
-	assert.notStrictEqual(targetSchema,undefined,new ConfigurationFileError(`Target Schema: Named schema "${job.source.schema}" not found. Valid schemas: "${Object.keys( configuration.schemas)}".`))
-
-    const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
-    const targetDescription = this.getDescription(targetDatabase,job.target.connection,targetSchema)
-          
-	const sourceParameters = Object.assign({},jobParameters || {})
-    sourceParameters.FROM_USER = this.getUser(sourceDatabase,sourceSchema)
-	  
-    switch (sourceDatabase) {
-       case 'mssql':
-   	   case 'snowflake':
-         sourceParameters.YADAMU_DATABASE = sourceSchema.database
-         break;
-       default:
-    }
-	  
-	const targetParameters = Object.assign({},jobParameters || {})
-    targetParameters.TO_USER = this.getUser(targetDatabase,targetSchema)
-	  
-	switch (targetDatabase) {
-       case 'mssql':
-	   case 'snowflake':
-         targetParameters.YADAMU_DATABASE = targetSchema.database
-         break;
-       default:
-    }
-	  
-    this.yadamu.reloadParameters(jobParameters);
-	if (this.yadamu.MODE === 'COMPARE') {
-	  // const compare = new YadamuCompare({parameters: jobParameters},new Set());
-	  // await compare.doCompare(this.yadamu,sourceConnection,targetConnection,sourceSchema,targetSchema)
-	}
-	else {
-	  const sourceDBI = await this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,sourceParameters)
-      const targetDBI = await this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection,targetParameters)    
-      await this.yadamu.doCopy(sourceDBI,targetDBI);       
-    }
-    this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
-  }
   
   async doCompare() {
      const compareDBI = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
@@ -599,7 +673,7 @@ class YadamuCLI {
 	await this.yadamu.initialize(configuration.parameters || {})
     const startTime = performance.now();
     for (const job of configuration.jobs) {
-	  await this.executeJob(configuration,job)
+	  await this.executeJob(this.yadamu,configuration,job)
     }
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete: Configuration:"${this.yadamu.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
@@ -608,16 +682,56 @@ class YadamuCLI {
   async doTests() {
     
 	const configuration = this.loadConfigurationFile()
-    const YadamuQA = await import('../../qa/core/yadamuQA.js');
-	const yadamuQA = new YadamuQA.default(configuration,this.yadamu.activeConnections);
-    await yadamuQA.initialize()
+    const Yadamu = await import('../../qa/core/yadamuQA.js');
+	const yadamu = new Yadamu.default(configuration,this.yadamu.activeConnections);
+    await yadamu.initialize()
 	const startTime = performance.now();
-	const results = await yadamuQA.doTests(configuration);
+	const results = await yadamu.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.log([`QA`,`YADAMU`,`REGRESSION`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
-  
+
+
+  async executeJob(yadamu,configuration,job) {
+    
+	
+	this.CONFIGURATION = configuration
+	// Initialize constructor parameters with values from configuration file and merge job specific parameters
+    
+	const jobParameters = {
+	  ...configuration.parameters || {}
+    , ...job.parameters || {} 
+    }
+			  
+    yadamu.reloadParameters(jobParameters);
+	
+    const sourceDBI = await this.getSourceConnection(yadamu,job)
+    const targetDBI = await this.getTargetConnection(yadamu,job)
+    const metrics = await yadamu.doCopy(sourceDBI,targetDBI);       
+	
+    const sourceDescription = this.getDescription(job.source.connection,sourceDBI)
+    const targetDescription = this.getDescription(job.target.connection,targetDBI)
+          
+    this.yadamuLogger.info([`YADAMU`,`JOB`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
+	
+	return {
+      source           : {
+		connection     : sourceDBI.parameters.CONNECTION_NAME
+	  , schema         : sourceDBI.parameters.FROM_USER
+	  , vendor         : sourceDBI.DATABASE_VENDOR
+	  , description    : sourceDescription
+	  }
+	, target           : {
+		connection     : targetDBI.parameters.CONNECTION_NAME
+	  , schema         : targetDBI.parameters.TO_USER
+	  , vendor         : targetDBI.DATABASE_VENDOR
+	  , target         : targetDescription
+	  } 
+	, metrics          : metrics
+	}
+  }
+    
 }
 
 

@@ -9,11 +9,11 @@ import Yadamu            from '../../core/yadamu.js';
 
 class TeradataQA extends YadamuQALibrary.qaMixin(TeradataDBI) {
 	
-	static #_DBI_PARAMETERS
+	static #DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
-	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,TeradataConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[TeradataConstants.DATABASE_KEY] || {},{RDBMS: TeradataConstants.DATABASE_KEY}))
-	   return this.#_DBI_PARAMETERS
+	   this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,TeradataConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[TeradataConstants.DATABASE_KEY] || {},{RDBMS: TeradataConstants.DATABASE_KEY}))
+	   return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {

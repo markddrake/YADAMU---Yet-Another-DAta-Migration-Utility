@@ -9,8 +9,16 @@ import {
   pipeline
 }                        from 'stream/promises'
 
+import assert             from 'assert';
+
 import Yadamu            from '../core/yadamu.js';
 import YadamuLogger      from '../core/yadamuLogger.js';
+
+import {
+  CommandLineError, 
+  ConfigurationFileError
+}                        from '../core/yadamuException.js';
+
 import YadamuLibrary     from '../lib/yadamuLibrary.js';
 import YadamuConstants   from '../lib/yadamuConstants.js';
 
@@ -19,240 +27,236 @@ import YadamuCLI         from '../cli/yadamuCLI.js';
 import FileDBI           from '../dbi/file/fileDBI.js'
 import StringWriter      from '../util/stringWriter.js'
 
+
 import HttpDBI from './httpDBI.js';
 
 class Service extends YadamuCLI {
-
-  
-  getUser(vendor,schema) {
-    
-     return vendor === 'mssql' ? schema.owner : (vendor === 'snowflake' ? schema.snowflake.schema : schema.schema)
-     
-  }
   
   constructor () {
-	super()
-    this.yadamuLogger.switchOutputStream(process.stdout)
-	this.configuration = this.loadConfigurationFile()
+    super()
+    // this.yadamuLogger.switchOutputStream(process.stdout)
+    this.CONFIGURATION = this.loadConfigurationFile()
   }
-		
+        
   initialize() {
   }
-
-  getConnectionList(file) {
-	return ` Valid values are "${Object.keys(this.configuration.connections).join('","')}".`
-  }	  
   
-  getSchemaList() {
-	return ` Valid values are "${Object.keys(this.configuration.schemas).join('","')}".`
-  }	  
-  
-  validateRestParameters(params) {
-	 
-    if (params.hasOwnProperty('sourceConnection') && !this.configuration.connections.hasOwnProperty(params.sourceConnection)) {
-	  return `Invalid URL: Source Connection named "${params.sourceConnection}" not found in configuration file.${this.getConnectionList(false)}`
-	}
-	
-    if (params.hasOwnProperty('sourceSchema') && !this.configuration.schemas.hasOwnProperty(params.sourceSchema)) {
-      return `Invalid URL: Source Schema named "${params.sourceSchema}" not found in configuration file.${this.getSchemaList()}`
-    }
-	
-    if (params.hasOwnProperty('targetConnection') && !this.configuration.connections.hasOwnProperty(params.targetConnection)) {
-	  return `Invalid URL: Target Connection named "${params.targetConnection}" not found in configuration file.${this.getConnectionList(false)}`
-	}
-	
-    if (params.hasOwnProperty('targetSchema') && !this.configuration.schemas.hasOwnProperty(params.targetSchema)) {
-      return `Invalid URL: Source Schema named "${params.targetSchema}" not found in configuration file.${this.getSchemaList()}`
-    }
-	
-    if (params.hasOwnProperty('directory') && !this.configuration.connections.hasOwnProperty(params.directory)) {
-	  return `Invalid URL: Directory named "${params.directory}" not found in configuration file.${this.getConnectionList(true)}`
-    }
-	
-	return undefined
-	
+  createJobfromRestParameters(request,response) {
+      
+     const job = {
+       source     : {}
+     , target     : {}
+     , parameters : {}
+     }
+     
+     const params = request.params 
+     const operation = request.originalUrl.split('/')[2]
+     
+     switch (operation) {
+       case 'download' :
+         assert(params.sourceConnection,`Invalid URL - Missing value for parameter "/sourceConnection/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.sourceSchema,`Invalid URL - Missing value for parameter "/sourceSchema/" : Valid values are ${this.SCHEMA_NAMES}.`)
+         job.source.connection = params.sourceConnection
+         job.source.schema = params.sourceSchema
+         break;
+       case 'export' :
+         assert(params.sourceConnection,`Invalid URL - Missing value for parameter "/source/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.sourceSchema,`Invalid URL - Missing value for parameter "/sourceSchema/" : Valid values are ${this.SCHEMA_NAMES}.`)
+         assert(params.directory,`Invalid URL - Missing value for parameter "/directory/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.file,`Invalid URL - Missing value for parameter "/file/"`)
+         job.source.connection = params.sourceConnection
+         job.source.schema = params.sourceSchema
+         job.target.connection = params.directory
+         job.parameters.file = params.file
+         break
+       case 'upload':
+         assert(params.targetConnection,`Invalid URL - Missing value for component "/targetConnection/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.targetSchema,`Invalid URL - Missing value for parameter "/targetSchema/" : Valid values are ${this.SCHEMA_NAMES}.`)
+         job.target.connection = params.targetConnection
+         job.target.schema = params.targetSchema
+         break;
+       case 'import':
+         assert(params.directory,`Invalid URL - Missing value for parameter "/directory/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.file,`Invalid URL - Missing value for parameter "/file/"`)
+         assert(params.targetConnection,`Invalid URL - Missing value for parameter "/targetConnection/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.targetSchema,`Invalid URL - Missing value for parameter "/targetSchema/" : Valid values are ${this.SCHEMA_NAMES}.`)
+         job.target.connection = params.targetConnection
+         job.target.schema = params.targetSchema
+         job.source.connection = params.directory
+         job.parameters.file = params.file
+         break;
+       case 'copy':
+         assert(params.sourceConnection,`Invalid URL - Missing value for parameter "/sourceConnection/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.targetConnection,`Invalid URL - Missing value for parameter "/targetConnection/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.sourceSchema,`Invalid URL - Missing value for parameter "/sourceSchema/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         assert(params.targetSchema,`Invalid URL - Missing value for parameter "/targetSchema/" : Valid values are ${this.CONNECTION_NAMES}.`)
+         job.source.connection = params.sourceConnection
+         job.source.schema = params.sourceSchema
+         job.target.connection = params.targetConnection
+         job.target.schema = params.targetSchema
+         break;
+       default:
+		 assert(false,`Invalid URL - Invalid value "${operation}" for component "/operation/" : Valid values are ["download","export","upload","import",copy"].`)
+	 }        
+     return job
   }
   
-  async getSourceConnection(yadamu,params) {
-  
-    const sourceConnection = this.configuration.connections[params.sourceConnection]
-    const sourceSchema = this.configuration.schemas[params.sourceSchema]
-    const sourceDatabase =   YadamuLibrary.getVendorName(sourceConnection)
-    const sourceParameters = {
-	  FROM_USER: this.getUser(sourceDatabase,sourceSchema)
-	}
-    return await this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection,sourceParameters);
-	
-  }
-
-  async getTargetConnection(yadamu,params) {
-
-    const targetConnection = this.configuration.connections[params.targetConnection]
-    const targetSchema = this.configuration.schemas[params.targetSchema]
-    const targetDatabase = YadamuLibrary.getVendorName(targetConnection);
-    const targetParameters = {
-	 TO_USER: this.getUser(targetDatabase,targetSchema)
-	}
-    return await this.getDatabaseInterface(yadamu,targetDatabase,targetConnection,targetParameters);
-	
-  }
-	  
-  async getDirectory(yadamu,params) {
-
-    const directory = this.configuration.connections[params.directory]
-    const parameters = {
-	  FILE: path.join(directory.file.directory,params.file)
-	}
-    return await this.getDatabaseInterface(yadamu,'file',{},parameters);
-
-  }	  
-	  
   async processRequest(yadamu,sourceDBI,targetDBI,response,resetLogger) {
 
-	try {
-      await yadamu.doCopy(sourceDBI,targetDBI)
-	} finally {
-      if (resetLogger) {
-		yadamu.LOGGER.switchOutputStream(process.stdout);
-	  }
-      response.end();	  
-	}
-  }	 
-	 
-	  
+    await yadamu.doCopy(sourceDBI,targetDBI)
+    response.end();     
+ 
+  }  
+          
   async exportStream(request,response) {
 
-    const parameterError = this.validateRestParameters(request.params)
-    if (parameterError) {		
-	  response.status(400).send(parameterError)
-	  return
-	} 
-
-    response.type('json')	  
-	const yadamu = this.yadamu.clone()
-    const sourceDBI = await this.getSourceConnection(yadamu,request.params)
-    const targetDBI = new HttpDBI(yadamu,response)
-    await this.processRequest(yadamu,sourceDBI,targetDBI,response,false)
-	  	  
-  }
-
-  async exportFile(request,response) {
-
-    const parameterError = this.validateRestParameters(request.params)
-    if (parameterError) {		
-	  response.status(400).send(parameterError)
-	  return
-	} 
-
-    response.type('text')	  
-	const yadamu = this.yadamu.clone()
-    yadamu.LOGGER.switchOutputStream(response);
-    const sourceDBI = await this.getSourceConnection(yadamu,request.params)
-    const targetDBI = await this.getDirectory(yadamu,request.params)
-	await this.processRequest(yadamu,sourceDBI,targetDBI,response,true)
-
+	try {
+      response.type('json')     
+      this.command = operation = request.originalUrl.split('/')[2].toUpperCase()
+      this.yadamu = this.createYadamu()
+      const job = this.createJobfromRestParameters(request)
+      const sourceDBI = await this.getSourceConnection(yadamu,job)
+      const targetDBI = new HttpDBI(yadamu,response)
+      await this.processRequest(yadamu,sourceDBI,targetDBI,response,false)
+    } catch (e) {
+      response.status(400).send(e.message)
+      throw e 
+    }      
   }
 
   async importStream(request,response) {
 
-    const parameterError = this.validateRestParameters(request.params)
-    if (parameterError) {		
-	  response.status(400).send(parameterError)
-	  return
-	} 
-
-    response.type('text')	  
-	const yadamu = this.yadamu.clone()
-    yadamu.LOGGER.switchOutputStream(response);
-	const sourceDBI = new HttpDBI(yadamu,request)
-    const targetDBI = await this.getTargetConnection(yadamu,request.params)
-	await this.processRequest(yadamu,sourceDBI,targetDBI,response,true)
+	try {
+      response.type('text')     
+      this.command = operation = request.originalUrl.split('/')[2].toUpperCase()
+      this.yadamu = this.createYadamu()
+      const responseLogger = YadamuLogger.streamLogger(response,this.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
+      yadamu.LOGGER = responseLogger
+      const job = this.createJobfromRestParameters(request)
+      const sourceDBI = new HttpDBI(yadamu,request)
+      const targetDBI = await this.getTargetConnection(yadamu,job)
+      await this.processRequest(yadamu,sourceDBI,targetDBI,response,true)
+    } catch (e) {
+      response.status(400).send(e.message)
+      throw e 
+    }      
   }
+      
+  
+  async executeRestRequest(request,response,resetLogger) {
+
+    this.command = operation = request.originalUrl.split('/')[2].toUpperCase()
+    this.yadamu = this.createYadamu()
+    const responseLogger = YadamuLogger.streamLogger(response,this.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
+    yadamu.LOGGER = responseLogger
+
+	try {
+      response.type('text')     
+      const job = this.createJobfromRestParameters(request)
+      await this.executeJob(yadamu,this.CONFIGURATION,job)
+      response.end();     
+    } catch (e) {
+      response.status(400).send(e.message)
+      throw e 
+	}
+  }
+  
+  async exportFile(request,response) {
 	  
+	await this.executeRestRequest(request,response,true)
+
+  }
+
   async importFile(request,response) {  
 
-    const parameterError = this.validateRestParameters(request.params)
-    if (parameterError) {		
-	  response.status(400).send(parameterError)
-	  return
-	} 
-
-    response.type('text')	  
-	const yadamu = this.yadamu.clone()
-    yadamu.LOGGER.switchOutputStream(response);
-    const sourceDBI = await this.getDirectory(yadamu,request.params)
-    const targetDBI = await this.getTargetConnection(yadamu,request.params)
-	await this.processRequest(yadamu,sourceDBI,targetDBI,response,true)
+	await this.executeRestRequest(request,response,true)
 
   }
-	  
+      
   async copy(request,response) {
 
-    const parameterError = this.validateRestParameters(request.params)
-    if (parameterError) {		
-	  response.status(400).send(parameterError)
-	  return
-	} 
-
-    response.type('text')	  
-	const yadamu = this.yadamu.clone()
-    yadamu.LOGGER.switchOutputStream(response);
-    const sourceDBI = await this.getSourceConnection(yadamu,request.params)
-    const targetDBI = await this.getTargetConnection(yadamu,request.params)
-	await this.processRequest(yadamu,sourceDBI,targetDBI,response,true)
+	await this.executeRestRequest(request,response,true)
 
   }
-	
+    
   async updateConfiguration(request,response) {
-	 const stringWriter = new StringWriter()
-	 await pipeline(request,stringWriter);
-	 this.configuration = JSON.parse(stringWriter.toString())
-     response.end();	  
+     const stringWriter = new StringWriter()
+     await pipeline(request,stringWriter);
+     this.CONFIGURATION = JSON.parse(stringWriter.toString())
+     response.end();      
   }
-	  
+      
   async executeJobs(request,response) {
-	  
-	  if (request.params.hasOwnProperty('jobNumber') && ((request.params.jobNumber-1) > this.configuration.jobs.length)) {
-		response.status(400).send(`Invalid URL: Job Number "${request.params.jobNumber}" not found in configuration file.`)
-		return
-      }
-	  
-      if (request.params.hasOwnProperty('jobNName') && !this.configuration.jobs.hasOwnProperty(request.params.jobName)) {
-		response.status(400).send(`Invalid URL: Job named "${request.params.targetConnection}" not found in configuration file.}`)
-		return
-      }
 
-	  const yadamu = this.yadamu.clone()
+      if (request.params.hasOwnProperty('jobName')) {
+        const jobName = request.params.jobName
+        if (!this.JOB_NAMES.includes(jobName)) {
+          response.status(400).send(`Job "${jobName}" not found. Valid jobs: "${this.JOB_NAMES}".`)
+          return
+        }
+      }
+      /*
+      if (request.params.hasOwnProperty('jobNumber') && ((request.params.jobNumber-1) > this.configuration.jobs.length)) {
+        response.status(400).send(`Invalid URL: Job Number "${request.params.jobNumber}" not found in configuration file.`)
+        return
+      }
+      */
 	  
-	  response.type('text')
-	  yadamu.LOGGER.switchOutputStream(response);
-	        
-	  let job
-      switch (true) {
-		 case request.params.hasOwnProperty('jobNumber'):
-		   job = this.configuration.jobs[request.params.jobNumber-1]
-           await this.executeJob(this.configuration,job)
-		   break;
-		 case request.params.hasOwnProperty('jobName'):
-		   job = this.configuration.jobs[request.params.jobName]
-           await this.executeJob(this.configuration,job)
-		   break;
-		 default:
-           for (const job of this.configuration.jobs) {
-	        await executeJob(this.configuration,job)
-          }
+	  const operation = request.originalUrl.split('/')[2].toUpperCase()
+      const yadamu = new Yadamu(operation)
+      const responseLogger = YadamuLogger.streamLogger(response,this.yadamu.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
+      yadamu.LOGGER = responseLogger
+
+      response.type('text')
+            
+	  try {		
+        const job = this.CONFIGURATION.jobs[request.params.jobName]
+        await this.executeJob(yadamu,this.CONFIGURATION,job)
+      } catch (e) {
+        response.status(400).send(e.message)
+      }
+	  
+      response.end();     
+  }
+    
+  async executeBatch(request,response) {
+
+    const batchName = request.params.batchName
+	try {
+  	  assert(this.BATCH_NAMES.includes(batchName),new ConfigurationFileError(`Batch "${batchName}" not found. Valid connections: "${this.BATCH_NAMES}".`))	
+	} catch(e) {
+  	  response.status(400).send(e.message)
+      return
+    }
+    
+	const batch = this.CONFIGURATION.batchOperations[batchName]
+
+	const operation = request.originalUrl.split('/')[2].toUpperCase()
+    const yadamu = new Yadamu(operation)
+    const responseLogger = YadamuLogger.streamLogger(response,this.yadamu.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
+    yadamu.LOGGER = responseLogger
+
+    response.type('text')
+
+    for (let jobName of batch) {          
+	  try {
+  	    assert(this.JOB_NAMES.includes(jobName),new ConfigurationFileError(`Job "${jobName}" not found. Valid job names: "${this.JOB_NAMES}".`))	
+        const job = this.CONFIGURATION.jobs[jobName]
+	    await this.executeJob(yadamu,this.CONFIGURATION,job)
+      }
+	  catch (e) {
+	    yadamu.LOGGER.logException(['YADAMU','SERVICE','EXECUTE_BATCH',batchName,jobName],e)
 	  }
-	  
-	  yadamu.LOGGER.switchOutputStream(process.stdout);
-	  response.end();	  
+	}
+    response.end();     
   }
-	
+    
   async about(request,response) {
-	response.type('text')
-	response.write('Yadamu Service v1.0. Copyright Yet Another Bay Area Software Company 2022.');
-	response.end();
+    response.type('text')
+    response.write('Yadamu Service v1.0. Copyright Yet Another Bay Area Software Company 2022.');
+    response.end();
   }
-	  
+      
 }
 
 export { Service as default }

@@ -11,68 +11,68 @@
       "COMMIT_RATIO"            : 0
     },          
     "tests": [{
-            "source": "oracle23c",
-            "target": "oracle23c",
+            "source": "oracle23ai",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
             "source": "oracle#1",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "oracle18c",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "oracle12c",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "oracle11g",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mssql#1",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mssql19",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "postgres#1",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mysql#1",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mariadb#1",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mongodb#1",
-            "target": "oracle23c",
+            "target": "oracle23ai",
             "tasks": [
                 "oracle","mssql","mysql"
             ]

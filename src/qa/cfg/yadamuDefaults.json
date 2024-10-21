@@ -14,6 +14,7 @@
 		"file": "../dbi//file/fileQA.js",
 		"loader": "../dbi/loader/loaderQA.js",
 		"awsS3": "../dbi/awsS3/awsS3QA.js",
+		"awsS3File": "../dbi/awsS3/awsS3FileQA.js",
 		"azure": "../dbi/azure/azureQA.js",
 		"oracle": "../dbi/oracle/oracleQA.js",
 		"postgres": "../dbi/postgres/postgresQA.js",

@@ -82,7 +82,7 @@ class PostgresOutputManager extends YadamuOutputManager  {
             }
             else {
               // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
-              col = col.toISOString();
+              col = col?.toISOString() 
             }
 			return col
 		  }

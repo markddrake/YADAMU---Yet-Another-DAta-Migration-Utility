@@ -261,6 +261,15 @@ switch ($ENV:YADAMU_TEST_NAME) {
     break
   }
 
+  "mariadb" {
+    runRegressionTest "mariadbShortRegression"
+    runRegressionTest "mariadbDataTypes"
+    runRegressionTest "mariadbTestSuite"
+	runRegressionTest "mariadbCopy"
+	runRegressionTest "mariadbCopy"
+    break
+  }
+
   "db2" {
 	runRegressionTest "db2ShortRegression"
     runRegressionTest "db2DataTypes"

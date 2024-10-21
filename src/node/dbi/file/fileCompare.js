@@ -82,7 +82,9 @@ class FileCompare extends YadamuCompare {
         
     Object.keys(object).forEach((key) => {
       if (key !== key.toLowerCase()) {
-        object[key.toLowerCase()] = Object.assign({}, object[key])
+        object[key.toLowerCase()] = {
+		  ...object[key]
+		}
         delete object[key]
       }
     })
@@ -92,7 +94,9 @@ class FileCompare extends YadamuCompare {
         
     Object.keys(mappings).forEach((table) => {
       if (metrics[table] && (mappings[table].tableName != table)) {
-        metrics[mappings[table].tableName] =  Object.assign({}, metrics[table])
+        metrics[mappings[table].tableName] = {
+		   ...metrics[table]
+		}
         delete metrics[table]
       }
     })

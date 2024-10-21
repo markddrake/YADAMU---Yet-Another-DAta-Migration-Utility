@@ -6,11 +6,11 @@
             "connectString": "ORA1903"
         }
     },
-    "oracle23c": {
+    "oracle23ai": {
         "oracle": {
             "user": "SYSTEM",
             "password": "oracle",
-            "connectString": "ORA2303"
+            "connectString": "ORA2305"
         }
     },
     "oracle21c": {
@@ -129,7 +129,7 @@
     "postgres#1": {
         "postgres": {
             "user": "postgres",
-            "host": "PGSQL16-01",
+            "host": "PGSQL17-01",
             "database": "yadamu",
             "password": "oracle",
             "port": 5432
@@ -138,7 +138,7 @@
     "postgres16": {
         "postgres": {
             "user": "postgres",
-            "host": "PGSQL16-01",
+            "host": "PGSQL17-01",
             "database": "yadamu",
             "password": "oracle",
             "port": 5432
@@ -174,7 +174,7 @@
     "mysql#1": {
         "mysql": {
             "user": "root",
-            "host": "MYSQL81-01",
+            "host": "MYSQL90-01",
             "database": "sys",
             "password": "oracle",
             "port": 3306,
@@ -199,10 +199,10 @@
             "dateStrings": true
         }
     },
-    "mysql81": {
+    "mysql91": {
         "mysql": {
             "user": "root",
-            "host": "MYSQL81-01",
+            "host": "MYSQL90-01",
             "database": "sys",
             "password": "oracle",
             "port": 3306,
@@ -257,7 +257,7 @@
     },
     "mongodb#1": {
         "mongodb": {
-            "host": "MONGO70-01",
+            "host": "MONGO80-01",
             "port": 27017,
             "options": {
                 "socketTimeoutMS": 900000
@@ -293,7 +293,7 @@
     },
     "mongodb70": {
         "mongodb": {
-            "host": "MONGO70-01",
+            "host": "MONGO80-01",
             "port": 27017,
             "options": {
                 "socketTimeoutMS": 900000
@@ -303,7 +303,7 @@
     "vertica#1": {
         "vertica": {
             "user": "dbadmin",
-            "host": "VRTCA23-01",
+            "host": "VRTCA24-01",
             "database": "VMart",
             "password": "oracle",
             "port": 5433
@@ -368,7 +368,7 @@
     "vertica23": {
         "vertica": {
             "user": "dbadmin",
-            "host": "VRTCA23-01",
+            "host": "VRTCA24-01",
             "database": "VMart",
             "password": "oracle",
             "port": 5433
@@ -420,16 +420,14 @@
             "region": "us-east-1",
             "endpoint": "http://MINIO-01:9000",
             "s3ForcePathStyle": true,
-            "signatureVersion": "v4"
-        },
-        "settings": {
+            "signatureVersion": "v4",
             "directory": "aws"
         }
     },
     "azurite#1": {
-        "azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1",
-        "settings": {
-            "directory": "azure"
+        "azure":  {
+		   "connection" : "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1",
+           "directory": "azure"
         }
     },
     "file-YADAMU_HOME": {

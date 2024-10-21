@@ -54,6 +54,7 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
                 
         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';    
         tableInfo.sizeConstraints = tableMetadata.sizeConstraints
+        tableInfo.columnMappings  = tableMetadata.source?.columnMappings || {}
 		
         tableInfo.insertOperators = dataTypeDefinitions.map((dataTypeDefinition,idx) => {
 		  switch (dataTypeDefinition.type) {
@@ -229,7 +230,6 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
         } 
 	    return tableInfo.ddl
       });
-	  
     }
     return statementCache;
   }

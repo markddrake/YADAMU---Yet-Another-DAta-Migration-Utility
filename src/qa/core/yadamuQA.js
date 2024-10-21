@@ -99,7 +99,8 @@ class YadamuQA {
   get RECREATE_SCHEMA()                           { return this.test.hasOwnProperty('recreateSchema') ? this.test.recreateSchema : this.configuration.hasOwnProperty('recreateSchema') ? this.configuration.recreateSchema : false }
   get TARGET_SCHEMA_SUFFIX()                      { return this.test.hasOwnProperty('targetSchemaSuffix') ? this.test.targetSchemaSuffix : this.configuration.hasOwnProperty('targetSchemaSuffix') ? this.configuration.targetSchemaSuffix : "1" }
   get COMPARE_SCHEMA_SUFFIX()                     { return this.test.hasOwnProperty('comapreSchemaSuffix') ? this.test.compareSchemaSuffix : this.configuration.hasOwnProperty('compareSchemaSuffix') ? this.configuration.compareSchemaSuffix : "1" }
-  get KILL_CONNECTION()                           { return this.test.hasOwnProperty('kill') ? this.test.kill : this.configuration.hasOwnProperty('kill') ? this.configuration.kill : false }
+  get TEST_LOST_CONNECTION()                      { return this.test.hasOwnProperty('kill') || this.configuration.hasOwnProperty('kill') }
+  get TERMINATION_CONFIGURATION()                 { return this.test.hasOwnProperty('kill') ? this.test.kill : this.configuration.hasOwnProperty('kill') ? this.configuration.kill : {} }
   get STAGING_AREA()                              { return this.test.hasOwnProperty('stagingArea') ? this.test.stagingArea : this.configuration.hasOwnProperty('stagingArea') ? this.configuration.stagingArea : undefined }
   get RELOAD_STAGING_AREA()                       { return this.test.hasOwnProperty('reloadStagingArea') ? this.test.reloadStagingArea : this.configuration.hasOwnProperty('reloadStagingArea') ? this.configuration.reloadStagingArea : false }
   get EMPTY_STRING_IS_NULL()                      { return this.test.hasOwnProperty('emptyStringIsNull') ? this.test.emptyStringIsNull : this.configuration.hasOwnProperty('emptyStringIsNull') ? this.configuration.emptyStringIsNull : undefined }
@@ -139,19 +140,17 @@ class YadamuQA {
     await this.yadamu.reset(parameters);
  
     // clone the connectionSettings
-    const connectionInfo = Object.assign({}, connectionSettings);
+    const connectionInfo = {...connectionSettings}
     if (Yadamu.QA_DRIVER_MAPPINGS.hasOwnProperty(driver)) { 
       const DBI = (await import(Yadamu.QA_DRIVER_MAPPINGS[driver])).default
-      dbi = driver === 'file' ? new DBI(this.yadamu,connectionInfo,parameters) : new DBI(this.yadamu,null,connectionInfo,parameters)
+      dbi = YadamuConstants.FILE_BASED_DRIVERS.includes(driver) ? new DBI(this.yadamu,connectionInfo,parameters) : new DBI(this.yadamu,null,connectionInfo,parameters)
     }   
     else {   
       const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: Unsupported database vendor "${driver}".`);  
       throw err
     }
     
-	if (this.KILL_CONNECTION  && (dbi.ROLE === this.KILL_CONNECTION.process)) {
-      this.yadamu.configureTermination(this.KILL_CONNECTION)
-    }
+	this.yadamu.TERMINATION_CONFIGURATION = this.TEST_LOST_CONNECTION  ? this.TERMINATION_CONFIGURATION : undefined
    
     if (identifierMappings) {
       this.yadamu.IDENTIFIER_MAPPINGS = identifierMappings 
@@ -189,7 +188,7 @@ class YadamuQA {
       
     let schema
     let database
-    const schemaInfo = (typeof operation.source === 'string') ? { schema : operation.source } : Object.assign({}, operation.source); 
+    const schemaInfo = (typeof operation.source === 'string') ? { schema : operation.source } : {...operation.source}; 
     switch (operation.vendor) {
       case 'mssql': 
         // MsSQL style schema information
@@ -313,7 +312,7 @@ class YadamuQA {
     const stepMetrics = this.LOGGER.getMetrics(true)
     this.metrics.adjust(stepMetrics)
     
-    if (this.LOGGER.FILE_LOGGER) {
+    if (this.LOGGER.FILE_BASED_LOGWRITER) {
       
       const colSizes = [24,128,14]
       let seperatorSize = (colSizes.length * 3) - 1;
@@ -392,10 +391,10 @@ class YadamuQA {
 	  const compareResults = await comparator.compare()
 	
 	  if (compareResults.failed.length > 0) {
-        this.failedOperations[sourceConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName])
-        this.failedOperations[sourceConnectionName][targetConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName])
+        this.failedOperations[sourceConnectionName] = {...this.failedOperations[sourceConnectionName]}
+        this.failedOperations[sourceConnectionName][targetConnectionName] = {...this.failedOperations[sourceConnectionName][targetConnectionName]}
         compareResults.failed.forEach((failed,idx) => {
-          this.failedOperations[sourceConnectionName][targetConnectionName][testId] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName][testId])
+          this.failedOperations[sourceConnectionName][targetConnectionName][testId] = {...this.failedOperations[sourceConnectionName][targetConnectionName][testId]}
           this.failedOperations[sourceConnectionName][targetConnectionName][testId][failed[2]] = compareResults.failed[idx]
         })
         // this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
@@ -421,10 +420,10 @@ class YadamuQA {
 	  const compareResults = await comparator.compareFiles(configuration.target.files[0],configuration.target.files[1],configuration.target.files[2],configuration.metrics)
 	
       if (compareResults.length > 0) {
-        this.failedOperations[sourceConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName])
-        this.failedOperations[sourceConnectionName][targetConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName])
+        this.failedOperations[sourceConnectionName] = {...this.failedOperations[sourceConnectionName]}
+        this.failedOperations[sourceConnectionName][targetConnectionName] = {...this.failedOperations[sourceConnectionName][targetConnectionName]}
         compareResults.forEach((failed,idx) => {
-          this.failedOperations[sourceConnectionName][targetConnectionName][testId] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName][testId])
+          this.failedOperations[sourceConnectionName][targetConnectionName][testId] = {...this.failedOperations[sourceConnectionName][targetConnectionName][testId]}
           this.failedOperations[sourceConnectionName][targetConnectionName][testId][failed[2]] = failed
         })
 	  }
@@ -438,7 +437,7 @@ class YadamuQA {
 
   dbRoundtripResults(operationsList,elapsedTime) {
           
-    if (this.LOGGER.FILE_LOGGER) {
+    if (this.LOGGER.FILE_BASED_LOGWRITER) {
       
       const colSizes = [24,128,14]
       let seperatorSize = (colSizes.length * 3) - 1;
@@ -553,15 +552,16 @@ class YadamuQA {
     const sourceSchema  = this.getSourceMapping(sourceDatabase,task);
     const targetSchema  = this.getTargetMapping(targetDatabase,task,this.TARGET_SCHEMA_SUFFIX);
         
-    const sourceParameters  = Object.assign({},parameters)
-    const targetParameters = Object.assign({},parameters)
+    const sourceParameters  = {...parameters}
+    const targetParameters = {...parameters}
     
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
     // this.setUser(targetParameters,'TO_USER', sourceDatabase, targetSchema)
     this.setUser(targetParameters,'TO_USER', targetDatabase, targetSchema)
 
-    this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
-      connection           : targetConnectionName
+    this.yadamu.MACROS = {
+      ...this.yadamu.MACROS
+    , connection           : targetConnectionName
     , location             : this.configuration.tasks.datasetLocation[task.vendor]
     , mode                 : this.yadamu.MODE
     , operation            : this.OPERATION
@@ -571,7 +571,7 @@ class YadamuQA {
     , targetConnection     : targetConnectionName
     , sourceUser           : sourceParameters.FROM_USER
     , targetUser           : targetParameters.TO_USER
-    })
+    }
     
     let sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
     let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA) 
@@ -723,23 +723,24 @@ class YadamuQA {
     const targetSchema  = this.getTargetMapping(targetDatabase,task,this.TARGET_SCHEMA_SUFFIX);
     const compareSchema = this.getTargetMapping(sourceDatabase,task,this.COMPARE_SCHEMA_SUFFIX);
        
-    const sourceParameters  = Object.assign({},parameters)
+    const sourceParameters  = {...parameters}
     sourceParameters.MODE = (homogeneousCopy && !stagedCopy && (taskMode !== 'DDL_ONLY')) ? 'DDL_AND_DATA' : 'DDL_ONLY'
 
     // Do not apply IDENTIFIER MAPPINGS during the 'CLONE' phase
     
-    const compareParameters = Object.assign({},parameters)
+    const compareParameters = {...parameters}
     compareParameters.MODE = sourceParameters.MODE;
     delete compareParameters.IDENTIFIER_MAPPING_FILE
 
-    const targetParameters  = Object.assign({},parameters)
+    const targetParameters  = {...parameters}
        
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
     this.setUser(targetParameters,'TO_USER', targetDatabase, targetSchema)
     this.setUser(compareParameters,'TO_USER', sourceDatabase, compareSchema)
 
-    this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
-      connection           : targetConnectionName
+    this.yadamu.MACROS = {
+	  ...this.yadamu.MACROS
+    , connection           : targetConnectionName
     , location             : this.configuration.tasks.datasetLocation[task.vendor]
     , mode                 : taskMode
     , operation            : this.OPERATION
@@ -749,7 +750,7 @@ class YadamuQA {
     , targetConnection     : targetConnectionName
     , sourceUser           : sourceParameters.FROM_USER
     , targetUser           : targetParameters.TO_USER
-    })
+    }
     
     /*
     **
@@ -853,7 +854,7 @@ class YadamuQA {
         const stagingDatabase           = YadamuLibrary.getVendorName(stagingConnection);
         const stagingSchema             = this.getTargetMapping(stagingDatabase,task,'1')
           
-        const stagingParameters         = Object.assign({},targetParameters)
+        const stagingParameters         = {...targetParameters}
         stagingParameters.OUTPUT_FORMAT = 'CSV'
         this.setUser(stagingParameters,'TO_USER',stagingDatabase,stagingSchema)
         const stagingDBI = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,this.RELOAD_STAGING_AREA)
@@ -1062,8 +1063,9 @@ class YadamuQA {
     const sourceDatabase =  YadamuLibrary.getVendorName(sourceConnection);
     const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
 
-    this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
-      connection       : targetConnectionName
+    this.yadamu.MACROS = {
+      ...this.yadamu.MACROS
+    , connection       : targetConnectionName
     , location         : this.configuration.tasks.datasetLocation[task.vendor]
     , mode             : this.yadamu.MODE
     , operation        : this.OPERATION
@@ -1073,7 +1075,7 @@ class YadamuQA {
     , targetconnection : targetConnectionName
     , importPath       : this.IMPORT_PATH
     , exportPath       : this.EXPORT_PATH
-    })
+    }
 
     const filename = task.hasOwnProperty('schemaPrefix') ? `${task.schemaPrefix}_${task.file}` : task.file
     const sourceDirectory = this.test.parameters?.SOURCE_DIRECTORY || this.configuration.parameters?.SOURCE_DIRECTORY || this.test.parameters?.DIRECTORY || this.configuration.parameters?.DIRECTORY
@@ -1093,8 +1095,8 @@ class YadamuQA {
 
     // Source File to Target Schema #1
     
-    let sourceParameters  = Object.assign({},parameters)
-    if (sourceDatabase === "file") {
+    let sourceParameters  = {...parameters}
+    if (YadamuConstants.FILE_BASED_DRIVERS.includes(sourceDatabase)) {
       sourceParameters.FILE = filename
       sourceParameters.SOURCE_DIRECTORY = importDirectory
 	  sourceParameters.FROM_USER = YadamuConstants.READER_ROLE
@@ -1102,7 +1104,7 @@ class YadamuQA {
     
     let fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
     
-    let targetParameters  = Object.assign({},parameters)
+    let targetParameters  = {...parameters}
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
 
     let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
@@ -1149,12 +1151,12 @@ class YadamuQA {
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
     sourceDescription = targetDescription
 
-    sourceParameters  = Object.assign({},parameters)
+    sourceParameters  = {...parameters}
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema1)
     
     let sourceDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,null,{})
 
-    targetParameters  = Object.assign({},parameters)
+    targetParameters  = {...parameters}
     targetParameters.FILE = filename1
     targetParameters.TARGET_DIRECTORY = exportDirectory
 	targetParameters.TO_USER = YadamuConstants.WRITER_ROLE
@@ -1188,7 +1190,7 @@ class YadamuQA {
     
     // File#1 to Target Schema #2
 
-    sourceParameters  = Object.assign({},parameters)
+    sourceParameters  = {...parameters}
     sourceParameters.FILE = filename1
     sourceParameters.SOURCE_DIRECTORY = exportDirectory
 	sourceParameters.FROM_USER = YadamuConstants.READER_ROLE
@@ -1196,7 +1198,7 @@ class YadamuQA {
     
     fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null,{})
 	
-    targetParameters  = Object.assign({},parameters)
+    targetParameters  = {...parameters}
 	targetParameters.TABLES = tableFilterList
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema2)
     targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA,{})
@@ -1229,12 +1231,12 @@ class YadamuQA {
 
     // Target Schema #2 to File#2
     
-    sourceParameters  = Object.assign({},parameters)
+    sourceParameters  = {...parameters}
 	sourceParameters.TABLES = tableFilterList
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema2)
     sourceDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,{})
 
-    targetParameters  = Object.assign({},parameters)
+    targetParameters  = {...parameters}
     targetParameters.FILE = filename2
     targetParameters.TARGET_DIRECTORY = exportDirectory
     targetParameters.TO_USER =  YadamuConstants.WRITER_ROLE
@@ -1324,7 +1326,7 @@ class YadamuQA {
 
     if (sourceAndTargetMatch) {
 		
-      const testParameters = {} // parameters ? Object.assign({},parameters) : {}
+      const testParameters = {} // parameters ? {...parameters} : {}
 
 	  const compareConfiguration = {
 	    source             : {
@@ -1352,7 +1354,7 @@ class YadamuQA {
 
     // Compare Target Schema #1 and Target Schema #2
 
-    const testParameters = parameters ? Object.assign({},parameters) : {}
+    const testParameters = parameters ? {...parameters} : {}
 
     const compareConfiguration = {
 	  source             : {
@@ -1420,10 +1422,11 @@ class YadamuQA {
 
     const targetSchema  = this.getSourceMapping(targetDatabase,task); 
     
-    const sourceParameters  = Object.assign({},parameters)
+    const sourceParameters  = {...parameters}
 
-    this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
-      connection           : targetConnectionName
+    this.yadamu.MACROS = {
+	  ... this.yadamu.MACROS
+    , connection           : targetConnectionName
     , location             : this.configuration.tasks.datasetLocation[task.vendor]
     , mode                 : this.yadamu.MODE
     , operation            : this.OPERATION
@@ -1433,7 +1436,7 @@ class YadamuQA {
     , exportPath           : this.EXPORT_PATH
     , sourceConnection     : sourceConnectionName 
     , targetconnection     : targetConnectionName
-    })
+    }
 
     let importFile
 
@@ -1442,7 +1445,7 @@ class YadamuQA {
     const importDirectory = YadamuLibrary.macroSubstitions(path.join(directory,this.IMPORT_PATH),this.yadamu.MACROS)
     
     sourceParameters.SOURCE_DIRECTORY = importDirectory
-    if ( sourceDatabase === "file" ) {
+    if (YadamuConstants.FILE_BASED_DRIVERS.includes(sourceDatabase)) {
       sourceParameters.FILE = filename
       sourceParameters.FROM_USER = 'YADAMU'
     }
@@ -1452,7 +1455,7 @@ class YadamuQA {
     
     const fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
 
-    const targetParameters  = Object.assign({},parameters)
+    const targetParameters  = {...parameters}
     this.setUser(targetParameters,'TO_USER',targetDatabase,targetSchema)
     
     if (targetConnection[targetDatabase].hasOwnProperty('directory')) {
@@ -1487,7 +1490,7 @@ class YadamuQA {
 
     if (metrics instanceof Error) {
       this.metrics.recordError(this.LOGGER.getMetrics(true))
-      return sourceDatabase === 'file' ? path.join(importDirectory,filename) : path.dirname(fileReader.CONTROL_FILE_PATH);
+      return YadamuConstants.FILE_BASED_DRIVERS.includes(sourceDatabase) ? path.join(importDirectory,filename) : path.dirname(fileReader.CONTROL_FILE_PATH);
     }    
 
     if ((this.VERIFY_OPERATION === true) && (this.yadamu.MODE !== 'DDL_ONLY')) {
@@ -1515,7 +1518,7 @@ class YadamuQA {
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,elapsedTime)
     this.metrics.recordTaskTimings([task.taskName,'TOTAL','',sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
     this.reportTimings(this.metrics.timings)
-    return sourceDatabase === 'file' ? path.join(importDirectory,filename) : path.dirname(fileReader.CONTROL_FILE_PATH)
+    return YadamuConstants.FILE_BASED_DRIVERS.includes(sourceDatabase) ? path.join(importDirectory,filename) : path.dirname(fileReader.CONTROL_FILE_PATH)
       
   }
  
@@ -1532,14 +1535,15 @@ class YadamuQA {
     const sourceDatabase =  YadamuLibrary.getVendorName(sourceConnection);
     const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
     
-    const sourceParameters  = Object.assign({},parameters)
+    const sourceParameters  = {...parameters}
     this.setUser(sourceParameters,'FROM_USER', sourceDatabase, this.getSourceMapping(sourceDatabase,task))
 
-    const targetParameters  = Object.assign({},parameters)
+    const targetParameters  = {...parameters}
     this.setUser(targetParameters,'TO_USER', targetDatabase, this.getSourceMapping(targetDatabase, task))
 
-    this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
-      connection           : sourceConnectionName
+    this.yadamu.MACROS = {
+	  ...this.yadamu.MACROS
+    , connection           : sourceConnectionName
     , location             : this.configuration.tasks.datasetLocation[task.vendor]
     , mode                 : this.yadamu.MODE
     , operation            : this.OPERATION
@@ -1549,7 +1553,7 @@ class YadamuQA {
     , targetconnection     : targetConnectionName
     , importPath           : this.IMPORT_PATH
     , exportPath           : this.EXPORT_PATH
-    })
+    }
 
     const sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
 
@@ -1557,12 +1561,12 @@ class YadamuQA {
     const directory = this.test.parameters?.TARGET_DIRECTORY || this.configuration.parameters?.TARGET_DIRECTORY || this.test.parameters?.DIRECTORY || this.configuration.parameters?.DIRECTORY || ''
     const exportDirectory = YadamuLibrary.macroSubstitions(path.join(directory,this.EXPORT_PATH),this.yadamu.MACROS)    
 
-    if (targetDatabase === "file") {
+    if (YadamuConstants.FILE_BASED_DRIVERS.includes(targetDatabase)) {
       targetParameters.FILE =  filename
       targetParameters.TARGET_DIRECTORY = exportDirectory               
       targetParameters.TO_USER = 'YADAMU'
     }
-    
+	
     const fileWriter = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
 
     const taskStartTime = performance.now();
@@ -1576,7 +1580,7 @@ class YadamuQA {
 
     let stepElapsedTime = performance.now() - stepStartTime
     let sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
-    const targetDescription = this.getDescription(sourceDatabase,fileWriter)  
+    const targetDescription = this.getDescription(targetDatabase,fileWriter)  
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
     this.metrics.recordTaskTimings([task.taskName,this.OPERATION_NAME,fileWriter.MODE,sourceConnectionName,targetDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
@@ -1588,8 +1592,8 @@ class YadamuQA {
         
     if (this.VERIFY_OPERATION === true) {
       sourceDescription = targetDescription
-      const sourceParameters  = Object.assign({},parameters)
-      if (targetDatabase === "file") { 
+      const sourceParameters  = {...parameters}
+      if (YadamuConstants.FILE_BASED_DRIVERS.includes(targetDatabase)) {
         sourceParameters.FILE = filename
         sourceParameters.SOURCE_DIRECTORY = exportDirectory
       } 
@@ -1599,7 +1603,7 @@ class YadamuQA {
       }
       const fileReader = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,null)
       
-      const targetParameters  = Object.assign({},parameters)
+      const targetParameters  = {...parameters}
       const sourceSchema = this.getSourceMapping(sourceDatabase,task)
       const targetSchema = this.getTargetMapping(sourceDatabase,task,'1')
       this.setUser(targetParameters,'TO_USER', sourceDatabase, targetSchema, task.vendor)
@@ -1659,7 +1663,7 @@ class YadamuQA {
       
     this.metrics.recordTaskTimings([task.taskName,'TOTAL','',sourceConnectionName,targetDatabase,YadamuLibrary.stringifyDuration(performance.now() - taskStartTime)])
     this.reportTimings(this.metrics.timings)
-    return targetDatabase === 'file' ? exportDirectory : path.dirname(fileWriter.CONTROL_FILE_PATH)
+    return  YadamuConstants.FILE_BASED_DRIVERS.includes(targetDatabase)  ? exportDirectory : path.dirname(fileWriter.CONTROL_FILE_PATH)
   }
   
   getTaskList(configuration,task) {
@@ -1889,7 +1893,7 @@ class YadamuQA {
   }
 
   async doTests(configuration) {
-      
+	  
     this.LOGGER.qa([`Environemnt`,process.arch,process.platform,process.version],`Running tests`);
 
     const sourceSummary = []
@@ -1898,12 +1902,12 @@ class YadamuQA {
     const summary = [['End Time','Operation','Source','Target','Task','Results','Memory Usage','Elapsed Time']]
     try {    
       for (this.test of configuration.tests) {
-        this.metrics.newTest()
+		this.metrics.newTest()
         const startTime = performance.now()
-        
+       
         // Initialize Configuration Parameters with values from configuration file
-        const testParameters = Object.assign({} , configuration.parameters || {})
-        // Merge test specific parameters
+        const testParameters = {...configuration.parameters || {}}
+		// Merge test specific parameters
         Object.assign(testParameters, this.test.parameters || {})
         this.yadamu.initializeParameters(testParameters);
 

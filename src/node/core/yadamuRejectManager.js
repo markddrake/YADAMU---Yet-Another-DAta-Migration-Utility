@@ -1,14 +1,15 @@
 
-import fs            from 'fs';
-import path          from 'path';
-import {Readable}    from 'stream'
-import {pipeline}    from 'stream/promises'
+import fs                             from 'fs';
+import path                           from 'path';
+import {Readable}                     from 'stream'
+import {pipeline}                     from 'stream/promises'
 
-import ArrayReadable from '../util/arrayReadable.js'
-import ErrorDBI      from '../dbi/file/errorDBI.js';
+import ArrayReadable                  from '../util/arrayReadable.js'
+import ErrorDBI                       from '../dbi/file/errorDBI.js';
 
-import DBWriter      from './dbWriter.js';
-import YadamuLogger  from './yadamuLogger.js'
+import DBWriter                       from './dbWriter.js';
+import YadamuLogger                   from './yadamuLogger.js'
+import YadamuLibrary                  from '../lib/yadamuLibrary.js'
 
 class YadamuRejectManager {
   
@@ -67,7 +68,7 @@ class YadamuRejectManager {
       await this.initialize(tableName)
       this.is.addContent([{table:tableName}])
 	  this.setInitializationComplete()
-	  this.setInitializationComplete = () => {}
+	  this.setInitializationComplete = YadamuLibrary.NOOP
     }
 	await this.initialziationCoomplete
     this.recordCount+= data.length

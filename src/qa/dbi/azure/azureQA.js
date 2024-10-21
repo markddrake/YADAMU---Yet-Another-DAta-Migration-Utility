@@ -8,11 +8,11 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
   
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 	
   static get DBI_PARAMETERS()  { 
-    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AzureConstants.DATABASE_KEY] || {},{RDBMS: AzureConstants.DATABASE_KEY}))
-    return this.#_DBI_PARAMETERS
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AzureConstants.DATABASE_KEY] || {},{RDBMS: AzureConstants.DATABASE_KEY}))
+    return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -29,14 +29,6 @@ class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
 	}
     await super.initializeImport();
   }	
-
-  setConnectionProperties(connectionProperties) {
-	if (connectionProperties.hasOwnProperty('yadamuOptions')) {
-	  Object.assign(this.azureOptions,connectionProperties.yadamuOptions)
-	  delete connectionProperties.yadamuOptions
-	}
-    super.setConnectionProperties(connectionProperties)
-  }
   
   classFactory(yadamu) {
     return new AzureQA(yadamu,this,this.connectionParameters,this.parameters)

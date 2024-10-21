@@ -1,7 +1,7 @@
 version: "2.4"
 services:
 
-  YADAMU-SVR:
+  YADAMU-SVC:
     container_name: YADAMU-SVC
     image:  yadamu/service
     command: [ "/usr/src/YADAMU/bin/service.sh",
@@ -35,7 +35,9 @@ services:
       - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - ORACLE-04
     ports: 
       - "15211:1521"
     environment:
@@ -62,7 +64,9 @@ services:
       - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - ORACLE-03
     ports: 
       - "15213:1521"
     environment:
@@ -87,7 +91,9 @@ services:
       - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - ORACLE-02
     ports: 
       - "15214:1521"
     environment:
@@ -112,7 +118,9 @@ services:
       - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - ORACLE-01
     ports: 
       - "15215:1521"
     environment:
@@ -137,7 +145,9 @@ services:
     security_opt:
       - seccomp:unconfined
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - MARIA-DB
     ports: 
       - "3307:3306"
     environment:
@@ -150,24 +160,27 @@ services:
 
   # MARAI10-01: 37071
 
-  MONGO70-01: 
-    container_name: MONGO70-01
+  MONGO80-01: 
+    container_name: MONGO80-01
     image:  mongo:latest 
     mem_limit: '10gb'
     shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - MONGO-DB
     ports: 
       - "27017:27017"
     volumes:
-      - MONGO70-01-VOLUME:/data/db 
+      - MONGO80-01-VOLUME:/data/db 
     restart: always
 
   # MONGO40-01: 27018
   # MONGO50-01: 27019
   # MONGO60-01: 27020
+  # MONGO70-01: 27021
 
   MSSQL22-01: 
     container_name: MSSQL22-01
@@ -177,7 +190,9 @@ services:
     security_opt:
       - seccomp:unconfined
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - MSSQL-01
     ports: 
       - "1433:1433"
     environment:
@@ -201,7 +216,9 @@ services:
     security_opt:
       - seccomp:unconfined
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - MSSQL-02
     ports: 
       - "14333:1433"
     environment:
@@ -213,10 +230,10 @@ services:
       - MSSQL19-01-VOLUME:/var/opt/mssql
     restart: always
 
-  MYSQL81-01: 
-    container_name: MYSQL81-01
+  MYSQL90-01: 
+    container_name: MYSQL90-01
     image:  mysql:latest
-    command: --secure-file-priv=/mnt/shared  
+    command: --secure-file-priv=/mnt/shared 
     mem_limit: '10gb'
     shm_size: '4gb'
     security_opt:
@@ -224,34 +241,38 @@ services:
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - MYSQL-DB
     ports: 
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: oracle  
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MYSQL81-01-VOLUME:/var/lib/mysql 
+      - MYSQL90-01-VOLUME:/var/lib/mysql 
     restart: always
 
   # MYSQL80-01: 33061
 
-  PGSQL16-01: 
-    container_name: PGSQL16-01
-    image:  yadamu/postgres:latest
+  PGSQL17-01: 
+    container_name: PGSQL17-01
+    image:  yadamu/postgres:17
     mem_limit: '10gb'
     shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - POSTGRES-DB
     ports: 
       - "5432:5432"
     environment:
       POSTGRES_PASSWORD: oracle 
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - PGSQL16-01-VOLUME:/var/lib/postgresql/data
+      - PGSQL17-01-VOLUME:/var/lib/postgresql/data
     restart: always
 
   # PGSQL11-01: 54321
@@ -259,16 +280,19 @@ services:
   # PGSQL13-01: 54323
   # PGSQL14-01: 54324
   # PGSQL15-01: 54325
+  # PGSQL15-01: 54326
 
-  VRTCA23-01: 
-    container_name: VRTCA23-01
+  VRTCA24-01: 
+    container_name: VRTCA24-01
     image:  vertica/vertica-ce:latest 
     mem_limit: '10gb'
     shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
-     - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - VERTICA-01
     ports: 
       - "5433:5433"
       - "5444:5444"
@@ -280,7 +304,7 @@ services:
     #  mode: global
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA23-01-VOLUME:/data
+      - VRTCA24-01-VOLUME:/data
     restart: always    
 
   # VRTCA09-01: 54331,54441
@@ -291,7 +315,9 @@ services:
     mem_limit: '10gb'
     shm_size: '4gb'
     networks:
-      - YADAMU-NET
+      YADAMU-NET:
+        aliases:
+          - VERTICA-02
     ports: 
       - "54332:5433"
       - "54442:5444"
@@ -313,6 +339,7 @@ services:
   MINIO-01: 
     container_name: MINIO-01
     image:  minio/minio 
+    mem_limit: '1gb'
     command:  server /data --console-address  ":9001"
     networks:
       - YADAMU-NET
@@ -329,6 +356,7 @@ services:
   AZURE-01: 
     container_name: AZURE-01
     image:   mcr.microsoft.com/azure-storage/azurite 
+    mem_limit: '1gb'
     command: azurite-blob --blobHost 0.0.0.0 --loose --blobPort 10000 
     networks:
       - YADAMU-NET
@@ -341,7 +369,7 @@ services:
   YADAMU-SMB: 
     container_name: YADAMU-SMB
     image:   dperson/samba
-    mem_limit: '512mb'
+    mem_limit: '1gb'
     command: -p -s "work;/mount;yes;no;yes" -n -p
     networks:
       - YADAMU-NET
@@ -371,13 +399,13 @@ volumes:
   ORA1120-01-DIAG:
   MSSQL19-01-VOLUME:
   MSSQL22-01-VOLUME:
-  PGSQL16-01-VOLUME:
-  MYSQL81-01-VOLUME:
+  PGSQL17-01-VOLUME:
+  MYSQL90-01-VOLUME:
   MARIA11-01-CONF:
   MARIA11-01-DATA:
-  MONGO70-01-VOLUME:
+  MONGO80-01-VOLUME:
   VRTCA10-01-VOLUME:
-  VRTCA23-01-VOLUME:
+  VRTCA24-01-VOLUME:
   MINIO-01-VOLUME:
   AZURE-01-VOLUME:
     

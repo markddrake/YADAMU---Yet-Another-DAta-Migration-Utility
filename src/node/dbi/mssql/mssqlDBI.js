@@ -73,11 +73,14 @@ import {
 
 class MsSQLDBI extends YadamuDBI {
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...MsSQLConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -104,7 +107,7 @@ class MsSQLDBI extends YadamuDBI {
   get ROW_LIMIT()                     { return this.parameters.ROW_LIMIT             || MsSQLConstants.ROW_LIMIT }
   get SPATIAL_MAKE_VALID()            { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
 
-  get DATABASE_NAME()                 { return this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.vendorProperties.database }
+  get DATABASE_NAME()                 { return this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.CONNECTION_PROPERTIES.database }
   get DEFAULT_COLATION()              { return this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8' }
 
   // get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS || this.TEDIOUS_TRANSACTION_ISSUE  }
@@ -118,6 +121,34 @@ class MsSQLDBI extends YadamuDBI {
 
   get BEGIN_TRANSACTION_ISSUE()       { return this._BEGIN_TRANSACTION_ISSUE }
   set BEGIN_TRANSACTION_ISSUE(v)      { this._BEGIN_TRANSACTION_ISSUE = v }
+
+  addVendorExtensions(connectionProperties)  {
+
+    connectionProperties.requestTimeout  = 2 * 60 * 60 * 10000
+    connectionProperties.options         = {
+      encrypt                        : false // Use this if you're on Windows Azure
+    , abortTransactionOnError        : false
+    , enableArithAbort               : true
+    }
+	
+	// MsSQL does not fallback to the default port if port is undefined
+	
+    if (connectionProperties.server === undefined) {
+      connectionProperties.server = connectionProperties.host
+	}
+
+	if (connectionProperties.port === undefined) {
+	  delete connectionProperties.port
+	}
+
+	if (connectionProperties.host     === undefined) {
+	  delete connectionProperties.host
+	}
+	
+	return connectionProperties
+
+  }
+  
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
@@ -173,7 +204,7 @@ class MsSQLDBI extends YadamuDBI {
   async testConnection() {   
     try {
       this.setTargetDatabase()
-      const connection = await sql.connect(this.vendorProperties)
+      const connection = await sql.connect(this.CONNECTION_PROPERTIES)
       await sql.close()
     } catch (e) {
       await sql.close()
@@ -207,8 +238,8 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   setTargetDatabase() {  
-    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.vendorProperties.database)) {
-      this.vendorProperties.database = this.parameters.YADAMU_DATABASE
+    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.CONNECTION_PROPERTIES.database)) {
+      this.CONNECTION_PROPERTIES.database = this.parameters.YADAMU_DATABASE
     }
   }
   
@@ -469,7 +500,7 @@ class MsSQLDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
       stack = new Error().stack;
       operation = 'sql.connectionPool()'
-      this.pool = new sql.ConnectionPool(this.vendorProperties)
+      this.pool = new sql.ConnectionPool(this.CONNECTION_PROPERTIES)
       this.pool.on('error',(err, p) => {
         const cause = err instanceof MsSQLError ? err : this.getDatabaseException(this.DRIVER_ID,err,stack,`${operation}.onError()`)
         if (!cause.suppressedError())  {
@@ -501,7 +532,7 @@ class MsSQLDBI extends YadamuDBI {
     try {
       await this.createConnectionPool()
     } catch (e) {
-      const err = new ConnectionError(e,this.vendorProperties)
+      const err = new ConnectionError(e,this.redactPasswords())
       throw err
     }
   } 
@@ -621,18 +652,7 @@ class MsSQLDBI extends YadamuDBI {
     await this.executeSQL('select 1')
     this.transaction = this.getTransactionManager()
   }
-  
-  setVendorProperties(connectionSettings) {
-    super.setVendorProperties(connectionSettings) 
-    if (this.vendorProperties) {
-	  if (!this.vendorProperties.hasOwnProperty("options")) {    
-        this.vendorProperties.options = {}
-      }
-      this.vendorProperties.options.abortTransactionOnError = false
-      this.vendorProperties.options.enableArithAbort = true;
-    }
-  }
-   
+     
   async cancelRequest(expected) {
 	
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,'CANCEL REQUEST'],`cancelRequest(${(expected)}),${this.request.canceled}`)
@@ -1131,27 +1151,7 @@ class MsSQLDBI extends YadamuDBI {
 	this.statementLibrary = new this.StatementLibrary(this)
   }
   
-  updateVendorProperties(vendorProperties) {
 
-    vendorProperties.server          = this.parameters.HOSTNAME        || vendorProperties.server 
-    vendorProperties.user            = this.parameters.USERNAME        || vendorProperties.user
-    vendorProperties.database        = this.parameters.DATABASE        || vendorProperties.database    
-    vendorProperties.password        = this.parameters.PASSWORD        || vendorProperties.password    
-    vendorProperties.port            = parseInt(this.parameters.PORT)  || vendorProperties.port
-    vendorProperties.requestTimeout  = 2 * 60 * 60 * 10000
-    vendorProperties.options         = {
-      encrypt                        : false // Use this if you're on Windows Azure
-    , abortTransactionOnError        : false
-    , enableArithAbort               : true
-    }
-	
-	// MsSQL does not fallback to the default port if port is undefined
-	
-	if (vendorProperties.port === undefined) {
-	  delete vendorProperties.port
-	}
-  }
-  
   /*
   **
   ** Begin the current transaction

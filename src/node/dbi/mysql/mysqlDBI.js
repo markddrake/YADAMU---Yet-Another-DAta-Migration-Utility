@@ -11,7 +11,7 @@ import {
 							          
 /* Database Vendors API */                                    
 
-import mysql from 'mysql';	          
+import mysql from 'mysql2/promise';	          
 
 /* Yadamu Core */                                    
 							          
@@ -43,13 +43,23 @@ import MySQLStatementLibrary          from './mysqlStatementLibrary.js'
 import MySQLCompare                   from './mysqlCompare.js'
 
 class MySQLDBI extends YadamuDBI {
-   
-  static #_DBI_PARAMETERS
+
+  
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...MySQLConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
+  
+  // Track MySQL2 double issue select  -1.7976931348623157e+308 returns -1.7976931348623155e+308
+  
+  #MYSQL2_DOUBLE_ISSUE = false;
+  get MYSQL2_DOUBLE_ISSUE()  { return this.#MYSQL2_DOUBLE_ISSUE }
+  set MYSQL2_DOUBLE_ISSUE(v) { this.#MYSQL2_DOUBLE_ISSUE = v }
    
   get DBI_PARAMETERS() {
 	return MySQLDBI.DBI_PARAMETERS
@@ -79,6 +89,25 @@ class MySQLDBI extends YadamuDBI {
   get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+
+  redactPasswords() {
+
+    const infileStreamFactory = this.CONNECTION_PROPERTIES.infileStreamFactory
+	delete this.CONNECTION_PROPERTIES.infileStreamFactory
+	const connectionProperties = structuredClone(this.CONNECTION_PROPERTIES)
+	this.CONNECTION_PROPERTIES.infileStreamFactory = infileStreamFactory
+	connectionProperties.infileStreamFactory = infileStreamFactory
+	connectionProperties.password = '#REDACTED'
+	return connectionProperties
+  }
+
+
+  addVendorExtensions(connectionProperties) {
+
+    Object.assign(connectionProperties,MySQLConstants.CONNECTION_PROPERTY_DEFAULTS)
+	return connectionProperties
+
+  }  
   
   constructor(yadamu,manager,connectionSettings,parameters) {
 
@@ -114,7 +143,7 @@ class MySQLDBI extends YadamuDBI {
      
   async testConnection() {   
     try {
-      this.connection = await mysql.createConnection(this.vendorProperties)
+      this.connection = await mysql.createConnection(this.CONNECTION_PROPERTIES)
 	  await this.executeSQL('select 1');
 	  await this.connection.end()
   	  this.connection = undefined
@@ -131,9 +160,9 @@ class MySQLDBI extends YadamuDBI {
     
     results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
     results.forEach((row) => {
-      switch (row.Variable_name) {
+      switch (row[0]) {
         case 'lower_case_table_names':
-          this.LOWER_CASE_TABLE_NAMES = row.Value
+          this.LOWER_CASE_TABLE_NAMES = row[1]
           if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
 			this.LOGGER.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`)
 	      }
@@ -142,6 +171,15 @@ class MySQLDBI extends YadamuDBI {
     })
   }
   
+  async checkMySQL2DoubleIssue() {
+	 
+     const minVal = -1.7976931348623157e308
+	 const results = await this.executeSQL(this.StatementLibrary.SQL_MYSQL2_DOUBLE_ISSUE,minVal)
+	 this.MYSQL2_DOUBLE_ISSUE = parseFloat(results[0].DOUBLE_VALUE) !== minVal
+	 // this.LOGGER.qa([this.DATABASE_VENDOR,`DOUBLE_ISSUE`],this.MYSQL2_DOUBLE_ISSUE)
+  }
+  
+ 
   async checkMaxAllowedPacketSize() {
 
     const existingConnection = this.connection !== undefined
@@ -150,44 +188,42 @@ class MySQLDBI extends YadamuDBI {
 	  this.connection = await this.getConnectionFromPool()
 	}
     
-    const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
-    const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
-    const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
-      
-    let results = await this.executeSQL(sqlQueryPacketSize)
-    
-    if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
+    let results = await this.executeSQL(this.StatementLibrary.SQL_GET_MAX_ALLOWED_PACKET)
+	if (parseInt(results[0]['@@MAX_ALLOWED_PACKET']) <  MySQLConstants.MAX_ALLOWED_PACKET) {
 		
 	  // Need to change the setting.
 		
-      this.LOGGER.info([this.DATABASE_VENDOR],`Increasing MAX_ALLOWED_PACKET to 1G.`)
-      results = await this.executeSQL(sqlSetPacketSize)
+      this.LOGGER.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to ${MySQLConstants.MAX_ALLOWED_PACKET}.`)
+      results = await this.executeSQL(this.StatementLibrary.SQL_SET_MAX_ALLOWED_PACKET)
 	  
 	  if (existingConnection) {
 		// Need to repalce the existsing connection to pick up the change. 
 		this.connection = await this.getConnectionFromPool()
 	  }	  
     }    
-    
+        
+	await this.checkMySQL2DoubleIssue()
+	
 	if (!existingConnection) {    
       await this.closeConnection()
 	}
 	
   }
   
+  
 
   async createConnectionPool() {
      
     // MySQL.createPool() is synchronous     
-      
     this.logConnectionProperties()
-    
+
     let stack, operation
+	
     try {
       stack = new Error().stack;
       operation = 'mysql.createPool()'  
       const sqlStartTime = performance.now()
-      this.pool = new mysql.createPool(this.vendorProperties)
+      this.pool = mysql.createPool(this.CONNECTION_PROPERTIES)
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       await this.checkMaxAllowedPacketSize()
     } catch (e) {
@@ -200,21 +236,20 @@ class MySQLDBI extends YadamuDBI {
   async getConnectionFromPool() {
 
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
+
+    let stack
     
     this.SQL_TRACE.comment(`Gettting Connection From Pool.`)
-    
-    const stack = new Error().stack;
-    const connection = await new Promise((resolve,reject) => {
+
+    try {    
+      stack = new Error().stack;
       const sqlStartTime = performance.now()
-      this.pool.getConnection((err,connection) => {
-        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
-        if (err) {
-          reject(this.getDatabaseException(this.DRIVER_ID,err,stack,'mysql.Pool.getConnection()'))
-        }
-        resolve(connection)
-      })
-    })
-    return connection
+      const connection = await this.pool.getConnection()
+      return connection
+      this.SQL_TRACE.traceTiming(sqlStartTime,perfrmance.now())
+	} catch (err) {
+	  throw this.getDatabaseException(this.DRIVER_ID,err,stack,'mysql.Pool.getConnection()')
+    }
   }
   
   async closeConnection(options) {
@@ -277,40 +312,34 @@ class MySQLDBI extends YadamuDBI {
 	
   }
 
-  executeSQL(sqlStatement,args) {
+  async executeSQL(sqlStatement,args) {
     
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
-    return new Promise((resolve,reject) => {
-      this.SQL_TRACE.traceSQL(sqlStatement)
+    let stack
+	let results
+    this.SQL_TRACE.traceSQL(sqlStatement)
 
-      const stack = new Error().stack;
-      const sqlStartTime = performance.now() 
-      this.connection.query(sqlStatement,args,async (err,results,fields) => {
-        const sqlEndTime = performance.now()
-        if (err) {
-          const cause = this.getDatabaseException(this.DRIVER_ID,err,stack,sqlStatement)
-          if (attemptReconnect && cause.lostConnection()) {
-            attemptReconnect = false
-            try {
-              await this.reconnect(cause,'SQL')
-              results = await this.executeSQL(sqlStatement,args)
-              resolve(results)
-            } catch (e) {
-              reject(e)
-            }                            
-          }
-          else {
-            reject(cause)
-          }
+    while (true) {
+      // Exit with result or exception.
+      try {
+        const sqlStartTime = performance.now() 
+        stack = new Error().stack;
+		const [results,fields] = await this.connection.query(sqlStatement,args)
+		this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		return results;
+      } catch (e) {
+		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement,args)
+        if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+		  continue;
         }
-		else {
-          this.SQL_TRACE.traceTiming(sqlStartTime,sqlEndTime)
-          resolve(results)
-		}
-      })
-    })
-  }  
+        throw cause
+      }
+    }
+  }
   
   async createSchema(schema) {      
   
@@ -358,27 +387,6 @@ class MySQLDBI extends YadamuDBI {
       return this.executeSQL(ddlStatement) 
     })) 
     return ddlResults;
-  }
-  
-  setVendorProperties(connectionProperties) {
-	super.setVendorProperties(connectionProperties)
-    this.vendorProperties = Object.assign(
-	  {},
-	  MySQLConstants.CONNECTION_PROPERTY_DEFAULTS,
-	  this.vendorProperties
-    )
-  }	 
-
-  updateVendorProperties(vendorProperties) {
-
-    vendorProperties.host              = this.parameters.HOSTNAME || vendorProperties.host
-    vendorProperties.user              = this.parameters.USERNAME || vendorProperties.user 
-    vendorProperties. password         = this.parameters.PASSWORD || vendorProperties. password
-    vendorProperties.database          = this.parameters.DATABASE || vendorProperties.database
-    vendorProperties.port              = this.parameters.PORT     || vendorProperties.port
-    
-	Object.assign(vendorProperties,MySQLConstants.CONNECTION_PROPERTY_DEFAULTS)
-	
   }
   
   /*  
@@ -692,7 +700,7 @@ class MySQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
         stack = new Error().stack
         const sqlStartTime = performance.now()
-        const is = this.connection.query(queryInfo.SQL_STATEMENT).stream()
+        const is = this.connection.connection.query({sql: queryInfo.SQL_STATEMENT, rowsAsArray: true}).stream()
         is.on('end',async () => {
 		  // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${queryInfo.TABLE_NAME}`],``) 
           if (keepAliveHdl !== undefined) {
@@ -748,7 +756,7 @@ class MySQLDBI extends YadamuDBI {
   
   async getConnectionID() {
     const results = await this.executeSQL(`select connection_id() "pid"`)
-    const pid = results[0].pid;
+    const pid = results[0].pid
     return pid
   }
   

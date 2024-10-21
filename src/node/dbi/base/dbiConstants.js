@@ -24,7 +24,7 @@ class DBIConstants {
   static get INPUT_STREAM_ID()           { return 'InputStream'  }
   static get PARSER_STREAM_ID()          { return 'Parser'       }
   static get TRANSFORMATION_STREAM_ID()  { return 'Transformer'  }
-  static get OUTPUT_STREAM_ID()         { return 'OutputStream' }
+  static get OUTPUT_STREAM_ID()          { return 'OutputStream' }
   
   static get PIPELINE_STATE() {
 	this._EMPTY_PIPELINE_STATE = this._EMPTY_PIPELINE_STATE || Object.freeze({
@@ -45,14 +45,20 @@ class DBIConstants {
     , batchWritten      : 0 // Batches Writen 
 
     })
-    return Object.assign({},this._EMPTY_PIPELINE_STATE);
+    return {
+	  ...this._EMPTY_PIPELINE_STATE
+	}
   }
   
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()      { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuConstants.YADAMU_PARAMETERS,this.STATIC_PARAMETERS, YadamuConstants.YADAMU_CONFIGURATION.yadamuDBI))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+	  ...YadamuConstants.YADAMU_PARAMETERS
+	, ...this.STATIC_PARAMETERS
+	, ...YadamuConstants.YADAMU_CONFIGURATION.yadamuDBI
+	})
+	return this.#DBI_PARAMETERS
   }
   
   static get MODE()                       { return this.DBI_PARAMETERS.MODE }
@@ -75,25 +81,25 @@ class DBIConstants {
   static get BATCH_FAILED()               { return 'batchFailed' }
   static get BATCH_IDLE()                 { return 'batchIdle' }
 
-  static #_STAGING_UNSUPPORTED
+  static #STAGING_UNSUPPORTED
 
   static get STAGING_UNSUPPORTED()        { 
-     this.#_STAGING_UNSUPPORTED  = this.#_STAGING_UNSUPPORTED || Object.freeze([]) 
-	 return this.#_STAGING_UNSUPPORTED
+     this.#STAGING_UNSUPPORTED  = this.#STAGING_UNSUPPORTED || Object.freeze([]) 
+	 return this.#STAGING_UNSUPPORTED
   }
   
-  static #_LOADER_STAGING
+  static #LOADER_STAGING
 
   static get LOADER_STAGING()             { 
-     this.#_LOADER_STAGING  = this.#_LOADER_STAGING || Object.freeze(['loader'])
-	 return this.#_LOADER_STAGING
+     this.#LOADER_STAGING  = this.#LOADER_STAGING || Object.freeze(['loader'])
+	 return this.#LOADER_STAGING
   }
 
-  static #_CLOUD_STAGING
+  static #CLOUD_STAGING
 
   static get CLOUD_STAGING()             { 
-     this.#_CLOUD_STAGING  = this.#_CLOUD_STAGING || Object.freeze(['awsS3','azure'])
-	 return this.#_CLOUD_STAGING
+     this.#CLOUD_STAGING  = this.#CLOUD_STAGING || Object.freeze(['awsS3','azure'])
+	 return this.#CLOUD_STAGING
   }
  
  

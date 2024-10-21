@@ -18,11 +18,11 @@ class PostgresConstants {
     return this._STATIC_PARAMETERS;
   }
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS() { 
-    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-    return this.#_DBI_PARAMETERS
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#DBI_PARAMETERS
   }
 
   static get PGOID_DATE()          { return _PGOID_DATE }
@@ -43,3 +43,8 @@ class PostgresConstants {
 }
 
 export { PostgresConstants as default }
+
+const PGOID_DATE         = 1082; 
+const PGOID_TIMESTAMP    = 1114;
+const PGOID_TIMESTAMP_TZ = 1118;
+

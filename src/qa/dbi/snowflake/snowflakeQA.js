@@ -12,11 +12,11 @@ import YadamuQALibrary    from '../../lib/yadamuQALibrary.js'
 
 class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
     
-	static #_DBI_PARAMETERS
+	static #DBI_PARAMETERS
 	
 	static get DBI_PARAMETERS()  { 
-	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[SnowflakeConstants.DATABASE_KEY] || {},{RDBMS: SnowflakeConstants.DATABASE_KEY}))
-	   return this.#_DBI_PARAMETERS
+	   this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[SnowflakeConstants.DATABASE_KEY] || {},{RDBMS: SnowflakeConstants.DATABASE_KEY}))
+	   return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {
@@ -38,8 +38,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 	async recreateDatabase() {
 
       try {	
-	    const vendorProperties = Object.assign({},this.vendorProperties)
-	    const dbi = new SnowflakeMgr(this.yadamu, vendorProperties)
+	    const dbi = new SnowflakeMgr(this.yadamu, this.CONNECTION_SETTINGS)
 	    await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE,this.parameters.TO_USER)
 	  }	catch (e) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.TO_USER],e);
@@ -94,11 +93,17 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 }
 
 class SnowflakeMgr extends SnowflakeDBI {
+
+    addVendorExtensions(connectionProperties)  {
+   
+      connectionProperties = super.addVendorExtensions(connectionProperties)
+	  connectionProperties.database = ''
+   	  return connectionProperties
+
+    }
 	
-	constructor(yadamu,vendorProperties) {
-	  super(yadamu)
-	  this.vendorProperties = vendorProperties
-      this.vendorProperties.database = '';
+	constructor(yadamu,connectionSettings) {
+	  super(yadamu,undefined,connectionSettings)
 	}
 	
     async initialize() {
@@ -107,7 +112,6 @@ class SnowflakeMgr extends SnowflakeDBI {
   
     async recreateDatabase(database,schema) {
 		     
-      this.vendorProperties.database = '';
       await this.createConnectionPool(); 
       this.connection = await this.getConnectionFromPool();
         

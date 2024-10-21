@@ -1,24 +1,41 @@
 
-
-import oracledb     from 'oracledb';
+import oracledb             from 'oracledb';
 
 import {
   YadamuError
-}                   from '../../core/yadamuException.js'
+}                           from '../../core/yadamuException.js'
 
-import YadamuParser from '../base/yadamuParser.js'
-import StringWriter from '../../util/stringWriter.js';
-import BufferWriter from '../../util/bufferWriter.js';
+import YadamuParser         from '../base/yadamuParser.js'
+import StringWriter         from '../../util/stringWriter.js';
+import BufferWriter         from '../../util/bufferWriter.js';
+import YadamuLibrary        from '../../lib/yadamuLibrary.js'
 import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js'
 
-import {OracleError} from './oracleException.js';
+import {OracleError}        from './oracleException.js';
 
 class OracleParser extends YadamuParser {
+  
+  #lobColumns = false
+  
+  set LOB_COLUMNS(v) { this.#lobColumns = v }
+  get LOB_COLUMNS()  { return this.#lobColumns }
   
   constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
     super(dbi,queryInfo,pipelineState,yadamuLogger)
 	dbi.PARSER = this
-	// console.log(queryInfo)
+  }
+
+  fetchLobContent = (row,idx) => {
+	try {
+      row[idx] = row[idx].getData()
+	} catch (e) {
+      const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
+	  if (cause.lostConnection()) {
+ 		this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
+		row[idx] = null
+	  }
+	  throw cause
+    }
   }
 
   setColumnMetadata(resultSetMetadata) { 
@@ -28,57 +45,31 @@ class OracleParser extends YadamuParser {
 	  return
 	}
     
-	this.deferredTransformations = new Array(resultSetMetadata.length).fill(null)
-    
-    this.transformations = resultSetMetadata.map((column,idx) => {
+	this.lobTransformations = new Array(resultSetMetadata.length) 
+
+   	this.transformations = resultSetMetadata.map((column,idx) => {
       let stack
 	  const dataType = this.queryInfo.DATA_TYPE_ARRAY[idx].toUpperCase()
 	  switch (column.fetchType) {
 		case oracledb.DB_TYPE_NCLOB:
 		case oracledb.DB_TYPE_CLOB:
-		  switch (dataType) {
-		    case this.dbi.DATA_TYPES.SPATIAL_TYPE:
-			  if (this.queryInfo.convertGeoJSONtoWKB === true) {
-		        this.deferredTransformations[idx] = (row,idx)  => {
-                  row[idx] = YadamuSpatialLibrary.geoJSONtoWKB(JSON.parse(row[idx]))
-		        }
-			  }
-			default:
-          }
-       	  return (row,idx)  => {
-		    try {
-		      stack = new Error().stack
-			  row[idx] = row[idx].getData()
-			} catch (e) {
-			  const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
-			  if (cause.lostConnection()) {
- 			    this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
-				return null
-			  }
-			  throw cause
+		  this.LOB_COLUMNS = true
+	      this.lobTransformations[idx] = this.fetchLobContent
+ 		  if (this.dbi.DATA_TYPES.SPATIAL_TYPE && this.queryInfo.convertGeoJSONtoWKB === true) {
+			return (row,idx)  => {
+			  row[idx] = YadamuSpatialLibrary.geoJSONtoWKB(JSON.parse(row[idx]))
 			}
-		  }
+          }
+		  return null;
 	    case oracledb.DB_TYPE_BLOB:	
+		  this.LOB_COLUMNS = true
+	      this.lobTransformations[idx] = this.fetchLobContent
 	      if (this.queryInfo.jsonColumns.includes(idx)) {
-            // Convert JSON store as BLOB to string
-		    this.deferredTransformations[idx] = (row,idx)  => {
-              row[idx] = row[idx].toString('utf8')
-		    }
-          }
- 	      return (row,idx)  => {
-            // row[idx] = this.blobToBuffer(row[idx])
-		    try {
-		      stack = new Error().stack
-			  row[idx] = row[idx].getData()
-			} catch (e) {
-			  const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
-			  if (cause.lostConnection()) {
- 			    this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
-				return null
-			  }
-			  throw cause
+ 	        return (row,idx)  => {
+   		       row[idx] = row[idx].toString('utf8')
 			}
-		  }
+          }
+ 	      return null
         default:
  		  switch (dataType) {
 		    case 'BINARY_FLOAT':
@@ -113,29 +104,36 @@ class OracleParser extends YadamuParser {
       }) 
     }
 	
-    this.deferredTransformation = this.deferredTransformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
-      this.deferredTransformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
+	this.processLobs = !this.LOB_COLUMNS ? YadamuLibrary.NOOP : async (data) => {
+	  this.lobTransformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (data[idx] !== null)) {
+          transformation(data,idx)
         }
-      }) 
-    }
-    
+	  })
+	  const row = (await Promise.allSettled(data)).map((p) => {
+		return p.value ? p.value : null
+	  })
+	  const results = await Promise.allSettled(data)
+	  results.forEach((p,idx) => {
+		data[idx] = p.value
+	  })
+    }  
   }
-  	  
+  
   async doTransform(data) {  
     try {
       // if (this.PIPELINE_STATE.parsed == 1) console.log(data)
-      data = await super.doTransform(data)
-	  const row = await Promise.all(data)
-      this.deferredTransformation(row)
-	  // if (this.PIPELINE_STATE.parsed == 1) console.log(row)
-	  return row
+      await this.processLobs(data)
+      super.doTransform(data)
+	  return data
 	} catch(err) {
+	  console.log(err)
 	  const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,err,new Error().stack,this.constructor.name)
+	  // cause.ignoreUnhandledRejection = true
 	  throw cause.lostConnection() ? cause : err
 	}
   }
+  
 }
 
 export {OracleParser as default }

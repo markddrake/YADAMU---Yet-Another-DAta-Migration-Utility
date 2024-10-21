@@ -1,7 +1,9 @@
 
-import { performance } from 'perf_hooks';
+import { performance }                from 'perf_hooks';
 
-import JSONOutputManager from './jsonOutputManager.js';
+import JSONOutputManager              from './jsonOutputManager.js';
+
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 class ErrorOutputManager extends JSONOutputManager {
 
@@ -20,7 +22,7 @@ class ErrorOutputManager extends JSONOutputManager {
 	this.firstTable = false;
 	this.rowSeperator = '';
 	super.beginTable() 
-    this.rowTransformation  = () => {}
+    this.rowTransformation  = YadamuLibrary.NOOP
 	this.processRow =  this._processRow
 	this.processOutOfSequenceMessages()
   }

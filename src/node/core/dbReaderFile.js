@@ -21,11 +21,9 @@ class DBReaderFile extends DBReader {
     super(dbi,yadamuLogger,options); 
   }
     
-  removeLeakedListeners(stream,initialListeners,listener) {
-    
-	const leakedListeners =  stream.listeners(listener).filter((f)  => {return !initialListeners.includes(f)});
-	leakedListeners.forEach((f) => {stream.removeListener(listener,f)})
-	
+  removePipleineListeners(event,stream,initialListeners) {
+	const additionalListeners =  stream.listeners(event).filter((f)  => {return !initialListeners.includes(f)});
+	additionalListeners.forEach((f) => {stream.removeListener(event,f)})	
   } 	  
 	
   async pipelineTable(task,readerDBI,writerDBI,retryOnError) {
@@ -48,11 +46,12 @@ class DBReaderFile extends DBReader {
     
 	// this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
 
-    const terminalStream = yadamuPipeline[yadamuPipeline.length-1]
+    const persistentStream = yadamuPipeline[yadamuPipeline.length-1]
     const initialListeners = {
-	  errorListeners : terminalStream.listeners('error')
-	, closeListeners : terminalStream.listeners('close')
-	, finishListeners : terminalStream.listeners('finsih')
+	  errorListeners : persistentStream.listeners('error')
+	, closeListeners : persistentStream.listeners('close')
+	, finishListeners : persistentStream.listeners('finsih')
+	, endListeners : persistentStream.listeners('end')
 	}	 
     
     try {	
@@ -88,10 +87,12 @@ class DBReaderFile extends DBReader {
 	  }
 
 	} finally {
-	  this.removeLeakedListeners(terminalStream,initialListeners.errorListeners,'error')
-	  this.removeLeakedListeners(terminalStream,initialListeners.closeListeners,'close')
-	  this.removeLeakedListeners(terminalStream,initialListeners.finishListeners,'finish')
+	  this.removePipleineListeners('error',persistentStream,initialListeners.errorListeners,)
+	  this.removePipleineListeners('close',persistentStream,initialListeners.closeListeners,)
+	  this.removePipleineListeners('finish',persistentStream,initialListeners.finishListeners)
+	  this.removePipleineListeners('end',persistentStream,initialListeners.finishListeners)
 	}
+    
 	
     return pipelineState  
 	

@@ -424,6 +424,8 @@ end;
       tableInfo.columnNames     = tableMetadata.columnNames
       tableInfo.sizeConstraints = tableMetadata.sizeConstraints
       tableInfo.insertMode      = 'Batch';      
+      tableInfo.columnMappings  = tableMetadata.source?.columnMappings || {}
+
 	  tableInfo.dataFile        = tableMetadata.dataFile
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
 	  tableInfo._SPATIAL_FORMAT = this.SPATIAL_FORMAT

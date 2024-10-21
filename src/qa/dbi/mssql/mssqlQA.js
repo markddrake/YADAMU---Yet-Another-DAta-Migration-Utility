@@ -12,17 +12,18 @@ import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 
-    static #_DBI_PARAMETERS
+    static #DBI_PARAMETERS
     
     static get DBI_PARAMETERS()  { 
-       this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
-       return this.#_DBI_PARAMETERS
+       this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
+       return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {
       return MsSQLQA.DBI_PARAMETERS
     }   
-        
+       
+	   
     constructor(yadamu,manager,connectionSettings,parameters) {
        super(yadamu,manager,connectionSettings,parameters)
     }
@@ -51,8 +52,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     async recreateDatabase() {
 
       try { 
-        const vendorProperties = Object.assign({},this.vendorProperties)
-        const dbi = new MsSQLDBMgr(this.yadamu, vendorProperties)
+        const dbi = new MsSQLDBMgr(this.yadamu,this.CONNECTION_SETTINGS)
         await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE)
       } catch (e) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.YADAMU_DATABASE],e);
@@ -64,22 +64,6 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
       return new MsSQLQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
-	/*
-       
-    async bulkInsert(bulkOperation) {
-	  
-	  this.batchNumber = this.batchNumber ? this.batchNumber + 1  : 1
-	  if (this.batchNumber === 5) {
-	    this.yadamu.killConfiguration = {delay: 1100}
-	    const pid = await this.getConnectionID();
-        await this.manager.scheduleTermination(pid,this.getWorkerNumber())
-	  }
-	  await super.bulkInsert(bulkOperation)
-	}
-	  
-
-    */
-	
     async scheduleTermination(pid,workerId) {
       const tags = this.getTerminationTags(workerId,pid)
       this.LOGGER.qa(tags,`Termination Scheduled.`);
@@ -88,7 +72,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
           this.LOGGER.log(tags,`Killing connection.`);
           // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
           // const request = new this.sql.Request(this.pool);
-          const request = await this.sql.connect(this.vendorProperties);
+          const request = await this.sql.connect(this.CONNECTION_PROPERTIES);
           let stack
           const sqlStatement = `kill ${pid}`
           try {
@@ -119,11 +103,17 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 }
 
 class MsSQLDBMgr extends MsSQLQA {
-    
-    constructor(yadamu,vendorProperties) {
-      super(yadamu)
-      this.vendorProperties = vendorProperties
-      this.vendorProperties.database = 'master';
+	
+    addVendorExtensions(connectionProperties)  {
+   
+      connectionProperties = super.addVendorExtensions(connectionProperties)
+	  connectionProperties.database = 'master'
+   	  return connectionProperties
+
+    }
+   
+    constructor(yadamu,connectionSettings) {
+      super(yadamu,undefined,connectionSettings)
     }
     
     async initialize() {
@@ -138,9 +128,6 @@ class MsSQLDBMgr extends MsSQLQA {
     
       try {
         await this.initialize()
-        // Create a connection pool using a well known database that must exist   
-        this.vendorProperties.database = 'master';
-        // await super.initialize();
 
         let results;       
         

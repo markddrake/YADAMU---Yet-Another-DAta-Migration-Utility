@@ -60,7 +60,7 @@ class CloudDBI extends LoaderDBI {
 	*/
 	
     return this._BASE_DIRECTORY || (() => {
-	  let baseDirectory =  this.vendorSettings.directory || ""
+	  let baseDirectory =  this.CONNECTION_PROPERTIES.directory || ""
 	  if (this.DIRECTORY) {
         if (path.isAbsolute(this.DIRECTORY)) {
 	      baseDirectory = this.DIRECTORY
@@ -98,12 +98,7 @@ class CloudDBI extends LoaderDBI {
   makeCloudPath(target) {
 	return target.split(path.sep).join(path.posix.sep)
   }
-  
-  setConnectionProperties(connectionSettings) {
-	this.vendorSettings = connectionSettings.settings
-	// delete connectionSettings.settings;
-	super.setConnectionProperties(connectionSettings)
-  }
+
   
   async loadMetadataFiles(copyStagedData) {
     // this.LOGGER.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
@@ -239,7 +234,7 @@ class CloudDBI extends LoaderDBI {
   async truncateTable(schema,tableName) {
 
     const datafilePath = this.makeAbsolute(this.getDataFileName(tableName));
-    await await this.cloudService.removeFile(dataFilePath)
+    await this.cloudService.removeFile(dataFilePath)
 	
   }
 	  

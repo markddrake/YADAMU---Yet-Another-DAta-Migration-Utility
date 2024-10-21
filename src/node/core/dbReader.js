@@ -131,10 +131,12 @@ class DBReader extends Readable {
       queryInfo = readerDBI.generateSQLQuery(task)
 	  queryInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[queryInfo.TABLE_NAME]?.dataTypes ?? []  
 	  queryInfo.TARGET_COLUMN_NAMES = writerDBI.metadata?.[queryInfo.TABLE_NAME]?.columnNames ?? [] 
-	  const inputStreams = await readerDBI.getInputStreams(queryInfo,pipelineState)
+      const inputStreams = await readerDBI.getInputStreams(queryInfo,pipelineState)
 	  const outputStreams = await writerDBI.getOutputStreams(queryInfo.MAPPED_TABLE_NAME,pipelineState)
 	  yadamuPipeline.push(...inputStreams,...outputStreams)
-      activeStreams.push(...yadamuPipeline.map((s) => { return finished(s) }))
+      activeStreams.push(...yadamuPipeline.map((s) => { 
+	    return finished(s) 
+	  }))
     } catch (e) {
       this.yadamuLogger.handleException(['PIPELINE','STREAM INITIALIZATION',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],e)
       throw (e)
@@ -363,7 +365,7 @@ class DBReader extends Readable {
    
   _read() {
     // this.yadamuLogger.trace([this.constructor.name,`READ`,this.dbi.DATABASE_VENDOR],this.nextPhase)
-	this.doRead().then(() => {}).catch((cause) => {
+	this.doRead().then(YadamuLibrary.NOOP).catch((cause) => {
 	  this.yadamuLogger.handleException([`READER`,`READ`,this.nextPhase,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],cause);
 	  this.underlyingError = cause;
       this.destroy(cause)

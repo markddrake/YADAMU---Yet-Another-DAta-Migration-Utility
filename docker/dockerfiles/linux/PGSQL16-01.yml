@@ -1,0 +1,32 @@
+version: "2.4"
+services:
+
+  PGSQL16-01: 
+    container_name: PGSQL16-01
+    image:  yadamu/postgres:latest
+    # command: ["postgres", "-c", "log_statement=all"]
+    mem_limit: '10gb'
+    shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - POSTGRES-DB
+    ports: 
+      - "54326:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL16-01-VOLUME:/var/lib/postgresql/data
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  PGSQL16-01-VOLUME:

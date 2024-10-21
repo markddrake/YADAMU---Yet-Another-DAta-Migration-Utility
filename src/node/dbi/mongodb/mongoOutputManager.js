@@ -6,6 +6,7 @@ import {
 import WKX from 'wkx';
 
 import mongodb                  from 'mongodb'
+
 const { 
   ObjectID, 
   Decimal128, 
@@ -178,6 +179,10 @@ class MongoOutputManager extends YadamuOutputManager {
 	
   }
 
+  getColumnOrderingTransformation(columnMappings) {
+	return YadamuLibrary.NOOP
+  }
+  
   async setTableInfo(tableName) {
 	  
 	await super.setTableInfo(tableName)
@@ -239,7 +244,6 @@ class MongoOutputManager extends YadamuOutputManager {
 	// Apply the row transformation and add row to the current batch.
 
     // console.log(row)
-	
 	this.rowTransformation(row)
 	this.batchRow(row)
     this.PIPELINE_STATE.cached++

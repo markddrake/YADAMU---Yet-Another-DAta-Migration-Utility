@@ -184,15 +184,26 @@ class YadamuDBI extends EventEmitter {
   
   // Override based on local parameters object ( which under the test harnesss may differ from the one obtained from yadamu in the constructor).
   
-  get FILE()                          { return this.parameters.FILE     || this.yadamu.FILE }
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || this.yadamu.PARALLEL)}
+
+  get FILE()                          { return this.parameters.FILE        || this.yadamu.FILE }  
+  get CIPHER()                        { return this.parameters.CIPHER      || this.yadamu.CIPHER }
+  get SALT()                          { return this.parameters.SALT        || this.yadamu.SALT }
+  get COMPRESSION()                   { return this.parameters.COMPRESSION || this.yadamu.COMPRESSION }
+  get PASSPHRASE()                    { return this.parameters.PASSPHRASE }
   
-  get EXCEPTION_FOLDER()              { return this.parameters.FILE     || this.yadamu.EXCEPTION_FOLDER }
-  get EXCEPTION_FILE_PREFIX()         { return this.parameters.FILE     || this.yadamu.EXCEPTION_FILE_PREFIX }
-  get REJECTION_FOLDER()              { return this.parameters.FILE     || this.yadamu.REJECTION_FOLDER }
-  get REJECTION_FILE_PREFIX()         { return this.parameters.FILE     || this.yadamu.REJECTION_FILE_PREFIX }
-  get WARNING_FOLDER()                { return this.parameters.FILE     || this.yadamu.WARNING_FOLDER }
-  get WARNING_FILE_PREFIX()           { return this.parameters.FILE     || this.yadamu.WARNING_FILE_PREFIX }
+  get ENCRYPTION()                    { return this.parameters.hasOwnProperty('ENCRYPTION') ? this.parameters.ENCRYPTION : this.yadamu.ENCRYPTION }
+
+  get ENCRYPTION_KEY_AVAILABLE()      { return this.parameters.ENCRYPTION_KEY_AVAILABLE }
+  get ENCRYPTION_KEY()                { return this._ENCRYPTION_KEY }
+  set ENCRYPTION_KEY(v)               { this._ENCRYPTION_KEY = v}  	
+    
+  get EXCEPTION_FOLDER()              { return this.parameters.EXCEPTION_FOLDER        || this.yadamu.EXCEPTION_FOLDER }
+  get EXCEPTION_FILE_PREFIX()         { return this.parameters.EXCEPTION_FILE_PREFIX   || this.yadamu.EXCEPTION_FILE_PREFIX }
+  get REJECTION_FOLDER()              { return this.parameters.REJECTION_FOLDER        || this.yadamu.REJECTION_FOLDER }
+  get REJECTION_FILE_PREFIX()         { return this.parameters.REJECTION_FILE_PREFIX   || this.yadamu.REJECTION_FILE_PREFIX }
+  get WARNING_FOLDER()                { return this.parameters.WARNING_FOLDER          || this.yadamu.WARNING_FOLDER }
+  get WARNING_FILE_PREFIX()           { return this.parameters.WARNING_FILE_PREFIX     || this.yadamu.WARNING_FILE_PREFIX }
   
   get TRANSACTION_IN_PROGRESS()       { return this._TRANSACTION_IN_PROGRESS === true }
   set TRANSACTION_IN_PROGRESS(v)      { this._TRANSACTION_IN_PROGRESS = v }
@@ -217,6 +228,8 @@ class YadamuDBI extends EventEmitter {
 
   get IS_READER()                     { return this.parameters.hasOwnProperty('FROM_USER') && !this.parameters.hasOwnProperty('TO_USER') }
   get IS_WRITER()                     { return !this.parameters.hasOwnProperty('FROM_USER') && this.parameters.hasOwnProperty('TO_USER') }
+  
+  get IS_FILE_BASED()                 { return false }
 
   get CURRENT_SCHEMA()                { 
     this._CURRENT_SCHEMA = this._CURRENT_SCHEMA || (() => {
@@ -361,10 +374,61 @@ class YadamuDBI extends EventEmitter {
     else {
      this.manager.PARTITIONED_TABLE_STATE[this.PIPELINE_STATE.partitionedTableName] = v
     }
-  }1
-    
-  constructor(yadamu,manager,connectionSettings,parameters) {
+  }
 
+  setConnectionProperties(connectionSettings) {
+    this.CONNECTION_SETTINGS = connectionSettings
+	this.vendorParameters  = {}
+	Object.keys(connectionSettings.parameters || {}).forEach((key) => {
+  	  this.vendorParameters[key.toUpperCase()] = connectionSettings.parameters[key];
+    })
+    this.vendorSettings = connectionSettings.settings || {}
+  }
+   
+  redactPasswords() {
+	   
+	const connectionProperties = structuredClone(this.CONNECTION_PROPERTIES)
+	connectionProperties.password = '#REDACTED'
+	return connectionProperties
+	
+  }
+
+  setDefaultConnectionProperties(connectionProperties) {
+
+    connectionProperties.user      = this.parameters.USERNAME  || connectionProperties.user
+    connectionProperties.host      = this.parameters.HOSTNAME  || connectionProperties.host
+    connectionProperties.database  = this.parameters.DATABASE  || connectionProperties.database 
+    connectionProperties.password  = this.parameters.PASSWORD  || connectionProperties.password
+    connectionProperties.port      = this.parameters.PORT      || connectionProperties.port 
+	
+  }
+  
+  addVendorExtensions(connectionProperties) {
+  }
+  
+  #CONNECTION_PROPERTIES = undefined
+  
+  get CONNECTION_PROPERTIES () {
+    this.#CONNECTION_PROPERTIES  = this.#CONNECTION_PROPERTIES || (() => {
+	  const connectionProperties = {
+		... this.CONNECTION_SETTINGS[this.DATABASE_KEY]
+	  }
+	  this.setDefaultConnectionProperties(connectionProperties)
+	  return this.addVendorExtensions(connectionProperties)
+    })();
+    return this.#CONNECTION_PROPERTIES 
+  }
+  
+  #CONNECTION_SETTINGS = {}
+  
+  get CONNECTION_SETTINGS()  { return this.#CONNECTION_SETTINGS }
+  set CONNECTION_SETTINGS(v) { 
+    // console.log(v); 
+	this.#CONNECTION_SETTINGS = v 
+  }
+   
+  constructor(yadamu,manager,connectionSettings,parameters) {
+	  
     super()
     this.DRIVER_ID = performance.now()
     yadamu.activeConnections.add(this)
@@ -392,8 +456,6 @@ class YadamuDBI extends EventEmitter {
 	this._ERROR_STATE = {
 	  LATEST_ERROR  : undefined
 	}
-
-    this.vendorProperties = this.getVendorProperties()   
 
     this.systemInformation = undefined;
     this.metadata = undefined;
@@ -544,10 +606,41 @@ class YadamuDBI extends EventEmitter {
   }
         
   initializeParameters(parameters){
-    // Merge default parameters for this driver with parameters from configuration files and command line parameters.
-    this.parameters = Object.assign({}, this.DBI_PARAMETERS, this.vendorParameters, parameters, this.yadamu.COMMAND_LINE_PARAMETERS)
-  }
+    
+	// Merge default parameters for this driver with parameters from configuration files and command line parameters. Map Key names to uppercase
+	
+	// Override values from DBI_PARAMETER with values from the YADAMU controller
+	
+    this.parameters = Object.fromEntries(Object.entries({
+	  ...this.DBI_PARAMETERS
+	, ...(this.yadamu.ENCRYPTION) || (this.yadamu.ENCRYPTION === false) && {ENCRYPTION : this.yadamu.ENCRYPTION}
+	, ...(this.yadamu.CIPHER)                                           && {CIPHER     : this.yadamu.CIPHER}
+	, ...(this.yadamu.SALT)                                             && {SALT       : this.yadamu.SALT}
+	, ...(this.yadamu.FILE)                                             && {FILE       : this.yadamu.FILE}
+	, ...(this.yadamu.parameters.BUCKET)                                && {BUCKET     : this.yadamu.parameters.BUCKET}
+	, ...this.vendorParameters
+	, ...parameters
+	, ...this.yadamu.COMMAND_LINE_PARAMETERS
+	}).map(([k, v]) => [k.toUpperCase(), v]))
+	
+    /*
+	**
 
+	console.log(this.constructor.name,'initializeParameters','Begin Parameter Dump')
+	console.log('DBI_PARAMETERS',this.DBI_PARAMETERS)
+	console.log('vendorParameters',this.vendorParameters)
+	console.log('parameters',parameters)
+	console.log('COMMAND_LINE_PARAMETERS',this.yadamu.COMMAND_LINE_PARAMETERS)
+    console.log('this.parameters',this.parameters)
+    console.log('this.yadamu.parameters',this.yadamu.parameters)
+	console.log(this.constructor.name,'initializeParameters','End Parameter Dump')
+	
+	**
+	*/
+    
+ }
+	
+	
   setParameters(parameters) {
     // Used when creating a worker.
     Object.assign(this.parameters, parameters || {})
@@ -703,51 +796,13 @@ class YadamuDBI extends EventEmitter {
   }
 
   logDisconnect() {
-    const pwRedacted = Object.assign({},this.vendorProperties)
-    delete pwRedacted.password
-    this.SQL_TRACE.comment(`DISCONNECT : Properies: ${JSON.stringify(pwRedacted)}`)
+    this.SQL_TRACE.comment(`DISCONNECT : Properies: ${JSON.stringify(this.redactPasswords())}`)
   }
   
   logConnectionProperties() {    
-    const pwRedacted = Object.assign({},this.vendorProperties)
-    delete pwRedacted.password
-    this.SQL_TRACE.comment(`CONNECT : Properies: ${JSON.stringify(pwRedacted)}`)
+    this.SQL_TRACE.comment(`CONNECT : Properies: ${JSON.stringify(this.redactPasswords())}`)
   }
-    
-  updateVendorProperties(vendorProperties) {
-
-    vendorProperties.username  = this.parameters.USERNAME  || vendorProperties.user
-    vendorProperties.hostname  = this.parameters.HOSTNAME  || vendorProperties.host
-    vendorProperties.database  = this.parameters.DATABASE  || vendorProperties.database 
-    vendorProperties.password  = this.parameters.PASSWORD  || vendorProperties.password
-    vendorProperties.port      = this.parameters.PORT      || vendorProperties.port 
-	
-  }
-
-  getVendorProperties() {
-
-    const vendorProperties = this.vendorProperties || {}
-    this.updateVendorProperties(vendorProperties)
-    return vendorProperties
-
-  }
-  
-  setVendorProperties(connectionSettings) {
-    if (!YadamuLibrary.isEmpty(connectionSettings[this.DATABASE_KEY])) {
-      this.vendorProperties = connectionSettings[this.DATABASE_KEY] 
-      delete connectionSettings[this.DATABASE_KEY] 
-    }
-    else {
-      this.vendorProperties = {}
-    }    
-  }
-     
-  setConnectionProperties(connectionSettings) {
-    this.setVendorProperties(connectionSettings)
-    this.vendorParameters = connectionSettings.parameters || {}
-    this.vendorSettings = connectionSettings.settings || {}
-  }
-   
+         
   isValidDDL() {
     return ((this.systemInformation.vendor === this.DATABASE_VENDOR) && (this.systemInformation.dbVersion <= this.DATABASE_VERSION))
   }
@@ -1063,6 +1118,8 @@ class YadamuDBI extends EventEmitter {
   
   async truncateTable(schema,tableName) {
 	 
+	 
+	const activeTransaction = this.TRANSACTION_IN_PROGRESS
 	if (this.TRANSACTION_IN_PROGRESS) {
 	  await this.rollbackTransaction()
 	}
@@ -1072,7 +1129,11 @@ class YadamuDBI extends EventEmitter {
 	await this.beginTransaction()
 	await this.executeSQL(sqlStatement)
 	await this.commitTransaction()
-	// await this.beginTransaction()
+	
+	if (activeTransaction) {
+	  await this.beginTransaction()
+	}
+	
   }
 	    
   analyzeStatementCache(statementCache,startTime) {
@@ -1101,7 +1162,7 @@ class YadamuDBI extends EventEmitter {
       connected = true
       await this.configureConnection()
     } catch (e) {
-      const err = connected ? e : new ConnectionError(e,this.vendorProperties)
+      const err = connected ? e : new ConnectionError(e,this.redactPasswords())
       throw err
     }
 
@@ -1218,7 +1279,7 @@ class YadamuDBI extends EventEmitter {
   }
   
   async getDatabaseConnection(requirePassword) {
-    let interactiveCredentials = (requirePassword && ((this.vendorProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.vendorProperties[this.PASSWORD_KEY_NAME].length === 0))) 
+    let interactiveCredentials = (requirePassword && ((this.CONNECTION_PROPERTIES[this.PASSWORD_KEY_NAME] === undefined) || (this.CONNECTION_PROPERTIES[this.PASSWORD_KEY_NAME].length === 0))) 
     let retryCount = interactiveCredentials ? this.RETRY_COUNT : 1
     
     
@@ -1231,12 +1292,12 @@ class YadamuDBI extends EventEmitter {
       if (interactiveCredentials)  {
         if (retryCount === this.RETRY_COUNT) {
           console.log('Loaded database password from environment variable "YADAMU_PASSWORD".')
-          this.vendorProperties[this.PASSWORD_KEY_NAME] = process.env.YADAMU_PASSWORD
+          this.CONNECTION_PROPERTIES[this.PASSWORD_KEY_NAME] = process.env.YADAMU_PASSWORD
         }
         else {
           const pwQuery = this.yadamu.createQuestion(prompt)
           const password = await pwQuery;
-          this.vendorProperties[this.PASSWORD_KEY_NAME] = password;
+          this.CONNECTION_PROPERTIES[this.PASSWORD_KEY_NAME] = password;
         }
       }
       try {
@@ -1617,7 +1678,7 @@ class YadamuDBI extends EventEmitter {
       })
       
       const invalidTableNames = this.TABLE_FILTER.filter((tableName) => {
-         // Return true if the table does not have an entry in the schemaInformstion collection
+         // Return true if the table does not have an entry in the schemaInformation collection
          return !tableNames.includes(tableName)
       })
       
@@ -1655,6 +1716,7 @@ class YadamuDBI extends EventEmitter {
       , dataTypes                : table.DATA_TYPE_ARRAY.map((DATA_TYPE) => {return YadamuDataTypes.decomposeDataType(DATA_TYPE).type})
       , sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
       , vendor                   : this.DATABASE_VENDOR 
+	  , skipColumnReordering       : table.SKIP_COLUMN_REORDERING === true
       }
       if (table.PARTITION_COUNT) {
         tableMetadata.partitionCount = table.PARTITION_COUNT
@@ -1809,7 +1871,7 @@ class YadamuDBI extends EventEmitter {
   }
 
   generateSQLQuery(tableMetadata) {
-    const queryInfo = Object.assign({},tableMetadata)   
+    const queryInfo = {...tableMetadata}
     queryInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
     
     // ### TESTING ONLY: Uncomment folllowing line to force Table Not Found condition
@@ -1832,6 +1894,9 @@ class YadamuDBI extends EventEmitter {
     inputStream.PIPELINE_STATE.errorSource = inputStream.PIPELINE_STATE.errorSource || DBIConstants.INPUT_STREAM_ID
     inputStream.STREAM_STATE.error = inputStream.STREAM_STATE.error || (inputStream.PIPELINE_STATE.errorSource === DBIConstants.INPUT_STREAM_ID) ? this.inputStreamError(err,sqlStatement) : inputStream.STREAM_STATE.error
     this.failedPrematureClose = YadamuError.prematureClose(err)
+    err.pipelineComponents = [...err.pipelineComponents || [], inputStream.constructor.name]
+	err.pipelineIgnoreErrors = true
+    err.pipelineState = YadamuError.clonePipelineState(inputStream.PIPELINE_STATE)  
   }
   
   
@@ -1951,12 +2016,12 @@ class YadamuDBI extends EventEmitter {
 
     this.setParameters(this.manager.parameters)
     
-    this.systemInformation  = this.manager.systemInformation
-    this.metadata           = this.manager.metadata
-    this.statementCache     = this.manager.statementCache
-    this.statementGenerator = this.manager.statementGenerator
-    this.partitionMetadata  = this.manager.partitionMetadata
-	this.vendorProperties   = this.manager.vendorProperties
+    this.systemInformation      = this.manager.systemInformation
+    this.metadata               = this.manager.metadata
+    this.statementCache         = this.manager.statementCache
+    this.statementGenerator     = this.manager.statementGenerator
+    this.partitionMetadata      = this.manager.partitionMetadata
+	this.#CONNECTION_PROPERTIES = this.manager.CONNECTION_PROPERTIES
     
     this.IDENTIFIER_MAPPINGS =  this.manager.IDENTIFIER_MAPPINGS
   }   

@@ -379,13 +379,13 @@ class YadamuStatementGenerator {
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
+      tableInfo.columnMappings = tableMetadata.source?.columnMappings || {}
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     })
    
     // await this.debugStatementGenerator({},statementCache)
-	
-    return statementCache;
+	return statementCache;
   }
 
 }

@@ -30,7 +30,7 @@ class MySQLParser extends YadamuParser {
   }
 
   async doTransform(data) {
-    data = Object.values(data)    
+    // data = Object.values(data)    
 	return await super.doTransform(data)
   }
 }

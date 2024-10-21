@@ -1,10 +1,10 @@
-FROM node:latest
+FROM node:22.2
 WORKDIR /usr/src/YADAMU
-ADD https://download.oracle.com/otn_software/linux/instantclient/213000/oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm .
+ADD https://download.oracle.com/otn_software/linux/instantclient/2350000/oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm .
 COPY src/package*.json ./
 RUN apt update \
  && apt-get -y install libaio1 alien \
- && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
+ && alien -i --scripts ./oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm \
  && npm install --global electron \
  && npm install \
  && npm ls \

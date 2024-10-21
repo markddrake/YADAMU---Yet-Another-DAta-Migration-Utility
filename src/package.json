@@ -29,23 +29,24 @@
     "ibm_db_electron": "npm:ibm_db@^3.2.2",
     "install": "^0.13.0",
     "jquery": "^3.7.1",
-    "mariadb": "^2.5.6",
+    "mariadb": "^3.3.0",
     "mime-types": "^2.1.28",
     "mongodb": "^6.2.0",
-    "mssql": "^10.0.1",
+    "mssql": "^11.0.1",
     "mysql": "^2.18.1",
+    "mysql2": "^3.11.0",
     "npm": "^10.2.1",
-    "oracledb": "^6.2.0",
+    "oracledb": "^6.6.0",
     "pg": "^8.11.3",
     "pg-copy-streams": "^6.0.6",
     "pg-query-stream": "^4.5.3",
     "readable-stream": "^4.4.2",
-    "snowflake-sdk": "^1.9.1",
-    "uuid": "^9.0.1",
+    "snowflake-sdk": "^1.14.0",
+    "uuid": "^10.0.0",
     "wkx": "^0.5.0"
   },
   "devDependencies": {
-    "electron": "^27.0.2",
+    "electron": "^32.1.2",
     "electron-packager": "^17.1.1"
   }
 }

@@ -49,11 +49,14 @@ const MAX_CHARATER_SIZE = 64000
 
 class TeradataDBI extends YadamuDBI {
      
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,TeradataConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...TeradataConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -67,6 +70,14 @@ class TeradataDBI extends YadamuDBI {
 
   get DATATYPE_IDENTITY_MAPPING() { return false }
   get FETCH_SIZE()                { return this.parameters.TERDATA_FETCH_SIZE || TeradataConstants.FETCH_SIZE}
+  
+  addVendorExtensions(connectionProperties) {
+
+    connectionProperties.log               = "0"
+	connectionProperties.teradata_values   = "false"
+	return connectionProperties
+
+  }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
@@ -103,7 +114,7 @@ class TeradataDBI extends YadamuDBI {
   async testConnection() {   
     this.setDatabase()
     try {
-      let connection = Teradata.createConnection(this.vendorProperties)
+      let connection = Teradata.createConnection(this.CONNECTION_PROPERTIES)
       connection = await this.establishConnection(connection)
       connection.destroy()
     } catch (e) {
@@ -129,7 +140,7 @@ class TeradataDBI extends YadamuDBI {
 	  operation = 'TeradataConnection.TeradataConnection()';
       const connection = new TeradataConnection.TeradataConnection()
 	  operation = 'TeradataConnection.TeradataConnection().connect()';      
-      connection.connect(this.vendorProperties)
+      connection.connect(this.CONNECTION_PROPERTIES)
 	  operation = 'TeradataConnection.TeradataConnection().cursor()';      
       this.cursor = connection.cursor()
 	  this.readCursor = this.cursor
@@ -166,17 +177,7 @@ class TeradataDBI extends YadamuDBI {
   async closePool(options) {
     // Teradata-SDK does not support connection pooling
   }
-  
-  updateVendorProperties(vendorProperties) {
-
-    vendorProperties.host              = this.parameters.HOSTNAME || vendorProperties.host      || vendorProperties.host
-    vendorProperties.user              = this.parameters.USERNAME || vendorProperties.user      || vendorProperties.user
-    vendorProperties.password          = this.parameters.PASSWORD || vendorProperties.password  || vendorProperties.password       
-    vendorProperties.log               = "0"
-	vendorProperties.teradata_values   = "false"
-
-  }
-  	  
+    	  
   async _executeDDL(ddl) {
 	
 	// Override to use for of rather than map
@@ -228,8 +229,8 @@ class TeradataDBI extends YadamuDBI {
   }   
   
   setDatabase() {  
-    if ((this.parameters.Teradata_SCHEMA_DB) && (this.parameters.Teradata_SCHEMA_DB !== this.vendorProperties.database)) {
-      this.vendorProperties.database = this.parameters.Teradata_SCHEMA_DB
+    if ((this.parameters.Teradata_SCHEMA_DB) && (this.parameters.Teradata_SCHEMA_DB !== this.CONNECTION_PROPERTIES.database)) {
+      this.CONNECTION_PROPERTIES.database = this.parameters.Teradata_SCHEMA_DB
     }
   }  
   

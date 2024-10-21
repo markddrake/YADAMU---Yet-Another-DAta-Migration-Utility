@@ -19,11 +19,11 @@ class RedshiftQA extends YadamuQALibrary.qaMixin(RedshiftDBI) {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
-    static #_DBI_PARAMETERS
+    static #DBI_PARAMETERS
     
     static get DBI_PARAMETERS()  { 
-       this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[RedshiftConstants.DATABASE_KEY] || {},{RDBMS: RedshiftConstants.DATABASE_KEY}))
-       return this.#_DBI_PARAMETERS
+       this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[RedshiftConstants.DATABASE_KEY] || {},{RDBMS: RedshiftConstants.DATABASE_KEY}))
+       return this.#DBI_PARAMETERS
     }
    
     get DBI_PARAMETERS() {

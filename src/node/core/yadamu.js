@@ -51,8 +51,8 @@ import {
 
 class Yadamu {
 
-  static #_YADAMU_PARAMETERS
-  static #_DBI_PARAMETERS
+  static #YADAMU_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get YADAMU_VERSION()         { return YadamuConstants.YADAMU_VERSION }
 
@@ -100,14 +100,17 @@ class Yadamu {
   }
   
   get CIPHER_KEY_SIZE()               { return 32 }
-  get CIPHER()                        { return this.parameters.CIPHER || YadamuConstants.CIPHER }
-  get SALT()                          { return this.parameters.SALT || YadamuConstants.SALT }
-  get ENCRYPTION()                    { return this.parameters.ENCRYPTION === undefined ? YadamuConstants.ENCRYPTION : this.parameters.ENCRYPTION }
+  get CIPHER()                        { return this.parameters.CIPHER            || YadamuConstants.CIPHER }
+  
+  get ENCRYPTION()                    { return this.parameters.hasOwnProperty('ENCRYPTION') ? this.parameters.ENCRYPTION : YadamuConstants.ENCRYPTION }
+  
+  get ENCRYPTION_KEY_AVAILABLE()      { return this.parameters.ENCRYPTION_KEY_AVAILABLE }
   get ENCRYPTION_KEY()                { return this._ENCRYPTION_KEY }
   set ENCRYPTION_KEY(v)               { this._ENCRYPTION_KEY = v}
-  
+ 
   get COMPRESSION()                   { return this.parameters.COMPRESSION || 'NONE' }
   get DATA_STAGING_ENABLED()          { return this.parameters.hasOwnProperty('DATA_STAGING_ENABLED') ? this.parameters.DATA_STAGING_ENABLED : true }
+  get CREATE_TARGET_DIRECTORY()       { return this.parameters.hasOwnProperty('CREATE_TARGET_DIRECTORY') ? this.parameters.CREATE_TARGET_DIRECTORY : false } 
   
   get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
   
@@ -161,6 +164,10 @@ class Yadamu {
     return this._LOGGER
   }
   
+  set LOGGER(v) {
+	 this._LOGGER = v 
+  }
+  
   get DEBUGGER() {
     return this.DEBUG_ENABLED ? this.LOGGER : YadamuLogger.NULL_LOGGER 
   }
@@ -180,6 +187,8 @@ class Yadamu {
     })();
     return this._WARNING_MANAGER
   }
+  
+  get METRICS() { return this.metrics }
   
   constructor(operation,configParameters) {
 	 
@@ -233,23 +242,13 @@ class Yadamu {
 	this.initializeLogging();
 	
     if (parameters && (parameters.PASSPHRASE || (parameters.ENCRYPTION === true))) {		
-	  await this.generateCryptoKey()
+	  this.ENCRYPTION_KEY = await this.generateCryptoKey(this.parameters)
 	}
-  }
-  
-  clone() {
-	
-    this.REJECTION_MANAGER.close();
-	this.WARNING_MANAGER.close();
-
-	this.reset();
-	this.LOGGER.resetMetrics()	
-	return this;
   }
   
   yadamuAbort(err,promise) {
 	  
-	if (err.ignoreUnhandledRejection === true) {
+	if ((err.ignoreUnhandledRejection === true)) {
 	  // this.LOGGER.trace(['UNHANDLED REJECTION','IGNORED','YADAMU',this.STATUS.operation],err);
 	  return;
 	}
@@ -275,12 +274,6 @@ class Yadamu {
     }  
   }  
   
-  reloadParameters(parameters) {
-  
-    this.initializeParameters(parameters || {})
-    this.initializeLogging();    
-  }
-  
   appendSynonym(argument,value) {
 	this._COMMAND_LINE_PARAMETERS[argument] = value
   }
@@ -305,19 +298,33 @@ class Yadamu {
   
  	  
   initializeParameters(configParameters) {
-
-
-    // Start with Yadamu Defaults
-    this.parameters = Object.assign({}, this.YADAMU_PARAMETERS);
-
+    //  Start with Yadamu Defaults
     // Merge parameters from configuration files
-    Object.assign(this.parameters, configParameters);
-
     // Merge parameters provided via command line arguments
-    Object.assign(this.parameters,this.COMMAND_LINE_PARAMETERS)
-   
+  
+	// Merge default parameters for this driver with parameters from configuration files and command line parameters. Map Key names to uppercase
+	
+    this.parameters = Object.fromEntries(Object.entries({
+	  ...this.YADAMU_PARAMETERS
+	, ...configParameters
+	, ...this.COMMAND_LINE_PARAMETERS
+	}).map(([k, v]) => [k.toUpperCase(), v]))
+	
+  }
+
+  reloadParameters(parameters) {
+  
+    this.initializeParameters(parameters || {})
+    this.initializeLogging();    
   }
   
+  updateParameters(parameters) {
+	this.parameters = {
+	  ...this.parameteres
+    , ...parameters
+    }
+  }
+          
   initializeSQLTrace() {
 	 
     /*
@@ -388,19 +395,24 @@ class Yadamu {
   
   }
   
-  async generateCryptoKey() {
-
-    let passphrase = this.parameters.PASSPHRASE || await this.requestPassPhrase()
-  
+  async generateCryptoKey(parameters) {
+	  
+	// Environemnt variables overide configuration files and command line parameters
+	
+    const passphrase = process.env.YADAMU_PASSPHRASE || parameters.PASSPHRASE || await this.requestPassPhrase()
+	const salt = process.env.YADAMU_SALT || parameters.SALT || YadamuConstants.SALT 
+	
+	// Prevent the PASSPHRASE from being 'Inspected'
+	delete parameters.PASSPHRASE
+    
     return await new Promise((resolve,reject) => {
-	  crypto.scrypt(passphrase, this.SALT, this.CIPHER_KEY_SIZE, (err,key) => {
+	  crypto.scrypt(passphrase, salt , this.CIPHER_KEY_SIZE, (err,key) => {
+		parameters.ENRYPTION_KEY_AVAILALBE = false
 		if (err) reject(err);
-		// console.log('Key',passphrase,this.SALT,this.CIPHER_KEY_SIZE,key)
-	    passphrase = undefined
-		this.ENCRYPTION_KEY = key
-		resolve()
+		// console.log('Key',passphrase,salt,this.CIPHER_KEY_SIZE,key)
+		parameters.ENRYPTION_KEY_AVAILALBE = true
+		resolve(key)
       })
-	  this.parameters.PASSPHRASE = undefined
 	})  
   }
   
@@ -409,7 +421,7 @@ class Yadamu {
 	   this.reloadParameters(parameters)
 	 }
 	 if (this.ENCRYPTION) {
-	   await this.generateCryptoKey()
+	   this.ENCRYPTION_KEY = await this.generateCryptoKey(this.parameters)
      }
   }
   
@@ -476,23 +488,19 @@ class Yadamu {
         yadamuLogger.info(terminationArgs,terminationMessage)
     }
 
-    if (yadamuLogger.FILE_LOGGER) {
-      console.log(`${new Date().toISOString()}[YADAMU][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
-    }
+    console.log(`${new Date().toISOString()} [YADAMU][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. ${yadamuLogger.FILE_BASED_LOGWRITER ? `See "${status.logFileName}" for details.` : ''}`);  
   }
   
   reportError(e,parameters,status,yadamuLogger) {
+    const endTime = performance.now();
     
 	if (!(e instanceof ConnectionError)) {
 	  yadamuLogger.handleException([`YADAMU`,`"${status.operation}"`],e);
 	}
-	
-    if (yadamuLogger.FILE_LOGGER) {
-      console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
-    }
-    else {
-      console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation Failed:`);
-      // console.dir(e,{depth:null});
+
+    console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation failed: Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. ${yadamuLogger.FILE_BASED_LOGWRITER ? `See "${status.logFileName}" for details.` : ''}`);  
+    	
+    if (!yadamuLogger.FILE_BASED_LOGWRITER) {
 	  YadamuLibrary.reportError(e)
     }
   }
@@ -502,7 +510,11 @@ class Yadamu {
 	 assert(validValues.includes(testValue),`Invalid value "${testValue}" specified for parameter "${parameterName}". Valid values are ${JSON.stringify(validValues)}.`)
 	 return testValue;
   }
-
+  
+  getBooleanValue(parameterName,parameterValue) {
+	 return this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+  }
+  
   isExistingFile(parameterName,parameterValue) {
   
     const resolvedPath = path.resolve(parameterValue);
@@ -622,7 +634,7 @@ class Yadamu {
         const parameterValue = arg.substring(arg.indexOf('=')+1);
         switch (parameterName) {
 		  case 'ALLOW_ANY_PARAMETER':
-   	        allowAnyParameter = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+   	        allowAnyParameter = this.getBooleanValue(parameterName,parameterValue)
 		    break;
 	      case 'INIT':		  
 	      case 'COPY':		  
@@ -638,7 +650,7 @@ class Yadamu {
             parameters.RDBMS = parameterValue;
             break;
 	      case 'OVERWRITE':		  
-	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+	        parameters.OVERWRITE = this.getBooleanValue(parameterName,parameterValue)
 		    break;
           case 'CREDENTIALS':
             parameters.CREDENTIALS =  this.isExistingFile(parameterName,parameterValue);
@@ -686,6 +698,8 @@ class Yadamu {
           case 'DIRECTORY':
             parameters.DIRECTORY = parameterValue;
             break;
+		  case 'CREATE_TARGET_DIRECTORY':
+		    parameters.CREATE_TARGET_DIRECTORY = this.getBooleanValue(parameterName,parameterValue)
 		  case 'SOURCE':
           case 'SOURCE_DIR':
           case 'SOURCE_DIRECTORY':
@@ -789,7 +803,7 @@ class Yadamu {
 			}
             break;
 	      case 'TRUNCATE_ON_LOAD':		  
-	        parameters.TRUNCATE_ON_LOAD = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+	        parameters.TRUNCATE_ON_LOAD = this.getBooleanValue(parameterName,parameterValue)
 		    break;
           case 'IDENTIFIER_MAPPING_FILE':
             parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);

@@ -33,11 +33,14 @@ import SnowflakeCompare               from './snowflakeCompare.js'
 
 class SnowflakeDBI extends YadamuDBI {
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...SnowflakeConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -58,7 +61,7 @@ class SnowflakeDBI extends YadamuDBI {
   get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return SnowflakeConstants.STATEMENT_TERMINATOR };
 
-  get CURRENT_DATABASE()       { return this.parameters.YADAMU_DATABASE ||this.vendorProperties.database }
+  get CURRENT_DATABASE()       { return this.parameters.YADAMU_DATABASE ||this.CONNECTION_PROPERTIES.database }
 
   // Enable configuration via command line parameters
 
@@ -91,7 +94,25 @@ class SnowflakeDBI extends YadamuDBI {
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
   
-  get ARRAY_BINDING_THRESHOLD() { return this.vendorProperties.arrayBindingThreshold }
+  get ARRAY_BINDING_THRESHOLD() { return this.CONNECTION_PROPERTIES.arrayBindingThreshold }
+  
+  addVendorExtensions(connectionProperties) {
+
+	// Convert supplied parameters to format expected by connection mechansim
+		
+    this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
+	
+    connectionProperties.account                = this.parameters.ACCOUNT                    || connectionProperties.account 
+    connectionProperties.username               = this.parameters.USERNAME                   || connectionProperties.username 
+    connectionProperties.password               = this.parameters.PASSWORD                   || connectionProperties.password  
+    connectionProperties.warehouse              = this.parameters.WAREHOUSE                  || connectionProperties.warehouse
+    connectionProperties.database               = this.parameters.DATABASE                   || connectionProperties.database   
+	connectionProperties.arrayBindingThreshold  = this.parameters.SNOWFLAKE_BUFFER_SIZE      || connectionProperties.arrayBindingThreshold || 100000      
+    connectionProperties.insecureConnect        = this.parameters.SNOWFLAKE_INSECURE_CONNECT || connectionProperties.insecureConnect || false      
+
+	return connectionProperties
+
+  }
     
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
@@ -139,7 +160,7 @@ class SnowflakeDBI extends YadamuDBI {
   async testConnection() {   
     this.setDatabase()
 	try {
-      let connection = snowflake.createConnection(this.vendorProperties)
+      let connection = snowflake.createConnection(this.CONNECTION_PROPERTIES)
       connection = await this.establishConnection(connection)
       connection.destroy()
 	} catch (e) {
@@ -158,10 +179,10 @@ class SnowflakeDBI extends YadamuDBI {
   async getConnectionFromPool() {
   	// Snowflake-SDK does not support connection pooling
   	// this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
-    
+    snowflake.configure({ logLevel: "OFF" });
     this.setDatabase()
     this.logConnectionProperties()
-    let connection = snowflake.createConnection(this.vendorProperties)
+    let connection = snowflake.createConnection(this.CONNECTION_PROPERTIES)
     connection = await this.establishConnection(connection)
     const sqlStartTime = performance.now()
     this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
@@ -200,21 +221,6 @@ class SnowflakeDBI extends YadamuDBI {
   	// Snowflake-SDK does not support connection pooling
   }
     
-  updateVendorProperties(vendorProperties) {
-
-	// Convert supplied parameters to format expected by connection mechansim
-		
-    this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
-	
-    vendorProperties.account                = this.parameters.ACCOUNT                    || vendorProperties.account 
-    vendorProperties.username               = this.parameters.USERNAME                   || vendorProperties.username 
-    vendorProperties.password               = this.parameters.PASSWORD                   || vendorProperties.password  
-    vendorProperties.warehouse              = this.parameters.WAREHOUSE                  || vendorProperties.warehouse
-    vendorProperties.database               = this.parameters.DATABASE                   || vendorProperties.database   
-	vendorProperties.arrayBindingThreshold  = this.parameters.SNOWFLAKE_BUFFER_SIZE      || vendorProperties.arrayBindingThreshold || 100000      
-    vendorProperties.insecureConnect        = this.parameters.SNOWFLAKE_INSECURE_CONNECT || vendorProperties.insecureConnect || false      
-  }
-
   executeSQL(sqlStatement,args) {
     
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
@@ -274,8 +280,8 @@ class SnowflakeDBI extends YadamuDBI {
   }
 
   setDatabase() {  
-    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.vendorProperties.database)) {
-      this.vendorProperties.database = this.parameters.YADAMU_DATABASE
+    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.CONNECTION_PROPERTIES.database)) {
+      this.CONNECTION_PROPERTIES.database = this.parameters.YADAMU_DATABASE
     }
   }  
   

@@ -150,7 +150,9 @@ async function selectTargetFile(control) {
 
 function updateConfiguration(connectionType,connectionProperties,parameters) {
 
-  const pwdRedacated = Object.assign({},connectionProperties);
+  const pwdRedacated = {
+    ... connectionProperties
+  }
   delete pwdRedacated.password
   
   const mode = connectionType.substring(0,connectionType.indexOf('-'));

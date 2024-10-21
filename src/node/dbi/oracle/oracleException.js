@@ -107,6 +107,11 @@ class OracleError extends DatabaseError {
     return (this.cause.errorNum && OracleConstants.NONEXISTENT_USER.includes(this.cause.errorNum))
   }
 
+  spatialWKBPolygonError() {
+    return (this.spatialError() && this.cause.message.includes('WKB byte')  && this.cause.message.includes('Polygon'))
+  }
+
+
   knownBug(bugNumber) {
 	switch (bugNumber) {
 	  case 33561708:

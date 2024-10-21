@@ -1,5 +1,6 @@
 
 import fs                             from 'fs';
+import path                           from 'path';
 import readline                       from 'readline';
 
 import { 
@@ -67,11 +68,14 @@ import YugabyteCompare               from './yugabyteCompare.js'
 
 class YugabyteDBI extends YadamuDBI {
     
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YugabyteConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+	  ...DBIConstants.DBI_PARAMETERS
+	, ...YugabyteConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -141,6 +145,30 @@ class YugabyteDBI extends YadamuDBI {
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
+  addVendorExtensions(connectionProperties) {
+
+	// PG Environment variables override command line parameters or configuration file supplied variables
+
+    connectionProperties.username     = process.env.PGUSER             || connectionProperties.user
+    connectionProperties.host         = process.env.PGHOST             || connectionProperties.host
+    connectionProperties.database     = process.env.PGDATABASE         || connectionProperties.database 
+    connectionProperties.password     = process.env.PGPASSWORD         || connectionProperties.password
+    connectionProperties.port         = process.env.PGHPORT            || connectionProperties.port 	
+    connectionProperties.sslrootcert  = process.env.PGSSLROOTCERT      || this.parameters.SSL_ROOT_CERT  || connectionProperties.sslrootcert 
+
+    // Load the SSL Certificate
+
+    if (connectionProperties.sslrootcert) {
+	  const sslCert = fs.readFileSync(path.resolve(connectionProperties.sslrootcert),'ascii')
+	  connectionProperties.ssl = {
+        ca: [sslCert]
+	  }
+	}	
+
+	return connectionProperties
+	
+  }	 
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
 	this.DATA_TYPES = YugabyteDataTypes
@@ -170,7 +198,7 @@ class YugabyteDBI extends YadamuDBI {
     
   async testConnection() {   
 	try {
-      const pgClient = new Client(this.vendorProperties)
+      const pgClient = new Client(this.CONNECTION_PROPERTIES)
       await pgClient.connect()
       await pgClient.end()     
 								  
@@ -184,7 +212,7 @@ class YugabyteDBI extends YadamuDBI {
 	
     this.logConnectionProperties()
 	let sqlStartTime = performance.now()
-	this.pool = new Pool(this.vendorProperties)
+	this.pool = new Pool(this.CONNECTION_PROPERTIES)
     this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	
 	this.pool.on('error',(err, p) => {
@@ -224,7 +252,7 @@ class YugabyteDBI extends YadamuDBI {
 	try {
 	  operation = 'pg.Client()'
 	  stack = new Error().stack;
-      this.connection = new Client(this.vendorProperties)
+      this.connection = new Client(this.CONNECTION_PROPERTIES)
 	  operation = 'Client.connect()'
 	  stack = new Error().stack;
       await this.connection.connect()
@@ -324,16 +352,6 @@ class YugabyteDBI extends YadamuDBI {
     const results = await this.executeSQL('select now()')
   }
   
-  updateVendorProperties(vendorProperties) {
-
-    vendorProperties.user      = this.parameters.USERNAME  || vendorProperties.user
-    vendorProperties.host      = this.parameters.HOSTNAME  || vendorProperties.host
-    vendorProperties.database  = this.parameters.DATABASE  || vendorProperties.database 
-    vendorProperties.password  = this.parameters.PASSWORD  || vendorProperties.password
-    vendorProperties.port      = this.parameters.PORT      || vendorProperties.port 
-	
-  }
-
   /*  
   **
   **  Connect to the database. Set global setttings

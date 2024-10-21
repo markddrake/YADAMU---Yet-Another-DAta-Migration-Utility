@@ -113,7 +113,7 @@ class TeradataDBI extends _TeradataDBI {
 	this.worker = await this.getTeradataWorker()
     this.SQL_TRACE.comment(`Enqueue: connect()`)
 
-	const result = await this.enqueueTask({action : "connect", connectionProperties : this.vendorProperties})
+	const result = await this.enqueueTask({action : "connect", connectionProperties : this.CONNECTION_PROPERTIES})
 	return result
   }
     
@@ -160,11 +160,6 @@ class TeradataDBI extends _TeradataDBI {
   setTransactionCursor() { /* OVERRRIDE */ } 
       
   resetTransactionCursor() { /* OVERRRIDE */ }
-
-  inputStreamError(e,sqlStatement) {
-    return this.getDatabaseException(this.DRIVER_ID,e,sqlStatement)
-  }
-
   
   async _getInputStream(tableInfo) {
 
@@ -181,7 +176,7 @@ class TeradataDBI extends _TeradataDBI {
         this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
 		stack = new Error().stack
         const sqlStartTime = performance.now()
-		const is = new TeradataReader(this.worker,this.vendorProperties,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)
+		const is = new TeradataReader(this.worker,this.CONNECTION_PROPERTIES,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
@@ -198,7 +193,7 @@ class TeradataDBI extends _TeradataDBI {
   }  
   
   async setWorkerConnection() {    
-    this.vendorProperties = this.manager.vendorProperties
+    this.CONNECTION_PROPERTIES = this.manager.CONNECTION_PROPERTIES
 	await this.getConnectionFromPool()
   }
 

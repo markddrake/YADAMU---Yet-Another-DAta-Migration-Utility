@@ -32,11 +32,14 @@ import ExammpleCompare                from './exampleCompare.js'
 
 class ExampleDBI extends YadamuDBI {
        
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,ExampleConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...ExampleConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
    
   get DBI_PARAMETERS() {
@@ -109,9 +112,6 @@ class ExampleDBI extends YadamuDBI {
     // Close the connection pool
     throw new UnimplementedMethod('closePool()',`YadamuDBI`,this.constructor.name)
  }
-
-  updateVendorProperties(vendorProperties) {
-  }
 
   async executeSQL(sqlStatement,args) {
 	  

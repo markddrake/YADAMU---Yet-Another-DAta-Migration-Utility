@@ -141,11 +141,11 @@ class ConfigurationFileError extends UserError {
 }
 
 class ConnectionError extends UserError {
-  constructor(cause,connectionProperties) {
+  constructor(cause,redactedConnectionProperties) {
     super(cause.message);
 	this.cause = cause;
 	this.stack = cause.stack
-	this.vendorProperties = typeof connectionProperties === 'object' ? Object.assign({},connectionProperties,{password: "#REDACTED#"}) : connectionProperties
+    this.connectionProperties = redactedConnectionProperties
   }
 }
 

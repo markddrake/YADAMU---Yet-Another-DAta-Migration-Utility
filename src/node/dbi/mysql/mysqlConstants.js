@@ -1,11 +1,13 @@
 
-import YadamuConstants from '../../lib/yadamuConstants.js';
+import fs                                from 'fs'
+import YadamuConstants                   from '../../lib/yadamuConstants.js';
 
 class MySQLConstants {
 
   static get DATABASE_KEY()               { return 'mysql' };
   static get DATABASE_VENDOR()            { return 'MySQL' };
   static get SOFTWARE_VENDOR()            { return 'Oracle Corporation (MySQL)' };
+  static get MAX_ALLOWED_PACKET()         { return 1 * 1024 * 1024 * 1024 };
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
@@ -18,11 +20,11 @@ class MySQLConstants {
     return this._STATIC_PARAMETERS;
   }
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS() { 
-  this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-    return this.#_DBI_PARAMETERS
+  this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#DBI_PARAMETERS
   }
 
   static get READ_KEEP_ALIVE()            { return this.DBI_PARAMETERS.READ_KEEP_ALIVE}
@@ -35,12 +37,14 @@ class MySQLConstants {
  
   static get CONNECTION_PROPERTY_DEFAULTS() { 
     this._CONNECTION_PROPERTY_DEFAULTS = this._CONNECTION_PROPERTY_DEFAULTS || Object.freeze({
-      multipleStatements: true
-    , typeCast          : true
-    , supportBigNumbers : true
-    , bigNumberStrings  : true          
-    , dateStrings       : true
-    , trace             : true
+      multipleStatements      : true
+    , typeCast                : true
+    , supportBigNumbers       : true
+    , bigNumberStrings        : true          
+    , dateStrings             : true
+    , trace                   : true
+	, jsonStrings             : true
+	, infileStreamFactory     : (path) => {return fs.createReadStream(path)}
     })
    return this._CONNECTION_PROPERTY_DEFAULTS;
   }

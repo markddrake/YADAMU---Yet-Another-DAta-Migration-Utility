@@ -959,7 +959,9 @@ class YadamuDataTypes {
   
   static get WELLKNOWN_UNBOUNDED_NUMERIC_TYPES() {
     return this._WELLKNOWN_UNBOUNDED_NUMERIC_TYPES || (() => {
-      this._WELLKNOWN_UNBOUNDED_NUMERIC_TYPES = Object.freeze(Object.assign({},DataTypeClassification.unboundedNumerics))
+      this._WELLKNOWN_UNBOUNDED_NUMERIC_TYPES = Object.freeze({
+	    ...DataTypeClassification.unboundedNumerics
+	  })
       return this._WELLKNOWN_UNBOUNDED_NUMERIC_TYPES
     })()
   }

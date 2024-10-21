@@ -61,11 +61,14 @@ import {
 
 class OracleDBI extends YadamuDBI {
 
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  {
-	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS))
-	return this.#_DBI_PARAMETERS
+	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
+      ...DBIConstants.DBI_PARAMETERS
+    , ...OracleConstants.DBI_PARAMETERS
+    })
+	return this.#DBI_PARAMETERS
   }
 
   get DBI_PARAMETERS() {
@@ -248,6 +251,21 @@ class OracleDBI extends YadamuDBI {
   
   set PARSER(v)                       { this._PARSER = v }
   get PARSER()                        { return this._PARSER }
+
+  addVendorExtensions(connectionProperties) {
+
+    if (this.parameters.USERID) {
+      this.parseConnectionString(connectionProperties,this.parameters.USERID)
+    }
+    else {
+     connectionProperties.user             = this.parameters.USER            || connectionProperties.user
+     connectionProperties.password         = this.parameters.PASSWORD        || connectionProperties.password
+     connectionProperties.connectString    = this.parameters.CONNECT_STRING  || connectionProperties.connectString
+    }
+
+	return connectionProperties
+
+  }
   
   constructor(yadamu,manager,connectionSettings,parameters) {
 
@@ -283,7 +301,7 @@ class OracleDBI extends YadamuDBI {
 	this.statementLibrary   = undefined
   }	 
 
-  parseConnectionString(vendorProperties, connectionString) {
+  parseConnectionString(connectionProperties, connectionString) {
 
     const user = YadamuLibrary.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')))
 
@@ -296,26 +314,14 @@ class OracleDBI extends YadamuDBI {
       console.log(`${new Date().toISOString()}[WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`)
     }
 
-    vendorProperties.user             = user          || vendorProperties.user
-    vendorProperties.password         = password      || vendorProperties.password
-    vendorProperties.connectString    = connectString || vendorProperties.connectString
-  }
-
-  updateVendorProperties(vendorProperties) {
-
-    if (this.parameters.USERID) {
-      this.parseConnectionString(vendorProperties,this.parameters.USERID)
-    }
-    else {
-     vendorProperties.user             = this.parameters.USER            || vendorProperties.user
-     vendorProperties.password         = this.parameters.PASSWORD        || vendorProperties.password
-     vendorProperties.connectString    = this.parameters.CONNECT_STRING  || vendorProperties.connectString
-    }
+    connectionProperties.user             = user          || connectionProperties.user
+    connectionProperties.password         = password      || connectionProperties.password
+    connectionProperties.connectString    = connectString || connectionProperties.connectString
   }
 
   async testConnection() {
 	try {
-      const conn = await oracledb.getConnection(this.vendorProperties)
+      const conn = await oracledb.getConnection(this.CONNECTION_PROPERTIES)
       await conn.close()
 	} catch (e) {
       throw e;
@@ -327,13 +333,13 @@ class OracleDBI extends YadamuDBI {
 	let stack;
     this.logConnectionProperties()
 	const sqlStartTime = performance.now()
-	this.vendorProperties.poolMax = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 3
+	this.CONNECTION_PROPERTIES.poolMax = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 3
 	try {
       stack = new Error().stack
       oracledb.initOracleClient()
       stack = new Error().stack
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
-	  this.pool = await oracledb.createPool(this.vendorProperties)
+	  this.pool = await oracledb.createPool(this.CONNECTION_PROPERTIES)
       // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE],'Pool Created')
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
@@ -366,7 +372,7 @@ class OracleDBI extends YadamuDBI {
   async getConnection() {
     this.logConnectionProperties()
 	const sqlStartTime = performance.now()
-	const connection = await oracledb.getConnection(this.vendorProperties)
+	const connection = await oracledb.getConnection(this.CONNECTION_PROPERTIES)
 	this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     return connection
   }
@@ -987,7 +993,7 @@ class OracleDBI extends YadamuDBI {
 
   async finalizeExport() {
 	this.checkConnectionState(this.LATEST_ERROR)
-    await this.setCurrentSchema(this.vendorProperties.user)
+    await this.setCurrentSchema(this.CONNECTION_PROPERTIES.user)
   }
 
   async initializeImport() {
@@ -1015,7 +1021,7 @@ class OracleDBI extends YadamuDBI {
 
   async finalizeImport() {
     this.checkConnectionState(this.LATEST_ERROR)
-	await this.setCurrentSchema(this.vendorProperties.user)
+	await this.setCurrentSchema(this.CONNECTION_PROPERTIES.user)
   }
 
   getCloseOptions(err) {
@@ -1326,7 +1332,9 @@ class OracleDBI extends YadamuDBI {
 		const partitionList = tableInformation.PARTITION_LIST
   	    delete tableInformation.PARTITION_LIST
 	    return partitionList.map((partitionName,idx) => {
-		  const partitionInfo = Object.assign({},tableInformation)
+		  const partitionInfo = {
+            ...tableInformation
+		  }
 		  partitionInfo.PARTITION_NUMBER = idx
 		  partitionInfo.PARTITION_NAME = partitionName
 		  return partitionInfo

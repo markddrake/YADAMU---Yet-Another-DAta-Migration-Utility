@@ -86,7 +86,8 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
       tableInfo.columnNames = tableMetadata.columnNames
       // msssql requires type and length information when generating a prepared statement.
       const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
-      
+      tableInfo.columnMappings = tableMetadata.source?.columnMappings || {}
+
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
       tableInfo._SPATIAL_FORMAT = this.SPATIAL_FORMAT
 	  

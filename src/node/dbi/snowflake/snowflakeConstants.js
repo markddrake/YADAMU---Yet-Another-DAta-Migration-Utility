@@ -31,11 +31,11 @@ class SnowflakeConstants {
     })
     return this._TIMESTAMP_FORMAT_MASKS
   }
-  static #_DBI_PARAMETERS
+  static #DBI_PARAMETERS
   
   static get DBI_PARAMETERS() { 
-    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS1: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_DBI_PARAMETERS
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS1: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#DBI_PARAMETERS
   }
 
   static get TRANSIENT_TABLES()       { return this.DBI_PARAMETERS.TRANSIENT_TABLES}
