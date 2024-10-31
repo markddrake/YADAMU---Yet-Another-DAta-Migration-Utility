@@ -23,7 +23,7 @@ const SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits 
 
 const SQL_SCHEMA_INFORMATION   = `select * from YADAMU.YADAMU_EXPORT($1,$2,$3)`;
  
-const SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user, session_user, current_setting('server_version_num') database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM'),6) timezone, YADAMU.YADAMU_INSTANCE_ID() YADAMU_INSTANCE_ID, YADAMU.YADAMU_INSTALLATION_TIMESTAMP() YADAMU_INSTALLATION_TIMESTAMP`;
+const SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user, session_user, current_setting('server_version_num') database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM'),6) timezone, YADAMU.YADAMU_INSTANCE_ID() YADAMU_INSTANCE_ID, YADAMU.YADAMU_INSTALLATION_TIMESTAMP() YADAMU_INSTALLATION_TIMESTAMP, version() extended_version_information`;
 
 const SQL_BEGIN_TRANSACTION    = `begin transaction`
 

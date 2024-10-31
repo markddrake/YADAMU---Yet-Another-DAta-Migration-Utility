@@ -16,11 +16,9 @@ services:
    volumes:
      - YADAMU_01-SHARED:/mnt/shared
      - TDATA17-01-APPLIANCE:/root/VBox 
-     - /tmp/.X11-unix:/tmp/.X11-unix
- 
+     - /tmp/.X11-unix:/tmp/.X11-unix 
    devices:
-     - "/dev/vboxdrv:/dev/vboxdrv"
-
+     - /dev/vboxdrv:/dev/vboxdrv
    restart: always
 
 volumes:

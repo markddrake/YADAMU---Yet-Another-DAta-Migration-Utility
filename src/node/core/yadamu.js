@@ -404,13 +404,12 @@ class Yadamu {
 	
 	// Prevent the PASSPHRASE from being 'Inspected'
 	delete parameters.PASSPHRASE
-    
     return await new Promise((resolve,reject) => {
 	  crypto.scrypt(passphrase, salt , this.CIPHER_KEY_SIZE, (err,key) => {
-		parameters.ENRYPTION_KEY_AVAILALBE = false
+		parameters.ENCRYPTION_KEY_AVAILABLE = false
 		if (err) reject(err);
 		// console.log('Key',passphrase,salt,this.CIPHER_KEY_SIZE,key)
-		parameters.ENRYPTION_KEY_AVAILALBE = true
+		parameters.ENCRYPTION_KEY_AVAILABLE = true
 		resolve(key)
       })
 	})  
@@ -836,6 +835,9 @@ class Yadamu {
             break;
           case 'SALT':
             parameters.SALT = parameterValue;
+            break;
+          case 'TASK':
+            parameters.TASK = parameterValue;
             break;
           default:
 		    if (allowAnyParameter) {

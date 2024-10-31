@@ -52,7 +52,7 @@ docker compose --file docker\dockerfiles\linux\COCKROACH-01.yml down -v
 docker compose --file docker\dockerfiles\linux\YUGABYTE-01.yml up -d
 echo 'Waiting for Yugabyte Startup'
 timeout /nobreak /t 60
-start "Yugabyte Configuration" /MIN /WAIT /D C:\DEVELOPMENT\YADAMU CMD /c docker\rdbms\configuration\linux\configureYugabyte yb-tserver-n1
+start "Yugabyte Configuration" /MIN /WAIT /D C:\DEVELOPMENT\YADAMU CMD /c docker\rdbms\configuration\linux\configureYugabyte YUGABYTE-01
 start "Yugabyte Test Suite" /MIN /WAIT /D C:\DEVELOPMENT\YADAMU CMD /c docker\bin\runTestSuite ydb > ydb.log
 echo 'Waiting for Yugabyte Test Suite to complete.'
 docker wait YADAMU-01

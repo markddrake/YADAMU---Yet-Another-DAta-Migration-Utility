@@ -110,8 +110,18 @@ class CockroachDBI extends YadamuDBI {
 
   get POSTGIS_VERSION()               { return this._POSTGIS_VERSION || "Not Installed" }
   set POSTGIS_VERSION(v)              { this._POSTGIS_VERSION = v }
-							         
+  						         
   get POSTGIS_INSTALLED()             { return this.POSTGIS_VERSION !== "Not Installed" }
+  
+  #COCKROACH_VERSION  = 'N/A'
+  get COCKROACH_VERSION()              { return this.#COCKROACH_VERSION}
+  set COCKROACH_VERSION(v)             { this.#COCKROACH_VERSION = v.split(' CCL v')[1].split(' ')[0]}
+ 	
+  #POSTGRES_VERSION  = 'N/A'
+  get POSTGRES_VERSION()              { return this.#POSTGRES_VERSION}
+  set POSTGRES_VERSION(v)             { this.#POSTGRES_VERSION = v }
+
+  
   // get POSTGIS_INSTALLED()          { return false }
 
   // Standard Spatial formatting only available when PostGIS is installed.
@@ -340,12 +350,16 @@ class CockroachDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DATABASE_VERSION = results.rows[0][3];
+    
+	this.POSTGRES_VERSION = results.rows[0][3]
+	this.COCKROACH_VERSION = results.rows[0][5]
+	
+	this._DATABASE_VERSION = this.COCKROACH_VERSION
 	
 	this.POSTGIS_VERSION = await this.getPostgisInfo()
 	
 	if (this.isManager()) {
-      this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Postgress Version: ${this.POSTGRES_VERSION}. PostGIS Version: ${this.POSTGIS_VERSION}.`)
 	}
   }
   

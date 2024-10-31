@@ -110,6 +110,17 @@ class YugabyteDBI extends YadamuDBI {
 							         
   get POSTGIS_INSTALLED()             { return this.POSTGIS_VERSION !== "Not Installed" }
 
+  #YUGABYTE_VERSION  = 'N/A'
+  get YUGABYTE_VERSION()              { return this.#YUGABYTE_VERSION}
+  set YUGABYTE_VERSION(v)             { this.#YUGABYTE_VERSION = v.split('-YB-')[1].split(' ')[0]}
+ 	
+  #POSTGRES_VERSION  = 'N/A'
+  get POSTGRES_VERSION()              { return this.#POSTGRES_VERSION}
+  set POSTGRES_VERSION(v)             { this.#POSTGRES_VERSION = v }
+ 	
+  get POSTGIS_INSTALLED()             { return this.POSTGIS_VERSION !== "Not Installed" }
+
+  
   // Standard Spatial formatting only available when PostGIS is installed.
   
   // If PostGIS is not available SPATIAL_FORMAT is set to 'GeoJSON' and the following rules apply for Export
@@ -301,14 +312,16 @@ class YugabyteDBI extends YadamuDBI {
     })
    
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
+	const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+	this.POSTGRES_VERSION = results.rows[0][3]
+	this.YUGABYTE_VERSION = results.rows[0][7]
 	
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DATABASE_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = this.YUGABYTE_VERSION
 	
 	this.POSTGIS_VERSION = await this.getPostgisInfo()
 	
 	if (this.isManager()) {
-      this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
+      this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Postgress Version: ${this.POSTGRES_VERSION}. PostGIS Version: ${this.POSTGIS_VERSION}.`)
 	}
   }
   

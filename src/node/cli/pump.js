@@ -16,7 +16,7 @@ import YadamuLogger           from '../core/yadamuLogger.js'
 import YadamuLibrary          from '../lib/yadamuLibrary.js'
 
 class Pump extends YadamuCLI {
-  
+    
   async pump(configurationFilePath,jobName) {
 	 
 	this.command = 'COPY'
@@ -30,8 +30,8 @@ class Pump extends YadamuCLI {
 	
     const startTime = performance.now()
 	try {
-      const job = this.CONFIGURATION.jobs[jobName]
   	  assert(this.JOB_NAMES.includes(jobName),new ConfigurationFileError(`Job "${jobName}" not found. Valid Job names: "${this.JOB_NAMES}".`))	
+      const job = this.CONFIGURATION.jobs[jobName]
 	  const startTime = performance.now()
       const summary = await this.executeJob(this.yadamu,this.CONFIGURATION,job)
 	  const endTime = performance.now()
@@ -56,5 +56,23 @@ class Pump extends YadamuCLI {
   }
 
 }
+
+async function main() {
+  
+  try {
+	const yadamuPump = new Pump();
+    try {
+      const summary = await yadamuPump.performJob()
+    } catch (e) {
+	  yadamuPump.reportError(e)
+    }
+    await yadamuPump.close();
+  } catch (e) {
+    YadamuLibrary.reportError(e)
+  }
+
+}
+
+main()
 
 export { Pump as default}

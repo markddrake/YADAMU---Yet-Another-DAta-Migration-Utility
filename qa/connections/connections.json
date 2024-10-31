@@ -390,7 +390,7 @@
     "yugabyte#1": {
         "yugabyte": {
             "user": "postgres",
-            "host": "yb-tserver-n1",
+            "host": "YUGABYTE-01",
             "database": "yadamu",
             "password": "oracle",
             "port": 5433

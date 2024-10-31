@@ -110,7 +110,7 @@ const SQL_SCHEMA_INFORMATION   =
              and t.table_schema =  p."schema"
         group by t.table_schema, t.table_name`;
  
-const SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user, session_user, current_setting('server_version_num') database_version, right(cast(current_timestamp as character varying),6) timezone`;
+const SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user, session_user, current_setting('server_version_num') database_version, right(cast(current_timestamp as character varying),6) timezone, version()`;
 
 const SQL_BEGIN_TRANSACTION    = `begin transaction`
 

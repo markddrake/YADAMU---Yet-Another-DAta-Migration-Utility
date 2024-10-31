@@ -1,59 +1,30 @@
-version: '2'
-
-volumes:
-  yb-master-data-1:
-  yb-tserver-data-1:
-  YADAMU_01-SHARED:
-    name: YADAMU_01-SHARED
+version: "2.4"
 
 services:
-  yb-master:
-      image: yugabytedb/yugabyte:latest
-      container_name: yb-master-n1
-      mem_limit: '4Gb'
+  YUGABYTE-01:
+      container_name: YUGABYTE-01
+      # image: yugabytedb/yugabyte:latest
+      image: yugabytedb/yugabyte:2024.1.3.0-b105
+      command: /home/yugabyte/bin/yugabyted start --background=false --base_dir=/home/yugabyte/yb_data
+      # command: sleep 365d
+      mem_limit: '16Gb'
       volumes:
-      - yb-master-data-1:/mnt/master
+      - YUGABYTE_01-DATA:/home/yugabyte/yb_data
       - YADAMU_01-SHARED:/mnt/shared
-      command: [ "/home/yugabyte/bin/yb-master",
-                "--fs_data_dirs=/mnt/master",
-                "--master_addresses=yb-master-n1:7100",
-                "--rpc_bind_addresses=yb-master-n1:7100",
-                "--replication_factor=1"]
-                #, "--memory_limit_hard_bytes 34359738368"
       networks:
       - YADAMU-NET
       ports:
-      - "7000:7000"
-      environment:
-        SERVICE_7000_NAME: yb-master
-
-  yb-tserver:
-      image: yugabytedb/yugabyte:latest
-      container_name: yb-tserver-n1
-      mem_limit: '16gb'
-      volumes:
-      - yb-tserver-data-1:/mnt/tserver
-      - YADAMU_01-SHARED:/mnt/shared
-      command: [ "/home/yugabyte/bin/yb-tserver",
-                "--fs_data_dirs=/mnt/tserver",
-                "--start_pgsql_proxy",
-                "--rpc_bind_addresses=yb-tserver-n1:9100",
-                "--tserver_master_addrs=yb-master-n1:7100",
-                "--memory_limit_hard_bytes=15032385536"]
-      networks:
-      - YADAMU-NET
-      ports:
-      - "9042:9042"
-      - "5533:5433"
-      - "9500:9000"
-      environment:
-        SERVICE_5433_NAME: ysql
-        SERVICE_9042_NAME: ycql
-        SERVICE_6379_NAME: yedis
-        SERVICE_9500_NAME: yb-tserver
-      depends_on:
-      - yb-master
+       - "7000:7000"
+       - "9010:9000" 
+       - "15433:15433"
+       - "5533:5433" 
+       - "9042:9042"
       
 networks: 
   YADAMU-NET:
      name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  YUGABYTE_01-DATA:

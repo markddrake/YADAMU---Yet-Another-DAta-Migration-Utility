@@ -124,7 +124,7 @@ class FileDBI extends YadamuDBI {
   static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  {
-	// Delete FILE iherited from YADAMU_CONFIGURATION
+	// Delete values inherited from YADAMU_CONFIGURATION
 	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(
 	  (() => {
   	    const parms = {
@@ -310,11 +310,18 @@ class FileDBI extends YadamuDBI {
  
   async initialize() {
     await super.initialize()
-	this.ENCRYPTION_KEY = this.parameters.PASSPHRASE 
-	                    ? await this.yadamu.generateCryptoKey(this.parameters)
-				 	    : this.yadamu.ENCRYPTION_KEY_AVAILABLE  
-				 	    ? this.yadamu.ENCRYPTION_KEY
-				 	    : undefined
+    // Check if an Encryption key is needed
+	// An encryption key is needed if USE_ENCRYPTION is true and a KEY is not available via YADAMU or a connection level passphrase was specified.
+	if (this.USE_ENCRYPTION) {
+      this.ENCRYPTION_KEY = this.parameters.PASSPHRASE
+	                      // Connection level passphrase specified - Generate a new Key
+	                      ? await this.yadamu.generateCryptoKey(this.parameters)
+				 	      : this.yadamu.parameters.ENCRYPTION_KEY_AVAILABLE 
+						  // Use prcoess level encryption key
+				 	      ? this.yadamu.ENCRYPTION_KEY
+						  // Generate a connection level passphrase - Will take it from YADAMU_PASSPHRASE environment variable or prompt
+				 	      : await this.yadamu.generateCryptoKey(this.parameters)
+	}
   }
  
   async createInputStream() {
@@ -378,10 +385,10 @@ class FileDBI extends YadamuDBI {
     if (this.USE_COMPRESSION) {
       streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
     }
-	
+
     if (this.USE_ENCRYPTION) {
       await this.createInitializationVector()
-      // console.log('Cipher',this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+      // this.LOGGER.trace([this.constructor.name,'ENCRYPTION',this.yadamu.parameters.ENCRYPTION_KEY_AVAILABLE,this.parameters.ENCRYPTION_KEY_AVAILABLE,this.CIPHER,this.ENCRYPTION_KEY.toString('hex'), Buffer.from(this.INITIALIZATION_VECTOR).toString('hex')],'Generating CIPHER stream')
 	  const cipherStream = crypto.createCipheriv(this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
@@ -620,7 +627,7 @@ class FileDBI extends YadamuDBI {
 	
 	if (this.USE_ENCRYPTION) {
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+      // this.LOGGER.trace([this.constructor.name,'DECRYPTION',this.yadamu.parameters.ENCRYPTION_KEY_AVAILABLE,this.parameters.ENCRYPTION_KEY_AVAILABLE,this.CIPHER,this.ENCRYPTION_KEY.toString('hex'), Buffer.from(this.INITIALIZATION_VECTOR).toString('hex')],'Generating CIPHER stream')
 	  const decipherStream = crypto.createDecipheriv(this.CIPHER,this.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  streams.push(decipherStream)
 	}

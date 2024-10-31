@@ -130,7 +130,7 @@ class AWSS3FileDBI extends FileDBI {
     const file = this.FILE
     const extension = path.extname(file);
     const contentType = mime.lookup(extension) || 'application/octet-stream'
-    const outputStream = this.cloudService.createWriteStream(file,contentType,new Set())
+    const outputStream = this.cloudService.createWriteStream(file,contentType,this.activeWriters)
 	return outputStream
   }
   

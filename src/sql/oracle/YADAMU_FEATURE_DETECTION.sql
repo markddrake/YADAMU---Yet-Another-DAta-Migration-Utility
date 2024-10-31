@@ -39,6 +39,9 @@ declare
 
   WHAT_IS_CLOUD EXCEPTION;
   PRAGMA EXCEPTION_INIT( WHAT_IS_CLOUD , -2003);
+  
+  TRANSPORTABLE_XML_ORA28817 EXCEPTION;
+  PRAGMA EXCEPTION_INIT( TRANSPORTABLE_XML_ORA28817 , -28817);
 
   V_PACKAGE_DEFINITION VARCHAR2(32767);
   
@@ -50,6 +53,9 @@ declare
   V_XML_STORAGE_MODEL      VARCHAR2(20);
   V_INSTALL_TIME           VARCHAR2(28) := TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS-TZH:TZM');
   V_YADAMU_GUID            VARCHAR2(36) := NULL;
+  V_HASH                   RAW(32);
+  V_XMLDOC                 VARCHAR2(64) := '<A>X'||CHR(13)||CHR(10)||'X</A>'; 
+  V_SERIALIZED_LENGTH      NUMBER(2);
 begin
 
   begin
@@ -292,28 +298,8 @@ $END
 	
 
 --
---  Default XML Storage Mode
+--  BOOLEAN SQL DATA TYPE
 --
-
-  begin
-    execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
-  exception 
-    when OTHERS then 
-	  NULL;
-  end;
- 
-  execute immediate 'create global temporary table YADAMU_XML_STORAGE_TEST(X XMLTYPE)';
-  
-  select STORAGE_TYPE 
-    INTO V_XML_STORAGE_MODEL
-	from USER_XML_TAB_COLS
-   where TABLE_NAME = 'YADAMU_XML_STORAGE_TEST' 
-  and COLUMN_NAME = 'X';
-  
-  execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
-  
-  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                   || '  XML_STORAGE_MODEL CONSTANT VARCHAR2(20) := ''' || V_XML_STORAGE_MODEL || ''';'|| C_NEWLINE;
 
   begin
 	-- Test for Native BOOLEAN Data Type
@@ -328,10 +314,82 @@ $END
 	  RAISE;
   end;
   
+
+--
+--  Default XML Storage Mode and XML Issues
+--
+
+  begin
+    execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
+  exception 
+    when OTHERS then 
+	  NULL;
+  end;
+ 
+  execute immediate 'create global temporary table YADAMU_XML_STORAGE_TEST(X XMLTYPE)';
+	    
+  select STORAGE_TYPE 
+    INTO V_XML_STORAGE_MODEL
+	from USER_XML_TAB_COLS
+   where TABLE_NAME = 'YADAMU_XML_STORAGE_TEST' 
+  and COLUMN_NAME = 'X';
+  
+  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                   || '  XML_STORAGE_MODEL CONSTANT VARCHAR2(20) := ''' || V_XML_STORAGE_MODEL || ''';'|| C_NEWLINE;
+
+  execute immediate 'insert into YADAMU_XML_STORAGE_TEST values (:1)' using V_XMLDOC;
+
+--
+--  DBMS_HASH Issue with XMLSERIALIZE in 23ai
+--
+
+  begin
+    if (V_XML_STORAGE_MODEL = 'TRANSPORTABLE BINARY') then
+
+	  begin
+	    execute immediate 'select DBMS_CRYPTO.HASH(XMLSERIALIZE(content x),4) from YADAMU_XML_STORAGE_TEST' into V_HASH;
+	    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                         || '  TRANSPORTABLE_XML_ORA28817 CONSTANT BOOLEAN      := FALSE;'     || C_NEWLINE;
+      exception
+        when TRANSPORTABLE_XML_ORA28817 then
+	      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                           || '  TRANSPORTABLE_XML_ORA28817 CONSTANT BOOLEAN    := TRUE;'     || C_NEWLINE;
+        when OTHERS then
+	      RAISE;
+      end;
+    else 
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+                           || '  TRANSPORTABLE_XML_ORA28817 CONSTANT BOOLEAN      := FALSE;'     || C_NEWLINE;
+    end if;						  
+	
+  end;
+
+  begin
+     
+    execute immediate 'select DBMS_LOB.GETLENGTH(XMLSERIALIZE(CONTENT X)) FROM YADAMU_XML_STORAGE_TEST' into V_SERIALIZED_LENGTH;
+	
+    if (V_SERIALIZED_LENGTH = LENGTH(V_XMLDOC) + 1) then
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  XML_PRESERVE_CRLF CONSTANT BOOLEAN      := TRUE;'     || C_NEWLINE;
+    else 
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  XML_PRESERVE_CRLF CONSTANT BOOLEAN      := FALSE;'    || C_NEWLINE;
+    end if;						  
+
+    begin 
+      execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
+    exception 
+      when OTHERS then 
+	    NULL;
+    end;
+	
+  end;
+
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                        || 'END;';
 --				      
   execute immediate V_PACKAGE_DEFINITION;
+
 end;
 /
 --

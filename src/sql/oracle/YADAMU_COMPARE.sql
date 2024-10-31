@@ -78,11 +78,31 @@ set define off
 create or replace package body YADAMU_COMPARE
 as
 --
+  C_CRLF CONSTANT VARCHAR2(2) := CHR(13) || CHR(10);
+  C_LF   CONSTANT VARCHAR2(1) := CHR(10);
+ 
 function STRIP_XML_DECLATION_XSL 
 return XMLTYPE
 as
 begin
   return C_STRIP_XML_DECLARATION_XSL;
+end;
+--
+procedure REPLACE_CRLF_LF(P_SERIALIZED_XML IN OUT CLOB) 
+as
+  V_OFFSET INTEGER; 
+  V_CONTENT VARCHAR2(32767);
+begin
+  if (DBMS_LOB.getLength(P_SERIALIZED_XML)  < 32768) then
+    V_CONTENT := P_SERIALIZED_XML;
+	P_SERIALIZED_XML := REPLACE(V_CONTENT,C_CRLF,C_LF);
+  else 
+    V_OFFSET := DBMS_LOB.INSTR(P_SERIALIZED_XML,C_CRLF,1);
+	while (V_OFFSET > 0) loop
+	  DBMS_LOB.FRAGMENT_REPLACE(P_SERIALiZED_XML,2,1,V_OFFSET,C_LF);
+      V_OFFSET := DBMS_LOB.INSTR(P_SERIALIZED_XML,C_CRLF,V_OFFSET);
+	end loop;
+  end if;
 end;
 --
 function JSON_COMPACT(P_JSON_INPUT CLOB)
@@ -285,9 +305,10 @@ as
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
   V_DOUBLE_PRECISION    NUMBER         := case when JSON_EXISTS(P_RULES, '$.doublePrecision')    then JSON_VALUE(P_RULES, '$.doublePrecision')       else NULL end;
-  V_NUMERIC_SCALE   NUMBER             := case when JSON_EXISTS(P_RULES, '$.numericScale')       then JSON_VALUE(P_RULES, '$.numericScale')          else NULL end;
+  V_NUMERIC_SCALE       NUMBER         := case when JSON_EXISTS(P_RULES, '$.numericScale')       then JSON_VALUE(P_RULES, '$.numericScale')          else NULL end;
   V_TIMESTAMP_PRECISION NUMBER         := case when JSON_EXISTS(P_RULES, '$.timestampPrecision') then JSON_VALUE(P_RULES, '$.timestampPrecision')    else 9 end; 
   V_ORDERED_JSON        BOOLEAN        := case when JSON_EXISTS(P_RULES, '$.orderedJSON')        then JSON_VALUE(P_RULES, '$.orderedJSON') = 'true'  else FALSE end; 
+  V_XML_STRIP_CRLF      BOOLEAN        := case when JSON_EXISTS(P_RULES, '$.xmlStripCRLF')       then JSON_VALUE(P_RULES, '$.xmlStripCRLF') = 'true' else FALSE end; 
   V_XML_RULE            VARCHAR2(128)  := case when JSON_EXISTS(P_RULES, '$.xmlRule')            then JSON_VALUE(P_RULES, '$.xmlRule')               else NULL end;
   V_OBJECTS_RULE        VARCHAR2(128)  := case when JSON_EXISTS(P_RULES, '$.objectsRule')        then JSON_VALUE(P_RULES, '$.objectsRule')           else NULL end;
   V_EXCLUDE_MVIEWS      VARCHAR2(5)    := case when JSON_EXISTS(P_RULES, '$.excludeMViews')      then UPPER(JSON_VALUE(P_RULES, '$.excludeMViews'))  else 'TRUE' end;
@@ -300,6 +321,7 @@ $ELSE
   V_NUMERIC_SCALE        NUMBER        := case when V_RULES.EXISTSNODE('/rules[number(numericScale) = numericScale]')             = 1 then V_RULES.extract('/rules/numericScale/text()').getNumberVal()          else NULL end;
   V_TIMESTAMP_PRECISION  NUMBER        := case when V_RULES.EXISTSNODE('/rules[number(timestampPrecision) = timestampPrecision]') = 1 then V_RULES.extract('/rules/timestampPrecision/text()').getNumberVal()    else 9 end; 
   V_ORDERED_JSON         BOOLEAN       := case when V_RULES.EXISTSNODE('/rules/orderedJSON')                                      = 1 then V_RULES.extract('/rules/orderedJSON/text()').getStringVal() = 'true'  else FALSE end; 
+  V_XML_STRIP_CRLF       BOOLEAN       := case when V_RULES.EXISTSNODE('/rules/xmlStripCRLF')                                     = 1 then V_RULES.extract('/rules/xmlStripCRLF/text()').getStringVal() = 'true' else FALSE end; 
   V_XML_RULE             VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/xmlRule/text()')                                   = 1 then V_RULES.extract('/rules/xmlRule/text()').getStringVal()               else NULL end;
   V_OBJECTS_RULE         VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/objectsRule')                                      = 1 then V_RULES.extract('/rules/objectsRule/text()').getStringVal()           else 'SKIP' end;
   V_EXCLUDE_MVIEWS       VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/excludeMViews')                                    = 1 then UPPER(V_RULES.extract('/rules/excludeMViews/text()').getStringVal())  else 'TRUE' end;
@@ -374,7 +396,23 @@ $END
 			   --
              when atc.DATA_TYPE = 'XMLTYPE' then
     		   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   $IF YADAMU_FEATURE_DETECTION.TRANSPORTABLE_XML_ORA28817 $THEN
+			      /*
+				  ** 23ai Suprise of the day
+				  **
+				  ** SQL> select case when t."WAREHOUSE_SPEC" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."WAREHOUSE_SPEC"  AS CLOB),4) end from OE.WAREHOUSES t
+                  ** 2  /
+                  ** select when t."WAREHOUSE_SPEC" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."WAREHOUSE_SPEC"  AS CLOB),4) end from OE.WAREHOUSES t
+                  ** ERROR at line 1:
+                  ** ORA-28817: PL/SQL function returned an error.
+                  ** ORA-06512: at "SYS.DBMS_CRYPTO_FFI", line 632
+                  ** ORA-06512: at "SYS.DBMS_CRYPTO", line 289
+				  **
+				  */
+			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_UTILITIES.CLOBTOBLOB(XMLSERIALIZE(CONTENT '  ||
+			   $ELSE
 			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT '  ||
+			   $END
 			   case 
 			     when (V_XML_RULE = 'SNOWFLAKE_VARIANT') then
 				   'YADAMU_COMPARE.SNOWFLAKE_TRANSFORMATION(t."' || atc.COLUMN_NAME || '")'
@@ -391,22 +429,10 @@ $END
 				 else 
 				   't."' || atc.COLUMN_NAME || '"'
 			   end
-			   $IF DBMS_DB_VERSION.VERSION < 23 $THEN
-			      /*
-				  ** 23ai Suprise of the day
-				  **
-				  ** SQL> select case when t."WAREHOUSE_SPEC" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."WAREHOUSE_SPEC"  AS CLOB),4) end from OE.WAREHOUSES t
-                  ** 2  /
-                  ** select when t."WAREHOUSE_SPEC" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."WAREHOUSE_SPEC"  AS CLOB),4) end from OE.WAREHOUSES t
-                  ** ERROR at line 1:
-                  ** ORA-28817: PL/SQL function returned an error.
-                  ** ORA-06512: at "SYS.DBMS_CRYPTO_FFI", line 632
-                  ** ORA-06512: at "SYS.DBMS_CRYPTO", line 289
-				  **
-				  */
-			      || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   $IF YADAMU_FEATURE_DETECTION.TRANSPORTABLE_XML_ORA28817 $THEN
+			      || '  AS CLOB)),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   $ELSE 
-			      || '  AS BLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			      || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   $END
 			 /*
 			 **

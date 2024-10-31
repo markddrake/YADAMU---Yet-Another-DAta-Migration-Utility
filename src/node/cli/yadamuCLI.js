@@ -466,7 +466,7 @@ class YadamuCLI {
   
   loadConfigurationFile() {
 	if (YadamuCLI.CONFIGURATION_REQUIRED.indexOf(this.command) > -1) {
-      const configuration = YadamuLibrary.loadJSON(this.yadamu.CONFIG,this.yadamuLogger);
+	  const configuration = YadamuLibrary.loadJSON(this.yadamu.CONFIG,this.yadamuLogger);
       this.expandConfiguration(configuration,this.yadamu.CONFIG);
 	  return configuration;
 	}
@@ -691,7 +691,16 @@ class YadamuCLI {
     this.yadamuLogger.log([`QA`,`YADAMU`,`REGRESSION`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
-
+  
+  async performJob() {
+	this.CONFIGURATION = this.loadConfigurationFile()
+	const jobName = this.yadamu.parameters.TASK
+  	assert(this.JOB_NAMES.includes(jobName),new ConfigurationFileError(`Job "${jobName}" not found. Valid Job names: "${this.JOB_NAMES}".`))	
+    const job = this.CONFIGURATION.jobs[jobName]
+	await this.yadamu.initialize()
+	const metrics = await this.executeJob(this.yadamu,this.CONFIGURATION,job)
+    return metrics
+  }
 
   async executeJob(yadamu,configuration,job) {
     
@@ -703,7 +712,7 @@ class YadamuCLI {
 	  ...configuration.parameters || {}
     , ...job.parameters || {} 
     }
-			  
+	
     yadamu.reloadParameters(jobParameters);
 	
     const sourceDBI = await this.getSourceConnection(yadamu,job)
