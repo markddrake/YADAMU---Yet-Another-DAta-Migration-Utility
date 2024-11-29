@@ -28,7 +28,7 @@ import {
   DirectoryNotFound
 }                    from '../file/fileException.js'
 
-import CloudCompare  from './cloudCompare.js';
+import Comparitor    from './cloudCompare.js';
 
 class CloudDBI extends LoaderDBI {
  
@@ -85,6 +85,7 @@ class CloudDBI extends LoaderDBI {
   constructor(yadamu,manager,settings,parameters) {
     // Export File Path is a Directory for in Load/Unload Mode
     super(yadamu,manager,settings,parameters)
+	this.COMPARITOR_CLASS = Comparitor
   }    
   
   async createInitializationVector() {
@@ -209,7 +210,7 @@ class CloudDBI extends LoaderDBI {
 	  const fileContents = await this.cloudService.getContentAsString(this.CONTROL_FILE_PATH)
   	  this.controlFile = this.parseJSON(fileContents)
 	} catch (err) {
-      throw (err.notFound && err.notFound()) ? new FileNotFound(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH) : new FileError(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH)
+      throw (err.notFound && err.notFound()) ? new FileNotFound(this,err,stack,this.CONTROL_FILE_PATH) : new FileError(this,err,stack,this.CONTROL_FILE_PATH)
 	}
   }
 
@@ -224,11 +225,6 @@ class CloudDBI extends LoaderDBI {
     // DBI implementations that do not use a pool / connection mechansim need to overide this function. eg MSSQLSERVER
 	this.cloudConnection = this.manager.cloudConnection
 	this.cloudService = this.manager.cloudService
-  }
-
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new CloudCompare(this,configuration)
   }
 
   async truncateTable(schema,tableName) {

@@ -11,6 +11,8 @@ class SnowflakeCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NA
 	}
 
     async getRowCounts(target) {
+	  
+	  target = this.dbi.getSchema(target)
 
       const useDatabase = `USE DATABASE "${target.database}";`;	  
       let results =  await this.dbi.executeSQL(useDatabase,[]);      
@@ -22,17 +24,19 @@ class SnowflakeCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NA
     }
     
     async compareSchemas(source,target,rules) {
+
+      source = this.dbi.getSchema(source)
+	  target = this.dbi.getSchema(target)
     
       const compareRules = JSON.stringify(this.formatCompareRules(rules))  
  	
-      const useDatabase = `USE DATABASE "${source.database}";`;
+      const useDatabase = `use database "${source.database}";`;
       let results =  await this.dbi.executeSQL(useDatabase,[]);      
          
       const report = {
         successful : []
        ,failed     : []
       }
-
       results = await this.dbi.executeSQL(SnowflakeCompare.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,compareRules]);
 
       let compare = JSON.parse(results[0].COMPARE_SCHEMAS)

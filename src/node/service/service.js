@@ -103,7 +103,8 @@ class Service extends YadamuCLI {
   
   async processRequest(yadamu,sourceDBI,targetDBI,response,resetLogger) {
 
-    await yadamu.doCopy(sourceDBI,targetDBI)
+    await yadamu.pumpData(sourceDBI,targetDBI)
+    await yadamu.close()
     response.end();     
  
   }  
@@ -112,12 +113,12 @@ class Service extends YadamuCLI {
 
 	try {
       response.type('json')     
-      this.command = operation = request.originalUrl.split('/')[2].toUpperCase()
+      this.command = request.originalUrl.split('/')[2].toUpperCase()
       this.yadamu = this.createYadamu()
       const job = this.createJobfromRestParameters(request)
-      const sourceDBI = await this.getSourceConnection(yadamu,job)
-      const targetDBI = new HttpDBI(yadamu,response)
-      await this.processRequest(yadamu,sourceDBI,targetDBI,response,false)
+      const sourceDBI = await this.getSourceConnection(this.yadamu,job)
+      const targetDBI = new HttpDBI(this.yadamu,response)
+      await this.processRequest(this.yadamu,sourceDBI,targetDBI,response,false)
     } catch (e) {
       response.status(400).send(e.message)
       throw e 
@@ -128,14 +129,14 @@ class Service extends YadamuCLI {
 
 	try {
       response.type('text')     
-      this.command = operation = request.originalUrl.split('/')[2].toUpperCase()
+      this.command = request.originalUrl.split('/')[2].toUpperCase()
       this.yadamu = this.createYadamu()
       const responseLogger = YadamuLogger.streamLogger(response,this.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
-      yadamu.LOGGER = responseLogger
+      this.yadamu.LOGGER = responseLogger
       const job = this.createJobfromRestParameters(request)
-      const sourceDBI = new HttpDBI(yadamu,request)
-      const targetDBI = await this.getTargetConnection(yadamu,job)
-      await this.processRequest(yadamu,sourceDBI,targetDBI,response,true)
+      const sourceDBI = new HttpDBI(this.yadamu,request)
+      const targetDBI = await this.getTargetConnection(this.yadamu,job)
+      await this.processRequest(this.yadamu,sourceDBI,targetDBI,response,true)
     } catch (e) {
       response.status(400).send(e.message)
       throw e 
@@ -145,15 +146,15 @@ class Service extends YadamuCLI {
   
   async executeRestRequest(request,response,resetLogger) {
 
-    this.command = operation = request.originalUrl.split('/')[2].toUpperCase()
+    this.command = request.originalUrl.split('/')[2].toUpperCase()
     this.yadamu = this.createYadamu()
     const responseLogger = YadamuLogger.streamLogger(response,this.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
-    yadamu.LOGGER = responseLogger
+    this.yadamu.LOGGER = responseLogger
 
 	try {
       response.type('text')     
       const job = this.createJobfromRestParameters(request)
-      await this.executeJob(yadamu,this.CONFIGURATION,job)
+      await this.executeJob(this.yadamu,this.CONFIGURATION,job)
       response.end();     
     } catch (e) {
       response.status(400).send(e.message)

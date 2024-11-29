@@ -92,7 +92,7 @@ class AzureStorageService {
 	  const createContainerResponse = await this.containerClient.createIfNotExists(this.dbi.CONTAINER);
       return createContainerResponse
 	} catch (e) { 
-      throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,`Azure.containerClient.createIfNotExists(${this.dbi.CONTAINER})`)
+      throw this.dbi.getDatabaseException(e,stack,`Azure.containerClient.createIfNotExists(${this.dbi.CONTAINER})`)
 	}
   }
 
@@ -103,7 +103,7 @@ class AzureStorageService {
       stack = new Error().stack
 	  return await this.containerClient.exists()
 	} catch (e) { 
-      throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,`Azure.containerClient.createIfNotExists(${this.dbi.CONTAINER})`)
+      throw this.dbi.getDatabaseException(e,stack,`Azure.containerClient.createIfNotExists(${this.dbi.CONTAINER})`)
 	}
   }
   
@@ -127,7 +127,7 @@ class AzureStorageService {
 	  const uploadBlobResponse = await blockBlobClient.upload(content, content.length);
 	  return uploadBlobResponse
 	} catch (e) {
-      throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,operation)
+      throw this.dbi.getDatabaseException(e,stack,operation)
 	}
   }
   
@@ -141,7 +141,7 @@ class AzureStorageService {
       const properties = await blockBlobClient.getProperties();
 	  return properties
 	} catch (e) {
-      throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,operation)
+      throw this.dbi.getDatabaseException(e,stack,operation)
 	}
   }
 
@@ -179,7 +179,7 @@ class AzureStorageService {
 		  this.LOGGER.qaWarning([AzureConstants.DATABASE_VENDOR,'READ',`RETRY`,key],`Retrying after 404`);		
 		  continue
 		}
-	    throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,operation)
+	    throw this.dbi.getDatabaseException(e,stack,operation)
 	  }
 	}
   }
@@ -196,7 +196,7 @@ class AzureStorageService {
 	    this.containerClient.deleteBlob(blob.name, {deleteSnapshots : "include"})
 	  }  
     } catch (e) {
-	  throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,operation)
+	  throw this.dbi.getDatabaseException(e,stack,operation)
     }
   }
 
@@ -213,7 +213,7 @@ class AzureStorageService {
 	    this.containerClient.deleteBlob(blob.name, {deleteSnapshots : "include"})
 	  }  
     } catch (e) {
-	  throw this.dbi.getDatabaseError(this.dbi.DRIVER_ID,e,stack,operation)
+	  throw this.dbi.getDatabaseException(e,stack,operation)
     }
 	*/
   }

@@ -48,7 +48,7 @@ class SnowflakeStatementLibrary {
                                end
                               ,','
                              ) within group (order by ordinal_position) "CLIENT_SELECT_LIST"
-                 from "${this.dbi.parameters.YADAMU_DATABASE}"."INFORMATION_SCHEMA"."COLUMNS" c, "${this.dbi.parameters.YADAMU_DATABASE}"."INFORMATION_SCHEMA"."TABLES" t
+                 from "${this.dbi.parameters.DATABASE}"."INFORMATION_SCHEMA"."COLUMNS" c, "${this.dbi.parameters.DATABASE}"."INFORMATION_SCHEMA"."TABLES" t
                 where t.table_name = c.table_name
                   and t.table_schema = c.table_schema
                   and t.table_type = 'BASE TABLE'
@@ -60,14 +60,14 @@ class SnowflakeStatementLibrary {
 
   get SQL_CREATE_STAGE() {
 	this._SQL_CREATE_STAGE = this._SQL_CREATE_STAGE || (() => { 
-	  return `create or replace stage  "${this.dbi.parameters.YADAMU_DATABASE}"."${this.dbi.parameters.TO_USER}"."YADAMU_STAGE" url = 's3://${this.dbi.REMOTE_STAGING_AREA}/' credentials = (${this.STAGE_CREDENTIALS}) file_format = (TYPE=CSV TRIM_SPACE=FALSE FIELD_OPTIONALLY_ENCLOSED_BY = '"')`;
+	  return `create or replace stage  "${this.dbi.parameters.DATABASE}"."${this.dbi.parameters.TO_USER}"."YADAMU_STAGE" url = 's3://${this.dbi.REMOTE_STAGING_AREA}/' credentials = (${this.STAGE_CREDENTIALS}) file_format = (TYPE=CSV TRIM_SPACE=FALSE FIELD_OPTIONALLY_ENCLOSED_BY = '"')`;
     })();
     return this._SQL_CREATE_STAGE
   }     
 
   get SQL_DROP_STAGE() {
 	this._SQL_DROP_STAGE = this._SQL_DROP_STAGE || (() => { 
-	  return `drop stage  "${this.dbi.parameters.YADAMU_DATABASE}"."${this.dbi.parameters.TO_USER}"."YADAMU_STAGE" `;
+	  return `drop stage  "${this.dbi.parameters.DATABASE}"."${this.dbi.parameters.TO_USER}"."YADAMU_STAGE" `;
     })();
     return this._SQL_DROP_STAGE
   }     

@@ -463,7 +463,7 @@ class YadamuWriter extends Writable {
     this.STREAM_STATE.readableLength = this.readableLength || 0
     this.STREAM_STATE.writableLength = this.writableLength || 0
     this.PIPELINE_STATE.insertMode   = this.tableInfo ? this.tableInfo.insertMode : this.dbi.insertMode
-    this.PIPELINE_STATE.skipTable    = this.tableInfo.skipTable
+    this.PIPELINE_STATE.skipTable    = this.tableInfo?.skipTable
     this.PIPELINE_STATE.sqlTime      = this.dbi.SQL_CUMLATIVE_TIME - this.SQL_START_TIME
 
     if (err) {

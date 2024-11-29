@@ -53,18 +53,18 @@ import {
 }                                    from '../file/fileException.js'
 
 /* Vendor Specific DBI Implimentation */                                   
+
+import Comparitor                    from './yugabyteCompare.js'
+import DatabaseError                 from './yugabyteException.js'
+import DataTypes                     from './yugabyteDataTypes.js'
+import Parser                        from '../postgres/postgresParser.js'
+import StatementGenerator            from '../postgres/postgresStatementGenerator.js'
+import StatementLibrary              from '../postgres/postgresStatementLibrary.js'
+import OutputManager                 from '../postgres/postgresOutputManager.js'
+import Writer                        from '../postgres/postgresWriter.js'
 						          
-import YugabyteParser                from '../postgres/postgresParser.js'
-import YugabyteWriter                from '../postgres/postgresWriter.js'
-import YugabyteStatementLibrary      from '../postgres/postgresStatementLibrary.js'
 
-import YugabyteOutputManager         from '../postgres/postgresOutputManager.js'
-import YugabyteStatementGenerator    from '../postgres/postgresStatementGenerator.js'
-
-import YugabyteError                 from './yugabyteException.js'
-import YugabyteDataTypes             from './yugabyteDataTypes.js'
 import YugabyteConstants             from './yugabyteConstants.js'
-import YugabyteCompare               from './yugabyteCompare.js'
 
 class YugabyteDBI extends YadamuDBI {
     
@@ -152,7 +152,7 @@ class YugabyteDBI extends YadamuDBI {
   get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED ? this.parameters.SPATIAL_FORMAT || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT : 'GeoJSON' };
   get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 							          
-  get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || YugabyteDataTypes.storageOptions.JSON_TYPE }
+  get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || DataTypes.storageOptions.JSON_TYPE }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
@@ -182,15 +182,21 @@ class YugabyteDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = YugabyteDataTypes
-    
+
+	this.COMPARITOR_CLASS = Comparitor
+	this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer
+	
+	this.DATA_TYPES = DataTypes
 	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.PGSQL_JSON_STORAGE_OPTION    || this.DBI_PARAMETERS.JSON_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.JSON_TYPE
 
     this.pgClient = undefined;
     this.useBinaryJSON = false
     
-    this.StatementLibrary = YugabyteStatementLibrary
-    this.statementLibrary = undefined
     this.pipelineAborted = false;
 	
 	this.yugabyteStack = new Error().stack
@@ -203,18 +209,16 @@ class YugabyteDBI extends YadamuDBI {
   **
   */
   
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new YugabyteError(driverId,cause,stack,sql)
-  }
-    
   async testConnection() {   
+    let stack
 	try {
-      const pgClient = new Client(this.CONNECTION_PROPERTIES)
+      stack = new Error().stack
+	  const pgClient = new Client(this.CONNECTION_PROPERTIES)
       await pgClient.connect()
       await pgClient.end()     
 								  
 	} catch (e) {
-      throw e;
+      throw this.createDatabaseError(e,stack,'testConnection.getConnection()')
 	}
 	
   }
@@ -228,7 +232,7 @@ class YugabyteDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.yugabyteStack,this.yugabyteOperation)
+	  // const pgErr = this.createDatabaseException(err,this.yugabyteStack,this.yugabyteOperation)
       this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','POOL'],err.message)
     })
 
@@ -249,7 +253,7 @@ class YugabyteDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.connect()')
+	  throw this.getDatabaseException(e,stack,'pg.Pool.connect()')
 	}
   }
 
@@ -271,17 +275,17 @@ class YugabyteDBI extends YadamuDBI {
       await this.configureConnection()
       return this.connection
 	} catch (e) {
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
+      throw this.getDatabaseException(e,stack,operation)
 	}
   }
   
   async getPostgisInfo() {
   
     try {
-      const results = await this.executeSQL(this.StatementLibrary.SQL_POSTGIS_INFO)
+      const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_POSTGIS_INFO)
 	  return results.rows[0][0];
 	} catch (e) {
-      if ((e instanceof YugabyteError) && e.postgisUnavailable()) {
+      if ((e instanceof DatabaseError) && e.postgisUnavailable()) {
         // ### What to do about SystemInfo.SPATIAL_FORMAT There can be no Geography or Geometry columns without POSTGIS
         return "Not Installed"
       }
@@ -307,12 +311,12 @@ class YugabyteDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.yugabyteStack,this.yugabyteOperation)
+	  // const pgErr = this.createDatabaseException(err,this.yugabyteStack,this.yugabyteOperation)
       this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','CONNECTION'],err.message)
     })
    
-    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
-	const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)				
+	const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
 	this.POSTGRES_VERSION = results.rows[0][3]
 	this.YUGABYTE_VERSION = results.rows[0][7]
 	
@@ -337,7 +341,7 @@ class YugabyteDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.getDatabaseException(this.DRIVER_ID,e,stack,'Client.release()')
+		const err = this.getDatabaseException(e,stack,'Client.release()')
 		throw err
       }
 	}
@@ -355,7 +359,7 @@ class YugabyteDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.close()')
+	    throw this.getDatabaseException(e,stack,'pg.Pool.close()')
 	  }
 	}
   }
@@ -396,7 +400,7 @@ class YugabyteDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -454,7 +458,7 @@ class YugabyteDBI extends YadamuDBI {
 
      // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
+     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION)
 	 super.beginTransaction()
 
   }
@@ -470,7 +474,7 @@ class YugabyteDBI extends YadamuDBI {
     // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
-    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_COMMIT_TRANSACTION)
 	
   }
 
@@ -491,7 +495,7 @@ class YugabyteDBI extends YadamuDBI {
 
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_ROLLBACK_TRANSACTION)
 	} catch (newIssue) {
 	  this.checkCause('ROLBACK TRANSACTION',cause,newIssue)								   
 	}
@@ -501,7 +505,7 @@ class YugabyteDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
   }
   
@@ -516,7 +520,7 @@ class YugabyteDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
       super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue)
@@ -527,7 +531,7 @@ class YugabyteDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RELEASE_SAVE_POINT)    
     super.releaseSavePoint()
 
   } 
@@ -561,7 +565,7 @@ class YugabyteDBI extends YadamuDBI {
    	  const is = await new Promise((resolve,reject) => {
         const stack = new Error().stack
         const inputStream = fs.createReadStream(importFilePath);
-        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,importFilePath) : new FileError(this,err,stack,importFilePath) )})
       })
 	  
 	  const rl = readline.createInterface({input: is, crlfDelay: Infinity})
@@ -585,7 +589,7 @@ class YugabyteDBI extends YadamuDBI {
       return elapsedTime;
     }
     catch (e) {
-      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,copyStatement)
+      const cause = this.getDatabaseException(e,stack,copyStatement)
 	  throw cause
 	}
   }
@@ -598,7 +602,7 @@ class YugabyteDBI extends YadamuDBI {
       elapsedTime = await this.loadStagingTable(importFilePath)
     }
     catch (e) {
-	  if ((e instanceof YugabyteError) && e.bjsonTooLarge()) {
+	  if ((e instanceof DatabaseError) && e.bjsonTooLarge()) {
         this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable()
@@ -629,7 +633,7 @@ class YugabyteDBI extends YadamuDBI {
 	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
-	const typeMappings = await this.getVendorDataTypeMappings(YugabyteStatementGenerator)
+	const typeMappings = await this.getVendorDataTypeMappings()
     
   	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
@@ -670,7 +674,7 @@ class YugabyteDBI extends YadamuDBI {
 
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
 	return Object.assign(
 	  super.getSystemInformation()
@@ -706,17 +710,13 @@ class YugabyteDBI extends YadamuDBI {
 	, "postgisInstalled"   : this.POSTGIS_INSTALLED
 	}
 	
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,options])
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,options])
 	if ((results.rowCount === 1) && Array.isArray(results.rows[0][6])) { // EXPORT_JSON returned Errors
        this.processLog(results.rows[0][6],`EXPORT_JSON('${this.CURRENT_SCHEMA}','${this.SPATIAL_FORMAT}')`)
 	}
     return this.generateSchemaInfo(results.rows)
   }
 
-  _getParser(queryInfo,pipelineState) {
-    return new YugabyteParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
-  
   async _getInputStream(queryInfo) {        
   
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
@@ -784,7 +784,7 @@ class YugabyteDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT)
+		const cause = this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -845,7 +845,7 @@ class YugabyteDBI extends YadamuDBI {
 	  this.DATA_TYPES.GEOMETRY_TYPE = this.DATA_TYPES.SPATIAL_TYPE
 	}
 	
-	const statementCache = await super.generateStatementCache(YugabyteStatementGenerator, schema)
+	const statementCache = await super.generateStatementCache(schema)
 	
 	/*
 	**
@@ -867,14 +867,6 @@ class YugabyteDBI extends YadamuDBI {
 	return statementCache
   }
 
-  getOutputManager(tableName,pipelineState) {
-	 return super.getOutputManager(YugabyteOutputManager,tableName,pipelineState)
-  }
-
-  getOutputStream(tableName,pipelineState) {
-	 return super.getOutputStream(YugabyteWriter,tableName,pipelineState)
-  }
- 
   classFactory(yadamu) {
 	return new YugabyteDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
@@ -935,12 +927,6 @@ class YugabyteDBI extends YadamuDBI {
 	 await this.commitTransaction();
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" cascade`)
   }
-
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new YugabyteCompare(this,configuration)
-  }
-	  
 
 }
 

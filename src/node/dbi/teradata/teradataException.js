@@ -4,8 +4,8 @@ import {DatabaseError} from '../../core/yadamuException.js'
 
 class TeradataError extends DatabaseError {
 
-  constructor(driverId,cause,stack,sql) {
-	super(driverId,cause,stack,sql);
+  constructor(dbi,cause,stack,sql) {
+	super(dbi,cause,stack,sql);
   }
 
   static recreateTeradataError(e) {

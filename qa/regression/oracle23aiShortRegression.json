@@ -6,7 +6,6 @@
 	"createDirectory": true,
 	"verifyOperation": true,
 	"parameters": {
-		"DIRECTORY": "%operation%/%mode%/%connection%",
 		"MODE"     : "DDL_AND_DATA"
 	},
 	"tests": [{
@@ -15,6 +14,9 @@
 	        "verifyOperation": false,
 			"source": "oracle23ai",
 			"target": "file-staging",
+			"parameters": {
+				"DIRECTORY": "export/%mode%/%sourceConnection%"
+			},
 			"tasks": [
 				"HR",
 				"BI"
@@ -24,7 +26,7 @@
 			"source": "file-staging",
 			"target": "oracle23ai",
 			"parameters": {
-				"DIRECTORY": "export/%mode%/%connection%"
+				"DIRECTORY": "export/%mode%/%targetConnection%"
 			},
 			"tasks": [
 				"HR",

@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "description": "User Interface for YADAMU",
-  "main": "./node/gui/gui.cjs",
+  "main": "./node/gui/index.mjs",
   "scripts": {
     "start": "electron ./"
   },
@@ -17,7 +17,7 @@
     "@aws-sdk/client-s3": "^3.441.0",
     "@aws-sdk/lib-storage": "^3.441.0",
     "@azure/storage-blob": "^12.17.0",
-    "@electron/remote": "^2.0.12",
+    "@electron/remote": "^2.1.2",
     "bootstrap": "^5.3.2",
     "bootstrap-icons": "^1.11.1",
     "cookie-parser": "^1.4.5",
@@ -27,13 +27,10 @@
     "font-awesome": "^4.7.0",
     "ibm_db": "^3.2.2",
     "ibm_db_electron": "npm:ibm_db@^3.2.2",
-    "install": "^0.13.0",
-    "jquery": "^3.7.1",
     "mariadb": "^3.3.0",
     "mime-types": "^2.1.28",
     "mongodb": "^6.2.0",
     "mssql": "^11.0.1",
-    "mysql": "^2.18.1",
     "mysql2": "^3.11.0",
     "npm": "^10.2.1",
     "oracledb": "^6.6.0",
@@ -46,7 +43,7 @@
     "wkx": "^0.5.0"
   },
   "devDependencies": {
-    "electron": "^32.1.2",
-    "electron-packager": "^17.1.1"
+    "@electron/packager": "^18.3.6",
+    "electron": "^33.2.0"
   }
 }

@@ -85,13 +85,13 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
        ,failed     : []
       }
 	  
-	  const results = await this.dbi.executeSQL(this.dbi.StatementLibrary.SQL_SCHEMA_INFORMATION(source))
+	  const results = await this.dbi.executeSQL(this.dbi.STATEMENT_LIBRARY_CLASS.SQL_SCHEMA_INFORMATION(source))
 	  let compareInfo = this.dbi.buildSchemaInfo(results.rows)
 	 	  
       const compareOperations = this.buildColumnLists(compareInfo,rules) 
 	  
       const compareResults = await Promise.all(Object.keys(compareOperations).map(async (TABLE_NAME) => {
-        const sqlStatement =
+      const sqlStatement =
 `select 
   '${TABLE_NAME}' "TABLE_NAME",
   (select count(*) from "${source}"."${TABLE_NAME}") SOURCE_ROWS,

@@ -1,5 +1,4 @@
 
-
 import fs                 from 'fs';
 import path               from 'path';
 import EventEmitter       from 'events'
@@ -18,6 +17,8 @@ import YadamuLibrary      from '../../lib/yadamuLibrary.js'
 import NullWriter         from '../../util/nullWriter.js'
 import NullWritable       from '../../util/nullWritable.js'
 
+import Comparitor         from './yadamuCompare.js'
+
 import {
   YadamuError, 
   InternalError, 
@@ -27,7 +28,8 @@ import {
   DatabaseError, 
   BatchInsertError, 
   CopyOperationAborted,
-  IterativeInsertError
+  IterativeInsertError,
+  UnimplementedMethod
 }                         from '../../core/yadamuException.js'
 
 import DBIConstants       from './dbiConstants.js'
@@ -43,7 +45,9 @@ class SQLTrace {
   get SQL_CUMLATIVE_TIME()      { return this._SQL_CUMLATIVE_TIME }
 
   constructor(writer,seperator,terminator,role) {
-    this.writer = writer
+	  
+	this.writer = writer
+	
     this.STATEMENT_SEPERATOR = seperator
     this.STATEMENT_TERMINATOR = terminator
     this.ROLE = role
@@ -59,7 +63,7 @@ class SQLTrace {
   }
   
   trace(msg) {
-    this.writer.write(msg)
+	this.writer.write(msg)
   }
   
   disable() {
@@ -155,8 +159,9 @@ class YadamuDBI extends EventEmitter {
   get RECONNECT_ON_ABORT()           { const retVal = this._RECONNECT_ON_ABORT; this._RECONNECT_ON_ABORT = false; return retVal }
   set RECONNECT_ON_ABORT(v)          { this._RECONNECT_ON_ABORT = v }
 
-  get SQL_TRACE()                    { return this._SQL_TRACE }
-  set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
+  #SQL_TRACE                         = undefined
+  get SQL_TRACE()                    { return this.#SQL_TRACE }
+  set SQL_TRACE(writer)              { this.#SQL_TRACE = this.#SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
   get SQL_CUMLATIVE_TIME()           { return this.SQL_TRACE.SQL_CUMLATIVE_TIME }
   
   get SQL_TRUNCATE_TABLE_OPERATION() { return 'TRUNCATE TABLE' }
@@ -245,13 +250,11 @@ class YadamuDBI extends EventEmitter {
     return this._CURRENT_SCHEMA 
   }
   
-  get DATA_TYPES()                    { return this._DATA_TYPES }
-
-  set DATA_TYPES(DriverDataTypes)     { this._DATA_TYPES = this._DATA_TYPES || new DriverDataTypes(); return this._DATA_TYPES } 
-      
   get ROLE()                          {                     
     this._ROLE = this._ROLE || (() => {
       switch (true) { 
+	    case (this.parameters.MODE === YadamuConstants.COMAPRE_ROLE):
+		  return YadamuConstants.COMARE_ROLE
         case this.IS_READER: 
           return YadamuConstants.READER_ROLE; 
         case this.IS_WRITER: 
@@ -268,6 +271,7 @@ class YadamuDBI extends EventEmitter {
   // Not available until configureConnection() has been called 
 
   get DATABASE_VERSION()              { return this._DATABASE_VERSION }
+  get CONNECTION_NAME()               { return this.parameters.CONNECTION_NAME}
 
   get SPATIAL_SERIALIZER()            { return this._SPATIAL_SERIALIZER }
   set SPATIAL_SERIALIZER(v)           { this._SPATIAL_SERIALIZER = v }
@@ -394,13 +398,11 @@ class YadamuDBI extends EventEmitter {
   }
 
   setDefaultConnectionProperties(connectionProperties) {
-
     connectionProperties.user      = this.parameters.USERNAME  || connectionProperties.user
     connectionProperties.host      = this.parameters.HOSTNAME  || connectionProperties.host
     connectionProperties.database  = this.parameters.DATABASE  || connectionProperties.database 
     connectionProperties.password  = this.parameters.PASSWORD  || connectionProperties.password
     connectionProperties.port      = this.parameters.PORT      || connectionProperties.port 
-	
   }
   
   addVendorExtensions(connectionProperties) {
@@ -422,11 +424,46 @@ class YadamuDBI extends EventEmitter {
   #CONNECTION_SETTINGS = {}
   
   get CONNECTION_SETTINGS()  { return this.#CONNECTION_SETTINGS }
-  set CONNECTION_SETTINGS(v) { 
-    // console.log(v); 
+  set CONNECTION_SETTINGS(v) { 0
 	this.#CONNECTION_SETTINGS = v 
   }
+  
+  #COMPARITOR_CLASS                     = Comparitor 
+  get COMPARITOR_CLASS()                { return this.#COMPARITOR_CLASS }
+  set COMPARITOR_CLASS(v)               { this.#COMPARITOR_CLASS = v }
    
+  #DATA_TYPES                           = undefined
+  get DATA_TYPES()                      { return this.#DATA_TYPES }
+  set DATA_TYPES(DriverDataTypes)       { this.#DATA_TYPES = this.#DATA_TYPES || new DriverDataTypes(); return this.#DATA_TYPES }
+
+  #PARSER_CLASS                         = undefined
+  get PARSER_CLASS()                    { return this.#PARSER_CLASS }
+  set PARSER_CLASS(v)                   { this.#PARSER_CLASS = v }
+
+  #STATEMENT_GENERATOR_CLASS            = undefined
+  get STATEMENT_GENERATOR_CLASS()       { return this.#STATEMENT_GENERATOR_CLASS }
+  set STATEMENT_GENERATOR_CLASS(v)      { this.#STATEMENT_GENERATOR_CLASS = v }
+
+  #STATEMENT_LIBRARY_CLASS              = undefined
+  get STATEMENT_LIBRARY_CLASS()         { return this.#STATEMENT_LIBRARY_CLASS }
+  set STATEMENT_LIBRARY_CLASS(v)        { this.#STATEMENT_LIBRARY_CLASS = v }
+  
+  #STATEMENT_LIBRARY                    = undefined
+  get STATEMENT_LIBRARY()               { return this.#STATEMENT_LIBRARY }
+  set STATEMENT_LIBRARY(v)              { this.#STATEMENT_LIBRARY = v }
+  
+  #OUTPUT_MANAGER_CLASS                 = undefined  
+  get OUTPUT_MANAGER_CLASS()            { return this.#OUTPUT_MANAGER_CLASS }
+  set OUTPUT_MANAGER_CLASS(v)           { this.#OUTPUT_MANAGER_CLASS = v }
+
+  #WRITER_CLASS                         = undefined  
+  get WRITER_CLASS()                    { return this.#WRITER_CLASS }
+  set WRITER_CLASS(v)                   { this.#WRITER_CLASS = v }
+
+  #DATABASE_ERROR_CLASS                 = DatabaseError
+  get DATABASE_ERROR_CLASS()            { return this.#DATABASE_ERROR_CLASS }
+  set DATABASE_ERROR_CLASS(v)           { this.#DATABASE_ERROR_CLASS = v }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
 	  
     super()
@@ -437,7 +474,6 @@ class YadamuDBI extends EventEmitter {
     this.yadamu = yadamu;
     this.setConnectionProperties(connectionSettings || {})
     this.status = yadamu.STATUS
-    
     
     this.LOGGER = yadamu.LOGGER;
 	this.DEBUGGER = yadamu.DEBUGGER
@@ -468,7 +504,6 @@ class YadamuDBI extends EventEmitter {
     this.RECONNECT_IN_PROGRESS = false
     this.TRANSACTION_IN_PROGRESS = false;
     this.SAVE_POINT_SET = false;
-    this.DESCRIPTION = this.getSchemaIdentifer()
 	
 	this.ACTIVE_INPUT_STREAM = false
 	this.PREVIOUS_PIPELINE_ABORTED = false
@@ -601,10 +636,35 @@ class YadamuDBI extends EventEmitter {
     return {}
   }
 
-  setOption(name,value) {
-    this.options[name] = value;
+  setSchema(schema,key) {
+    
+     switch (true) {
+       case (schema.owner === 'dbo'):
+         this.parameters[key] = schema.database
+		 break;
+	   case (schema.hasOwnProperty('owner')):
+         this.parameters[key] = schema.owner
+		 break
+       default:
+         this.parameters[key] = schema.schema
+     }
+	 this.DESCRIPTION = `"${this.CURRENT_SCHEMA}"`
   }
-        
+  
+  getSchema(schema) {
+    
+     switch (true) {
+       case (schema.owner === 'dbo'):
+         return schema.database
+		 break;
+	   case (schema.hasOwnProperty('owner')):
+         return schema.owner
+		 break
+       default:
+         return schema.schema
+     }
+  }
+   
   initializeParameters(parameters){
     
 	// Merge default parameters for this driver with parameters from configuration files and command line parameters. Map Key names to uppercase
@@ -618,10 +678,12 @@ class YadamuDBI extends EventEmitter {
 	, ...(this.yadamu.SALT)                                             && {SALT       : this.yadamu.SALT}
 	, ...(this.yadamu.FILE)                                             && {FILE       : this.yadamu.FILE}
 	, ...(this.yadamu.parameters.BUCKET)                                && {BUCKET     : this.yadamu.parameters.BUCKET}
+	, MODE : this.yadamu.MODE
 	, ...this.vendorParameters
 	, ...parameters
 	, ...this.yadamu.COMMAND_LINE_PARAMETERS
 	}).map(([k, v]) => [k.toUpperCase(), v]))
+
 	
     /*
 	**
@@ -633,14 +695,14 @@ class YadamuDBI extends EventEmitter {
 	console.log('COMMAND_LINE_PARAMETERS',this.yadamu.COMMAND_LINE_PARAMETERS)
     console.log('this.parameters',this.parameters)
     console.log('this.yadamu.parameters',this.yadamu.parameters)
+    console.log('this.parameters',this.yadamu.parameters)
 	console.log(this.constructor.name,'initializeParameters','End Parameter Dump')
 	
 	**
 	*/
     
- }
-	
-	
+  }
+
   setParameters(parameters) {
     // Used when creating a worker.
     Object.assign(this.parameters, parameters || {})
@@ -820,12 +882,12 @@ class YadamuDBI extends EventEmitter {
     return err
   } 
    
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new DatabaseError(driverId,cause,stack,sql)
+  createDatabaseError(cause,stack,sql) {
+    return new this.DATABASE_ERROR_CLASS(this,cause,stack,sql)
   }
   
-  getDatabaseException(driverId,cause,stack,sql) {
-    const err = this.createDatabaseError(driverId,cause,stack,sql)
+  getDatabaseException(cause,stack,sql) {
+    const err = this.createDatabaseError(cause,stack,sql)
     return this.trackExceptions(err)
   }
 
@@ -956,6 +1018,8 @@ class YadamuDBI extends EventEmitter {
   }
  
   applyIdentifierMappings(metadata,mappings,reportMappedIdentifiers) {
+	  
+	  console.log(metadata,mappings,reportMappedIdentifiers, new Error().stack) 
       
     // This function does not change the names of the keys in the metadata object.
     // It only changes the value of the tableName property associated with a mapped tables.
@@ -1337,7 +1401,7 @@ class YadamuDBI extends EventEmitter {
   **
   */
 
-  async setLibraries() {
+  setLibraries() {
   }
   
   async initialize(requirePassword) {
@@ -1348,14 +1412,13 @@ class YadamuDBI extends EventEmitter {
     ** Calculate CommitSize
     **
     */
-    
     if (this.parameters.PARAMETER_TRACE === true) {
       this.LOGGER.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`)
     }
     
     if (this.isDatabase()) {
       await this.getDatabaseConnection(requirePassword)
-      await this.setLibraries()
+      this.setLibraries()
     }
     
     
@@ -1564,7 +1627,7 @@ class YadamuDBI extends EventEmitter {
       await this.finalizeImport()
       return log
     } catch (err) {
-      throw err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,this.UPLOAD_FILE) : new FileError(this.DRIVER_ID,err,stack,this.UPLOAD_FILE)
+      throw err.code === 'ENOENT' ? new FileNotFound(this,err,stack,this.UPLOAD_FILE) : new FileError(this,err,stack,this.UPLOAD_FILE)
     }
   }
 
@@ -1793,10 +1856,6 @@ class YadamuDBI extends EventEmitter {
   The following methods are used by the YADAMU DBwriter class
   **
   */
-  
-  getSchemaIdentifer() {
-    return this.CURRENT_SCHEMA
-  }
 
   async initializeExport() {
   }
@@ -1824,18 +1883,17 @@ class YadamuDBI extends EventEmitter {
   async finalizeImport() {
   }
   
-  async getVendorDataTypeMappings(StatementGenerator) {
-    const statementGenerator = new StatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.LOGGER);
+  async getVendorDataTypeMappings() {
+    const statementGenerator = new this.STATEMENT_GENERATOR_CLASS(this,this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.LOGGER);
     await statementGenerator.init()
     return JSON.stringify(Array.from(statementGenerator.TYPE_MAPPINGS.entries()))
   }
   
-  async generateStatementCache(StatementGenerator,schema) {
-    const statementGenerator = new StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.LOGGER)
+  async generateStatementCache(schema) {
+    const statementGenerator = new this.STATEMENT_GENERATOR_CLASS(this,this.systemInformation.vendor,schema,this.metadata,this.LOGGER)
     this.statementCache = await statementGenerator.generateStatementCache()
     this.emit(YadamuConstants.CACHE_LOADED  )
     return this.statementCache
-
   }
 
   async finalizeRead(tableInfo) {
@@ -1882,7 +1940,7 @@ class YadamuDBI extends EventEmitter {
   }   
 
   inputStreamError(err,sqlStatement) {
-     return this.trackExceptions(((err instanceof DatabaseError) || (err instanceof CopyOperationAborted)) ? err : this.createDatabaseError(this.DRIVER_ID,err,new Error().stack,sqlStatement))
+     return this.trackExceptions(((err instanceof DatabaseError) || (err instanceof CopyOperationAborted)) ? err : this.createDatabaseError(err,new Error().stack,sqlStatement))
   }
 
   handleInputStreamError(inputStream,err,sqlStatement) {
@@ -1929,8 +1987,8 @@ class YadamuDBI extends EventEmitter {
   }      
 
   getParser(queryInfo,pipelineState) {
-    const parser = this._getParser(queryInfo,pipelineState)
-    return parser
+	const parser = new this.PARSER_CLASS(this,queryInfo,pipelineState,this.LOGGER)
+	return parser
   }
 
   async getInputStreams(queryInfo,pipelineState) {
@@ -1949,14 +2007,14 @@ class YadamuDBI extends EventEmitter {
 	return streams;
   }
   
-  getOutputManager(OutputManager,tableName,pipelineState) {
-    const outputManager = new OutputManager(this,tableName,pipelineState,this.status,this.LOGGER)
+  getOutputManager(tableName,pipelineState) {
+    const outputManager = new this.OUTPUT_MANAGER_CLASS(this,tableName,pipelineState,this.status,this.LOGGER)
     return outputManager
   }
 
-  getOutputStream(OutputStream,tableName,pipelineState) {
+  getOutputStream(tableName,pipelineState) {
     // this.LOGGER.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
-    const outputStream = new OutputStream(this,tableName,pipelineState,this.status,this.LOGGER)
+    const outputStream = new this.WRITER_CLASS(this,tableName,pipelineState,this.status,this.LOGGER)
     return outputStream
   }
   
@@ -2010,9 +2068,6 @@ class YadamuDBI extends EventEmitter {
     this.dbConnected  = this.manager.dbConnected
     this.cacheLoaded  = this.manager.cacheLoaded
     this.ddlComplete  = this.manager.ddlComplete
-	
-    this.StatementLibrary   = this.manager.StatementLibrary
-    this.StatementGenerator = this.manager.StatementGenerator
 
     this.setParameters(this.manager.parameters)
     
@@ -2023,7 +2078,7 @@ class YadamuDBI extends EventEmitter {
     this.partitionMetadata      = this.manager.partitionMetadata
 	this.#CONNECTION_PROPERTIES = this.manager.CONNECTION_PROPERTIES
     
-    this.IDENTIFIER_MAPPINGS =  this.manager.IDENTIFIER_MAPPINGS
+    this.IDENTIFIER_MAPPINGS    =  this.manager.IDENTIFIER_MAPPINGS
   }   
 
   workerDBI(workerNumber) {
@@ -2143,13 +2198,10 @@ class YadamuDBI extends EventEmitter {
   async finalizeCopy() {
   }
 
-  getSchema(schemaInfo) {
-	return schemaInfo.schema || (schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
-  }
-
   async getComparator(configuration) {
+	 this.options.recreateSchema = false
 	 await this.initialize()
-	 return new YadamuCompare(this,configuration)
+	 return new this.COMPARITOR_CLASS(this,configuration)
   }
 
   trackPartitionedTableState(partitionState) {
@@ -2304,6 +2356,19 @@ class YadamuDBI extends EventEmitter {
 	}
 	
     return cause
+  }
+  
+  getDriverState(userKey,description) {
+	return {
+      vendor             : this.DATABASE_VENDOR
+	, version            : this.DATABASE_VERSION
+   	, description        : description
+ 	, connection         : this.parameters.CONNECTION_NAME
+    , schema             : this.parameters[userKey]
+	, mode               : this.MODE
+	, file               : this.FILE
+	, ddlValid           : this.isValidDDL()
+	}	 
   }
     
 }

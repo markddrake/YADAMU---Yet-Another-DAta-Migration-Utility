@@ -38,15 +38,16 @@ import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                   
 
+import Comparitor                     from './db2Compare.js'
+import DatabaseError                  from './db2Exception.js'
+import DataTypes                      from './db2DataTypes.js'
+import Parser                         from './db2Parser.js'
+import StatementGenerator             from './db2StatementGenerator.js'
+import StatementLibrary               from './db2StatementLibrary.js'
+import OutputManager                  from './db2OutputManager.js'
+import Writer                         from './db2Writer.js'
+
 import DB2Constants                   from './db2Constants.js'
-import DB2DataTypes                   from './db2DataTypes.js'
-import DB2Error                       from './db2Exception.js'
-import DB2Parser                      from './db2Parser.js'
-import DB2Writer                      from './db2Writer.js'
-import DB2OutputManager               from './db2OutputManager.js'
-import DB2StatementLibrary            from './db2StatementLibrary.js'
-import DB2StatementGenerator          from './db2StatementGenerator.js'
-import DB2Compare                     from './db2Compare.js'
 
 class DB2DBI extends YadamuDBI {
     
@@ -99,7 +100,15 @@ class DB2DBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = DB2DataTypes
+
+	this.COMPARITOR_CLASS = Comparitor
+	this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer	
+	this.DATA_TYPES = DataTypes
   }
 
   /*
@@ -108,17 +117,12 @@ class DB2DBI extends YadamuDBI {
   **
   */
   
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new DB2Error(driverId,cause,stack,sql)
-  }
-  
-  
   async testConnection() {   
     const ibmdb = await ( import(process.versions.hasOwnProperty('electron') ? "ibm_db_electron" : "ibm_db"))
 	const stack = new Error().stack
 	const connection = await new Promise((resolve,reject) => {
       ibmdb.open(this.CONNECTION_PROPERTIES.connection,(err,conn) => {
-	    if (err) reject(this.createDatabaseError(this.DRIVER_ID,err,stack,'DB2.open()'))
+	    if (err) reject(this.createDatabaseError(err,stack,'DB2.open()'))
 	    resolve(conn)
 	  })
 	})
@@ -138,7 +142,7 @@ class DB2DBI extends YadamuDBI {
 	   const results = await this.connection.query(`select 1 from sysibm.sysdummy1`)
 	   return false
 	 } catch(e) {
-	   const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,'DB2.Pool.badConnection()')
+	   const cause = this.createDatabaseError(e,stack,'DB2.Pool.badConnection()')
 	   if (cause.lostConnection()) {
 		 return true
 	   }
@@ -168,7 +172,7 @@ class DB2DBI extends YadamuDBI {
         const stack = new Error().stack
 	    const connection = await new Promise((resolve,reject) => {
           this.connectionPool.open(this.CONNECTION_PROPERTIES.connection,(err,conn) => {
-	        if (err) reject(this.createDatabaseError(this.DRIVER_ID,err,stack,'DB2.Pool.getConnection()'))
+	        if (err) reject(this.createDatabaseError(err,stack,'DB2.Pool.getConnection()'))
 	        resolve(conn)
 	      })
 	    })
@@ -192,7 +196,7 @@ class DB2DBI extends YadamuDBI {
   
   async configureConnection() {    
 
-    let result = await this.executeSQL(DB2StatementLibrary.SQL_CONFIGURE_CONNECTION)
+    let result = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)
 
     this._DATABASE_VERSION = result[0].DATABASE_VERSION.substring(5)
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
@@ -247,7 +251,7 @@ class DB2DBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if itYAD cannot reconnect...
@@ -290,7 +294,7 @@ class DB2DBI extends YadamuDBI {
 		return results;
       } catch (e) {
 		timerAbort.abort()
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,batch.sql)
+		const cause = this.getDatabaseException(e,stack,batch.sql)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if itYAD cannot reconnect...
@@ -424,7 +428,7 @@ class DB2DBI extends YadamuDBI {
 	**
 	*/
 	 
-    await this.executeSQL(DB2StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
   }
   
@@ -448,7 +452,7 @@ class DB2DBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(DB2StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
       super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
@@ -520,7 +524,7 @@ class DB2DBI extends YadamuDBI {
   
     // Get Information about the target server
 	
-	const sysInfo = await this.executeSQL(DB2StatementLibrary.SQL_SYSTEM_INFORMATION)
+	const sysInfo = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
     return Object.assign(
 	  super.getSystemInformation()
 	, sysInfo[0]
@@ -592,12 +596,8 @@ class DB2DBI extends YadamuDBI {
     **
     */
           
-    return await this.executeSQL(DB2StatementLibrary.SQL_SCHEMA_METADATA,[this.CURRENT_SCHEMA])
+    return await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SCHEMA_METADATA,[this.CURRENT_SCHEMA])
   }
-
-  _getParser(queryInfo,pipelineState) {
-    return new DB2Parser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
 
   async _getInputStream(queryInfo) {
 
@@ -619,7 +619,7 @@ class DB2DBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -642,20 +642,6 @@ class DB2DBI extends YadamuDBI {
 	await this.executeSQL(`create schema "${schema}"`)
   }
   
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(DB2StatementGenerator, schema)
-  }
-
-  getOutputStream(tableName,pipelineState) {
-	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(DB2Writer,tableName,pipelineState)
-  }
-
-  getOutputManager(tableName,pipelineState) {
-	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(DB2OutputManager,tableName,pipelineState)
-  }
-
   classFactory(yadamu) {
 	// Create a worker DBI that has it's own connection to the database (eg can begin and end transactions of it's own. 
 	// Ideally the connection should come from the same connection pool that provided the connection to this DBI.
@@ -667,11 +653,6 @@ class DB2DBI extends YadamuDBI {
     throw new Error('Unimplemented Method')
   }
 
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new DB2Compare(this,configuration)
-  }
-	  
 }
 
 export { DB2DBI as default }

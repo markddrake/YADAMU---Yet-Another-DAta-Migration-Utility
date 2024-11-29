@@ -14,6 +14,9 @@ class SnowflakeConstants {
     , "DATA_RETENTION_TIME"       : 0
 	, "XML_STORAGE_OPTION"        : this.VARIANT_DATA_TYPE
 	, "JSON_STORAGE_OPTION"       : this.VARIANT_DATA_TYPE
+	, "DEFAULT_SCHEMA"            : "PUBLIC"
+	, "DEFAULT_DATABASE"          : "DEMO_DB"
+	, "DEFAULT_WAREHOUSE"         : "DEMO_WH" 
     })
     return this._STATIC_PARAMETERS;
   }
@@ -34,7 +37,7 @@ class SnowflakeConstants {
   static #DBI_PARAMETERS
   
   static get DBI_PARAMETERS() { 
-    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS1: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
 	return this.#DBI_PARAMETERS
   }
 
@@ -43,6 +46,9 @@ class SnowflakeConstants {
 
   static get XML_STORAGE_OPTION()     { return this.DBI_PARAMETERS.XML_STORAGE_OPTION };
   static get JSON_STORAGE_OPTION()    { return this.DBI_PARAMETERS.JSON_STORAGE_OPTION };
+  static get DEFAULT_SCHEMA()         { return this.DBI_PARAMETERS.DEFAULT_SCHEMA };
+  static get DEFAULT_DATABASE()       { return this.DBI_PARAMETERS.DEFAULT_DATABASE };
+  static get DEFAULT_WAREHOUSE()      { return this.DBI_PARAMETERS.DEFAULT_WAREHOUSE };
 
   static get STATEMENT_TERMINATOR()   { return ';' }
 

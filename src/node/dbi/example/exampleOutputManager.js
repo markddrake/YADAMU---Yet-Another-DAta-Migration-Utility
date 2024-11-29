@@ -17,12 +17,8 @@ class ExampleOutputManager extends YadamuOutputManager {
 
   generateTransformations(targetDataTypes) {
 
-    // Set up Transformation functions to be applied to the incoming rows
- 
-rmations(targetDataTypes) {
-
-    // Set up Transformation functions to be applied to the incoming rows
- 
+    // Set up Transformation functions to be applied to the incoming rows 
+	
     return  this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(targetDataType);
 	  switch (dataTypeDefinition.type.toUpperCase()) {

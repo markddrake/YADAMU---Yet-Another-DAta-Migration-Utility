@@ -30,7 +30,8 @@
       }
      ,"parameters"                  : {
         "MODE"                      : "DATA_ONLY",
-		"TRUNCATE_ON_LOAD"          : true
+		"TRUNCATE_ON_LOAD"          : true,
+	    "ENCRYPTION"                : false
       }
    }]
 }

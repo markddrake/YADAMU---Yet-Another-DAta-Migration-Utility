@@ -9,20 +9,18 @@ const { dialog } = require('@electron/remote')
 const { ipcRenderer} = electron
 const fs = require('fs')
 
-window.$ = window.jQuery = require('jquery')
-
 window.validSource = false;
 window.validTarget = false;
 window.encryption = false;
 
 window.configuration = { 
   connections          : {
-    source             : undefined
-  ,	target             : undefined
+    source             : {}
+  ,	target             : {}
   }
 , schemas              : {
-    source             : undefined
-  , target             : undefined	
+    source             : {}
+  , target             : {}	
   }
   ,"jobs"                            : [{
      "source"                       : {
@@ -39,35 +37,40 @@ window.configuration = {
   }]
 }
 
-ipcRenderer.on('load-config', function (event, configuration) {
-  loadConfiguration(configuration)
-})
+function onLoad() {
 
-$('#source-tab a').on('click', function (e) {
-  disableCopy(e.target.href.substring(e.target.href.indexOf('#')+1)+'-status')
-})
-
-$('#source-oracle-caseSensitive').change(function (e) {
-  if (this.checked) {
-	$('#source-oracle-user').removeClass('text-uppercase');
-	$('#source-oracle-schema').removeClass('text-uppercase');
-  }
-  else {
-	$('#source-oracle-user').addClass('text-uppercase');
-	$('#source-oracle-schema').addClass('text-uppercase');
-  }
-})
-
-$('#target-oracle-caseSensitive').change(function (e) {
-  if (this.checked) {
-	$('#target-oracle-user').removeClass('text-uppercase');
-	$('#target-oracle-schema').removeClass('text-uppercase');
-  }
-  else {
-	$('#target-oracle-user').addClass('text-uppercase');
-	$('#target-oracle-schema').addClass('text-uppercase');
-  }
-})
+   ipcRenderer.on('load-config', (event, configuration) => {
+     loadConfiguration(configuration)
+   })
+   
+   /*
+   document.querySelector('#source-tab a').on('click', (e) => {
+     disableCopy(e.target.href.substring(e.target.href.indexOf('#')+1)+'-status')
+   })
+   */
+   
+   document.querySelector('#source-oracle-caseSensitive').change((e) => {
+     if (this.checked) {
+   	   document.querySelector('#source-oracle-user').removeClass('text-uppercase');
+   	   document.querySelector('#source-oracle-schema').removeClass('text-uppercase');
+     }
+     else {
+       document.querySelector('#source-oracle-user').addClass('text-uppercase');
+   	   document.querySelector('#source-oracle-schema').addClass('text-uppercase');
+     }
+   })
+   
+   document.querySelector('#target-oracle-caseSensitive').change((e) => {
+     if (this.checked) {
+       document.querySelector('#target-oracle-user').removeClass('text-uppercase');
+   	   document.querySelector('#target-oracle-schema').removeClass('text-uppercase');
+     }
+     else {
+   	   document.querySelector('#target-oracle-user').addClass('text-uppercase');
+   	   document.querySelector('#target-oracle-schema').addClass('text-uppercase');
+     }
+   })
+}
 
 function resetSourceState(statusID) {
   disableCopy(statusID);
@@ -105,9 +108,22 @@ function setCopyState() {
   
 }
 
-function selectSourceFile(control) {
+function selectFile(event,filePath) {
 	
-  const options = {
+  const button = event.target.closest('button')
+  if (filePath) {
+    document.querySelector(`#${button.dataset.target}`).value = filePath[0]
+    const parameters = {
+	  FILE : filePath[0]
+    }
+	ipcRenderer.send('source-filename',parameters);
+	window.validSource = true;
+	setCopyState();
+  }
+}
+
+function getSourceFileOptions() {
+ return {
     title : "Select File to upload", 
  
 	filters :[
@@ -116,25 +132,16 @@ function selectSourceFile(control) {
 	],
 	properties: ['openFile']
   }	
-  
-  // const browseResults = await dialog.showOpenDialog(null,options)
-  
-  const filePath = dialog.showOpenDialogSync(null,options)
-  
-  if (filePath) {
-    document.getElementById('source-filename').value = filePath[0]
-    const parameters = {
-	  FILE : filePath[0]
-    }
-	ipcRenderer.send('source-filename',parameters);
-	window.validSource = true;
-	setCopyState();
-  }
+ 
 }
 
-function selectTargetFile(control) {
-	
-  const options = {
+function selectSourceFile(event) {
+   const filePath = dialog.showOpenDialogSync(null,getSourceFileOptions()) 
+   selectFile(event,filePath)
+}
+
+function getTargetFileOptions() {
+  return {
     title : "Select File to save", 
  
 	filters :[
@@ -143,42 +150,32 @@ function selectTargetFile(control) {
 	],
 	properties: []
   }	
-  
-  const filePath = dialog.showSaveDialogSync(null,options)
-  
-  if (filePath) {
-    document.getElementById('source-filename').value = filePath[0]
-    const parameters = {
-	  FILE : filePath[0]
-    }
-	ipcRenderer.send('source-filename',parameters);
-	window.validSource = true;
-	setCopyState();
-  }
 }
 
-function updateConfiguration(connectionType,connectionProperties,parameters) {
+function selectTargetFile(event) {
+   const filePath = dialog.showSaveDialogSync(null,getTargetFileOptions())
+   selectFile(event,filePath)
+}
+
+function updateConfiguration(role,rdbms,connectionProperties,parameters) {
 
   const pwdRedacated = {
     ... connectionProperties
   }
   delete pwdRedacated.password
   
-  const mode = connectionType.substring(0,connectionType.indexOf('-'));
-  const db = connectionType.substring(connectionType.indexOf('-')+1);
-  
-  window.configuration.connections[mode] = pwdRedacated 
+  window.configuration.connections[role] = { [rdbms] : pwdRedacated }
   const schemaInfo = {}
   
-  switch (mode) {
+  switch (role) {
 	case 'source':
-	  switch (db) {
+	  switch (rdbms) {
 		case 'mssql' :
-		  schemaInfo.database = connectionProperties.database
+		  schemaInfo.database = pwdRedacated.database
 		  schemaInfo.schema = parameters.FROM_USER;
 	      break; 
 	    case 'snowflake':
-		  schemaInfo.database = connectionProperties.database
+		  schemaInfo.database = pwdRedacated.database
 		  schemaInfo.owner = parameters.FROM_USER;
 	      break; 
         default:
@@ -187,13 +184,13 @@ function updateConfiguration(connectionType,connectionProperties,parameters) {
 	  window.configuration.schemas.source = schemaInfo
 	  break;
 	case 'target':
-	  switch (db) {
+	  switch (rdbms) {
 		case 'mssql' :
-		  schemaInfo.database = connectionProperties.database
+		  schemaInfo.database = pwdRedacated.database
 		  schemaInfo.owner = parameters.TO_USER;
 	      break; 
 	    case 'snowflake':
-		  schemaInfo.database = connectionProperties.database
+		  schemaInfo.database = pwdRedacated.database
 		  schemaInfo.schema = parameters.TO_USER;
 	      break; 
         default:
@@ -206,517 +203,76 @@ function updateConfiguration(connectionType,connectionProperties,parameters) {
 	  
 }
 
-function testConnection(button,status,connection,connectionProperties,parameters) {
+function testConnection(button,role,connectionProperties,parameters) {
  
   let valid = false;
 
+  const status = document.querySelector(`#${role}-${button.dataset.rdbms}-state`)
+  
   status.classList.remove('bi-question-circle')
   status.classList.remove('bi-check-circle')
   status.classList.remove('bi-times-circle')
 
-  const state = ipcRenderer.sendSync(connection,connectionProperties,parameters);
+  const state = ipcRenderer.sendSync(role,button.dataset.rdbms,connectionProperties,parameters);
   if (state === 'success') {
     valid = true
     status.classList.add('bi-check-circle')
-	updateConfiguration(connection,connectionProperties,parameters)
+	updateConfiguration(role,button.dataset.rdbms,connectionProperties,parameters)
   }
   else  {
 	valid = false
     status.classList.add('bi-times-circle')
     dialog.showErrorBox('Connection Error', state)
   }
+  
   button.disabled = false;	 
   return valid;  
 }
 
-function validateOracleSource(button) {
+function getFormData(event) {
+  const form = event.target.form || event.target.closest('form')
+  if (form) {
+    const formValid = form.reportValidity()
+    if (!formValid) return 
+	const formData = Object.fromEntries(new FormData(form).entries())
+	return formData
+  }
+}
+	
 
+
+function validateConnection(event,role,key) {
+
+  const button = event.target.closest('button')
   button.disabled = true;
-  const status = document.getElementById('source-oracle-status')
-  const connectionProperties = {
-    user              : document.getElementById('source-oracle-user').value
-  , connectString     : document.getElementById('source-oracle-connectString').value
-  , password          : document.getElementById('source-oracle-password').value
-  };
+  
+  const prefix = `${role}-${button.dataset.rdbms}`
+  
+  const connectionProperties = getFormData(event)
   
   const parameters = {
-	FROM_USER : document.getElementById('source-oracle-schema').value
+	[key] : connectionProperties.schema
   }
+  
+  delete connectionProperties.schema
  
-  if (document.getElementById('source-oracle-caseSensitive').checked === false) {
+  if (document.querySelector(`#${prefix}-caseSensitive`) && !document.querySelector(`#${prefix}-caseSensitive`) .checked) {
 	connectionProperties.user = connectionProperties.user.toUpperCase();
-    parameters.FROM_USER = parameters.FROM_USER.toUpperCase();
+    parameters[key] = parameters[key].toUpperCase();
   }	
  
-  window.validSource = testConnection(button,status,'source-oracle',{ oracle : connectionProperties},parameters)  
-  setCopyState()
+  return testConnection(button,role,connectionProperties,parameters)  
   
 }
 
-function validateOracleTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-oracle-status')
-  const connectionProperties = {
-    user              : document.getElementById('target-oracle-user').value
-  , connectString     : document.getElementById('target-oracle-connectString').value
-  , password          : document.getElementById('target-oracle-password').value
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-oracle-schema').value
-  }
- 
-  if (document.getElementById('target-oracle-caseSensitive').checked === false) {
-	connectionProperties.user = connectionProperties.user.toUpperCase();
-    parameters.TO_USER = parameters.TO_USER.toUpperCase();
-  }	
- 
-  window.validTarget = testConnection(button,status,'target-oracle',connectionProperties,parameters)  
+function validateSourceConnection(event) {
+  window.validSource = validateConnection(event,'source','FROM_USER')
   setCopyState()
-  
 }
 
-function validatePostgresSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-postgres-status')
-  const connectionProperties = {
-    user      : document.getElementById('source-postgres-user').value
-  , host      : document.getElementById('source-postgres-host').value
-  , database  : document.getElementById('source-postgres-database').value
-  , password  : document.getElementById('source-postgres-password').value
-  , port      : document.getElementById('source-postgres-port').value
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-postgres-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-postgres',{ postgres: connectionProperties},parameters)  
+function validateTargetConnection(event) {
+  window.validTarget = validateConnection(event,'target','TO_USER')
   setCopyState()
-
-}
-
-function validatePostgresTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-postgres-status')
-  const connectionProperties = {
-    user      : document.getElementById('target-postgres-user').value
-  , host      : document.getElementById('target-postgres-host').value
-  , database  : document.getElementById('target-postgres-database').value
-  , password  : document.getElementById('target-postgres-password').value
-  , port      : document.getElementById('target-postgres-port').value
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-postgres-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-postgres',{ postgres: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateVerticaSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-vertica-status')
-  const connectionProperties = {
-    user      : document.getElementById('source-vertica-user').value
-  , host      : document.getElementById('source-vertica-host').value
-  , database  : document.getElementById('source-vertica-database').value
-  , password  : document.getElementById('source-vertica-password').value
-  , port      : document.getElementById('source-vertica-port').value
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-vertica-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-vertica',{ vertica: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateVerticaTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-vertica-status')
-  const connectionProperties = {
-    user      : document.getElementById('target-vertica-user').value
-  , host      : document.getElementById('target-vertica-host').value
-  , database  : document.getElementById('target-vertica-database').value
-  , password  : document.getElementById('target-vertica-password').value
-  , port      : document.getElementById('target-vertica-port').value
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-vertica-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-vertica',{ vertica: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateYugabyteSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-yugabyte-status')
-  const connectionProperties = {
-    user      : document.getElementById('source-yugabyte-user').value
-  , host      : document.getElementById('source-yugabyte-host').value
-  , database  : document.getElementById('source-yugabyte-database').value
-  , password  : document.getElementById('source-yugabyte-password').value
-  , port      : document.getElementById('source-yugabyte-port').value
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-yugabyte-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-yugabyte',{ yugabyte: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateYugabyteTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-yugabyte-status')
-  const connectionProperties = {
-    user      : document.getElementById('target-yugabyte-user').value
-  , host      : document.getElementById('target-yugabyte-host').value
-  , database  : document.getElementById('target-yugabyte-database').value
-  , password  : document.getElementById('target-yugabyte-password').value
-  , port      : document.getElementById('target-yugabyte-port').value
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-yugabyte-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-yugabyte',{ yugabyte: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateCockroachSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-cockroach-status')
-  const connectionProperties = {
-    user      : document.getElementById('source-cockroach-user').value
-  , host      : document.getElementById('source-cockroach-host').value
-  , database  : document.getElementById('source-cockroach-database').value
-  , password  : document.getElementById('source-cockroach-password').value
-  , port      : document.getElementById('source-cockroach-port').value
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-cockroach-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-cockroach',{ cockroach: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateCockroachTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-cockroach-status')
-  const connectionProperties = {
-    user      : document.getElementById('target-cockroach-user').value
-  , host      : document.getElementById('target-cockroach-host').value
-  , database  : document.getElementById('target-cockroach-database').value
-  , password  : document.getElementById('target-cockroach-password').value
-  , port      : document.getElementById('target-cockroach-port').value
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-cockroach-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-cockroach',{ cockroach: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateIBMDB2Source(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-ibmdb2-status')
-  const connectionProperties = {
-    user      : document.getElementById('source-ibmdb2-user').value
-  , host      : document.getElementById('source-ibmdb2-host').value
-  , database  : document.getElementById('source-ibmdb2-database').value
-  , password  : document.getElementById('source-ibmdb2-password').value
-  , port      : document.getElementById('source-ibmdb2-port').value
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-ibmdb2-schema').value
-  }
-  window.validSource = testConnection(button,status,'source-ibmdb2',{ db2: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateIBMDB2Target(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-ibmdb2-status')
-  const connectionProperties = {
-    user      : document.getElementById('target-ibmdb2-user').value
-  , host      : document.getElementById('target-ibmdb2-host').value
-  , database  : document.getElementById('target-ibmdb2-database').value
-  , password  : document.getElementById('target-ibmdb2-password').value
-  , port      : document.getElementById('target-ibmdb2-port').value
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-ibmdb2-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-ibmdb2',{ db2: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMsSQLSource(button) {
-  button.disabled = true;
-  const status = document.getElementById('source-mssql-status')
-  const connectionProperties = {
-    user                       : document.getElementById('source-mssql-user').value
-  , server                     : document.getElementById('source-mssql-host').value
-  , port                       : parseInt(document.getElementById('source-mssql-port').value)
-  , database                   : document.getElementById('source-mssql-database').value
-  , password                   : document.getElementById('source-mssql-password').value
-  , requestTimeout             : 360000000
-  , options                    : {
-      encrypt                  : false 
-    , abortTransactionOnError  : false
-    }
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-mssql-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-mssql',{ mssql: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMsSQLTarget(button) {
-  button.disabled = true;
-  const status = document.getElementById('target-mssql-status')
-  const connectionProperties = {
-    user                       : document.getElementById('target-mssql-user').value
-  , server                     : document.getElementById('target-mssql-host').value
-  , port                       : parseInt(document.getElementById('target-mssql-port').value)
-  , database                   : document.getElementById('target-mssql-database').value
-  , password                   : document.getElementById('target-mssql-password').value
-  , requestTimeout             : 360000000
-  , options                    : {
-      encrypt                  : false 
-    , abortTransactionOnError  : false
-    }
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-mssql-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-mssql',{ mssql: connectionProperties},parameters)  
-  setCopyState()
-
-}
-function validateMySQLSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-mysql-status')
-  const connectionProperties = {
-    user                       : document.getElementById('source-mysql-user').value
-  , host                       : document.getElementById('source-mysql-host').value
-  , database                   : document.getElementById('source-mysql-database').value
-  , password                   : document.getElementById('source-mysql-password').value
-  , port                       : document.getElementById('source-mysql-port').value
-  , multipleStatements         : true
-  , typeCast                   : true
-  , supportBigNumbers          : true
-  , bigNumberStrings           : true          
-  , dateStrings                : true
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-mysql-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-mysql',{ mysql: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMySQLTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-mysql-status')
-  const connectionProperties = {
-    user                       : document.getElementById('target-mysql-user').value
-  , host                       : document.getElementById('target-mysql-host').value
-  , database                   : document.getElementById('target-mysql-database').value
-  , password                   : document.getElementById('target-mysql-password').value
-  , port                       : document.getElementById('target-mysql-port').value
-  , multipleStatements         : true
-  , typeCast                   : true
-  , supportBigNumbers          : true
-  , bigNumberStrings           : true          
-  , dateStrings                : true
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-mysql-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-mysql',{ mysql: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMariaDBSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-mariadb-status')
-  const connectionProperties = {
-    user                       : document.getElementById('source-mariadb-user').value
-  , host                       : document.getElementById('source-mariadb-host').value
-  , database                   : document.getElementById('source-mariadb-database').value
-  , password                   : document.getElementById('source-mariadb-password').value
-  , port                       : document.getElementById('source-mariadb-port').value
-  , multipleStatements         : true
-  , typeCast                   : true
-  , supportBigNumbers          : true
-  , bigNumberStrings           : true          
-  , dateStrings                : true
-  };
-  
-  const parameters = {
-	FROM_USER : document.getElementById('source-mariadb-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-mariadb',{ mariadb: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMariaDBTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-mariadb-status')
-  const connectionProperties = {
-    user                       : document.getElementById('target-mariadb-user').value
-  , host                       : document.getElementById('target-mariadb-host').value
-  , database                   : document.getElementById('target-mariadb-database').value
-  , password                   : document.getElementById('target-mariadb-password').value
-  , port                       : document.getElementById('target-mariadb-port').value
-  , multipleStatements         : true
-  , typeCast                   : true
-  , supportBigNumbers          : true
-  , bigNumberStrings           : true          
-  , dateStrings                : true
-  };
-  
-  const parameters = {
-	TO_USER : document.getElementById('target-mariadb-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-mariadb',{ mariadb: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validatesnowflakeSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-snowflake-status')
-  const connectionProperties = {
-    account                    : document.getElementById('source-snowflake-account').value
-  , username                   : document.getElementById('source-snowflake-user').value
-  , password                   : document.getElementById('source-snowflake-password').value
-  , warehouse                  : document.getElementById('source-snowflake-warehouse').value
-  , database                   : document.getElementById('source-snowflake-database').value
-  };
-  
-  const parameters = {
-	YADAMU_DATABASE : connectionProperties.database 
-  , FROM_USER : document.getElementById('source-snowflake-schema').value
-  }
- 
-  window.validSource = testConnection(button,status,'source-snowflake',{ snowflake: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validatesnowflakeTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-snowflake-status')
-  const connectionProperties = {
-    account                    : document.getElementById('target-snowflake-account').value
-  , username                   : document.getElementById('target-snowflake-user').value
-  , password                   : document.getElementById('target-snowflake-password').value
-  , warehouse                  : document.getElementById('target-snowflake-warehouse').value
-  , database                   : document.getElementById('target-snowflake-database').value
-  };
-  
-  const parameters = {
-	YADAMU_DATABASE : connectionProperties.database 
-  , TO_USER : document.getElementById('target-snowflake-schema').value
-  }
- 
-  window.validTarget = testConnection(button,status,'target-snowflake',{ snowflake: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMongoDBSource(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('source-mongodb-status')
-  const connectionProperties = {
-    host                       : document.getElementById('source-mongodb-host').value
-  , port                       : document.getElementById('source-mongodb-port').value
-  , database                   : document.getElementById('source-mongodb-database').value
-  };
-  
-  const parameters = {
-  }
-  
-  window.validSource = testConnection(button,status,'source-mongodb',{ mongodb: connectionProperties},parameters)  
-  setCopyState()
-
-}
-
-function validateMongoDBTarget(button) {
-
-  button.disabled = true;
-  const status = document.getElementById('target-mongodb-status')
-  const connectionProperties = {
-    host                       : document.getElementById('target-mongodb-host').value
-  , port                       : document.getElementById('target-mongodb-port').value
-  , database                   : document.getElementById('target-mongodb-database').value
-  };
-  
-  const parameters = {
-  }
-
-  window.validTarget = testConnection(button,status,'target-mongodb',{ mongodb: connectionProperties},parameters)  
-  setCopyState()
-
 }
 
 function doCopy() {
@@ -778,8 +334,8 @@ function loadConfiguration(configuration) {
 	document.getElementById(sourcePrefix+'schema').value = sourceSchemaInfo.schema
 	document.getElementById(targetPrefix+'schema').value = targetSchemaInfo.schema
 
-	$('#source-tab a[href="#source-tab-' + sourceDatabase + '"]').tab('show')	
-	$('#target-tab a[href="#target-tab-' + targetDatabase + '"]').tab('show')	
+	document.querySelector('#source-tab a[href="#source-tab-' + sourceDatabase + '"]').tab('show')	
+	document.querySelector('#target-tab a[href="#target-tab-' + targetDatabase + '"]').tab('show')	
 }
 
 async function saveConfiguration(control) {

@@ -30,12 +30,14 @@ class OracleCompare extends YadamuCompare {
     }
 
 	async compareSchemas(source,target,rules) {
-		
+	
 	  let compareRules = this.formatCompareRules(rules)	  
 	  
 	  compareRules.objectsRule   = rules.OBJECTS_COMPARISON_RULE || 'SKIP'
-      compareRules.excludeMViews = ((rules.OPERATION  !== 'DBROUNDTRIP') && (rules.MODE === 'DATA_ONLY'))
-   	  
+	  
+	  // Exclude Materialzied Views from the Comparrison when the copy operation did not detect materialized views present.
+	  
+	  compareRules.excludeMViews = !this.configuration.includeMaterializedViews
 	  compareRules = this.dbi.JSON_PARSING_SUPPORTED ? JSON.stringify(compareRules) : this.makeXML(compareRules)
       
 	  const args = {

@@ -53,18 +53,22 @@ import {
 }                                    from '../file/fileException.js'
 
 /* Vendor Specific DBI Implimentation */                                   
+
+import Comparitor                     from './mssqlCompare.js'
+import DatabaseError                  from './mssqlException.js'
+import DataTypes                      from './mssqlDataTypes.js'
+import Parser                         from './mssqlParser.js'
+import StatementGenerator             from './mssqlStatementGenerator.js'
+import StatementLibrary               from './mssqlStatementLibrary.js'
+import OutputManager                  from './mssqlOutputManager.js'
+import Writer                         from './mssqlWriter.js'
+
+import StatementGenerator2014         from './2014/mssqlStatementGenerator.js'
+import StatementLibrary2014           from './2014/mssqlStatementLibrary.js'
 					
 import MsSQLConstants                 from './mssqlConstants.js'
-import MsSQLDataTypes                 from './mssqlDataTypes.js'
-import MsSQLError                     from './mssqlException.js'
-import MsSQLParser                    from './mssqlParser.js'
-import MsSQLOutputManager             from './mssqlOutputManager.js'
-import MsSQLWriter                    from './mssqlWriter.js'
-import MsSQLStatementGenerator        from './mssqlStatementGenerator.js'
-import MsSQLReader                    from './mssqlReader.js'
 import MsSQLFileLoader                from './mssqlFileLoader.js'
-import MsSQLStatementLibrary          from './mssqlStatementLibrary.js'
-import MsSQLCompare                   from './mssqlCompare.js'
+import MsSQLReader                    from './mssqlReader.js'
 
 import {
   ConnectionError
@@ -107,7 +111,7 @@ class MsSQLDBI extends YadamuDBI {
   get ROW_LIMIT()                     { return this.parameters.ROW_LIMIT             || MsSQLConstants.ROW_LIMIT }
   get SPATIAL_MAKE_VALID()            { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
 
-  get DATABASE_NAME()                 { return this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.CONNECTION_PROPERTIES.database }
+  get DATABASE_NAME()                 { return this.parameters.DATABASE ? this.parameters.DATABASE : this.CONNECTION_PROPERTIES.database }
   get DEFAULT_COLATION()              { return this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8' }
 
   // get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS || this.TEDIOUS_TRANSACTION_ISSUE  }
@@ -152,7 +156,26 @@ class MsSQLDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = MsSQLDataTypes
+	
+	if (manager) {
+      this.COMPARITOR_CLASS          = manager.COMPARITOR_CLASS         
+      this.DATABASE_ERROR_CLASS      = manager.DATABASE_ERROR_CLASS     
+      this.PARSER_CLASS              = manager.PARSER_CLASS             
+      this.STATEMENT_GENERATOR_CLASS = manager.STATEMENT_GENERATOR_CLASS
+      this.STATEMENT_LIBRARY_CLASS   = manager.STATEMENT_LIBRARY_CLASS  
+	  this.OUTPUT_MANAGER_CLASS      = manager.OUTPUT_MANAGER_CLASS     
+      this.WRITER_CLASS              = manager.WRITER_CLASS             
+	} else {
+      this.COMPARITOR_CLASS          = Comparitor
+      this.DATABASE_ERROR_CLASS      = DatabaseError
+      this.PARSER_CLASS              = Parser
+      this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+      this.STATEMENT_LIBRARY_CLASS   = StatementLibrary	
+	  this.OUTPUT_MANAGER_CLASS      = OutputManager
+      this.WRITER_CLASS              = Writer	
+	}
+	
+	this.DATA_TYPES = DataTypes
 
     this.yadamuRollack = false
 
@@ -171,12 +194,8 @@ class MsSQLDBI extends YadamuDBI {
 	this.BEGIN_TRANSACTION_ISSUE   = false
   }
   
-  createDatabaseError(driverId,cause,stack,sql) {
-	return new MsSQLError(driverId,cause,stack,sql)
-  }
-  
-  getDatabaseException(driverId,cause,stack,sql) {
-    const err = this.createDatabaseError(driverId,cause,stack,sql)
+  getDatabaseException(cause,stack,sql) {
+    const err = this.createDatabaseError(cause,stack,sql)
 	if (err.cancelledOperation() && this.CANCEL_REQUESTED) {
 	  this.CANCEL_REQUESTED = false
 	  return err
@@ -186,29 +205,54 @@ class MsSQLDBI extends YadamuDBI {
   
   initializeManager() {
 	super.initializeManager()
-	this.StatementGenerator = MsSQLStatementGenerator
-    this.StatementLibrary   = MsSQLStatementLibrary
-    this.statementLibrary   = undefined
   }	 
 
-  getSchemaIdentifer() {
-	return `${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}`
+   setSchema(schema,key) {
+     
+	 switch (true) {
+	   case (schema.hasOwnProperty('owner')):
+	     this.parameters[key] = schema.owner
+		 this.parameters.DATABASE = schema.database 
+		 break
+	   case (schema.hasOwnProperty('database')):
+	     this.parameters[key] = schema.schema
+		 this.parameters.DATABASE = schema.database 
+		 break
+	   default:
+	     this.parameters[key] = 'dbo'
+		 this.parameters.DATABASE = schema.schema
+	 }
+
+	this.DESCRIPTION = `:${this.parameters.DATABASE}"."${this.CURRENT_SCHEMA}"`
   }  
   
+  getSchema(schema) {
+	 switch (true) {
+	   case (schema.hasOwnProperty('owner')):
+	     return schema
+	   case (schema.hasOwnProperty('database')):
+	     return { database : schema.database, owner: schema.schema }
+	   default:
+	     return { database : schema.schema, owner: 'dbo' }
+	 }
+  }
+
   /*
   **
   ** Local methods 
   **
   */
-
+1
   async testConnection() {   
+    let stack
     try {
       this.setTargetDatabase()
-      const connection = await sql.connect(this.CONNECTION_PROPERTIES)
+      stack = new Error().stack
+	  const connection = await sql.connect(this.CONNECTION_PROPERTIES)
       await sql.close()
     } catch (e) {
       await sql.close()
-      throw (e)
+      throw this.createDatabaseError(e,stack,'testConnection.getConnection()')
     } 
   }
 
@@ -238,14 +282,14 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   setTargetDatabase() {  
-    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.CONNECTION_PROPERTIES.database)) {
-      this.CONNECTION_PROPERTIES.database = this.parameters.YADAMU_DATABASE
+    if ((this.parameters.DATABASE) && (this.parameters.DATABASE !== this.CONNECTION_PROPERTIES.database)) {
+      this.CONNECTION_PROPERTIES.database = this.parameters.DATABASE
     }
   }
   
   reportTransactionState(operation) {
     const e = new Error(`Unexpected ${operation} operation`)
-    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],this.createDatabaseError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
+    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],this.createDatabaseError(e,e.stack,this.constructor.name))    
   }
 
   getTransactionManager() {
@@ -283,7 +327,7 @@ class MsSQLDBI extends YadamuDBI {
       })
       return this.request;
     } catch (e) {
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,`sql.Request(${this.requestProvider.constuctor.name})`)
+      throw this.getDatabaseException(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`)
     }
   }
   
@@ -483,7 +527,7 @@ class MsSQLDBI extends YadamuDBI {
       try {
         await statement.unprepare()
       } catch (e) {}
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,`sql.PreparedStatement(${sqlStatement}`)
+      throw this.getDatabaseException(e,stack,`sql.PreparedStatement(${sqlStatement}`)
     }
   }
 
@@ -502,7 +546,7 @@ class MsSQLDBI extends YadamuDBI {
       operation = 'sql.connectionPool()'
       this.pool = new sql.ConnectionPool(this.CONNECTION_PROPERTIES)
       this.pool.on('error',(err, p) => {
-        const cause = err instanceof MsSQLError ? err : this.getDatabaseException(this.DRIVER_ID,err,stack,`${operation}.onError()`)
+        const cause = err instanceof DatabaseError ? err : this.getDatabaseException(err,stack,`${operation}.onError()`)
         if (!cause.suppressedError())  {
           this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,`sql.ConnectionPool.onError()`],cause)
           if (!this.RECONNECT_IN_PROGRESS) {
@@ -519,7 +563,7 @@ class MsSQLDBI extends YadamuDBI {
       this.transaction = this.getTransactionManager()
       
     } catch (e) {
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
+      throw this.getDatabaseException(e,stack,operation)
     }       
 
     await this.configureConnection()
@@ -529,11 +573,13 @@ class MsSQLDBI extends YadamuDBI {
 	  
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`_getDatabaseConnection()`)
 	
+	let stack
     try {
+	  stack = new Error().stack
       await this.createConnectionPool()
     } catch (e) {
-      const err = new ConnectionError(e,this.redactPasswords())
-      throw err
+      const connectionError = new ConnectionError(e,this.redactPasswords())
+      throw connectionError 
     }
   } 
   
@@ -641,7 +687,7 @@ class MsSQLDBI extends YadamuDBI {
 		timerAbort.abort()
         // this.pool = undefined
         this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE],`Error Closing Pool`)
-        throw this.getDatabaseException(this.DRIVER_ID,e,stack,psudeoSQL)
+        throw this.getDatabaseException(e,stack,psudeoSQL)
       }
 	} 
   }
@@ -662,7 +708,7 @@ class MsSQLDBI extends YadamuDBI {
       try {
 		if (!expected) {
 	      const e = new Error(`Unexpected Cancel Request`)
-          this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'REQUEST MANAGER'],this.createDatabaseError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
+          this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'REQUEST MANAGER'],this.createDatabaseError(e,e.stack,this.constructor.name))    
         }
         const sqlStartTime = performance.now()
         stack = new Error().stack;
@@ -670,7 +716,7 @@ class MsSQLDBI extends YadamuDBI {
         await this.request.cancel()
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       } catch (e) {
-        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.request.cancel()')
+        const cause = this.getDatabaseException(e,stack,'sql.request.cancel()')
         throw cause
       }
     }
@@ -678,7 +724,7 @@ class MsSQLDBI extends YadamuDBI {
    
   isExpectedCancellation (e) {
 	// console.log(this.CANCEL_REQUESTED)
-    if (this.CANCEL_REQUESTED && (e instanceof MsSQLError) && e.cancelledOperation()) {
+    if (this.CANCEL_REQUESTED && (e instanceof DatabaseError) && e.cancelledOperation()) {
 	  this.CANCEL_REQUESTED = false
       return true
 	}
@@ -909,7 +955,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatment)
+        const cause = this.getDatabaseException(e,stack,sqlStatment)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -938,7 +984,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,psuedoSQL)
+        const cause = this.getDatabaseException(e,stack,psuedoSQL)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -974,7 +1020,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,this.preparedStatement.sqlStatement)
+        const cause = this.getDatabaseException(e,stack,this.preparedStatement.sqlStatement)
         if (attemptReconnect && cause.lostConnection()) {
           this.preparedStatement === undefined;
           attemptReconnect = false;
@@ -1028,7 +1074,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
+		const cause = this.getDatabaseException(e,stack,operation)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -1058,7 +1104,7 @@ class MsSQLDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -1137,18 +1183,18 @@ class MsSQLDBI extends YadamuDBI {
     
   }   
 
-  async setLibraries() {
+  setLibraries() {
 	  
 	switch (this.DATABASE_VERSION) {
 	  case 11:
 	  case 12:
-	    this.StatementLibrary = (await import('./2014/mssqlStatementLibrary.js')).default
-		this.StatementGenerator = (await import('./2014/mssqlStatementGenerator.js')).default
+	    this.STATEMENT_LIBRARY_CLASS = StatementLibrary2014
+		this.STATEMENT_GENERATOR_CLASS = StatementGenerator2014
 	    break;
       default:
 	}
 	this.setSpatialSerializer(this.SPATIAL_FORMAT)
-	this.statementLibrary = new this.StatementLibrary(this)
+	this.statementLibrary = new this.STATEMENT_LIBRARY_CLASS(this)
   }
   
 
@@ -1184,7 +1230,7 @@ class MsSQLDBI extends YadamuDBI {
         }
         break;
       } catch (e) {
-        const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.begin()')
+        const cause = this.getDatabaseException(e,stack,'sql.Transaction.begin()')
 		
         if (attemptReconnect && cause.lostConnection()) {
 
@@ -1199,7 +1245,7 @@ class MsSQLDBI extends YadamuDBI {
 	      } catch (e) {
 			if (e.code && (e.code !== 'EINVALIDSTATE')) {
               stack = new Error().stack
-  		      this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],this.createDatabaseError(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()'))
+  		      this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],this.createDatabaseError(e,stack,'sql.Transaction.rollback()'))
 			}
 	      }
 
@@ -1241,13 +1287,13 @@ class MsSQLDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
     } catch (e) {
-      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.commit()')
+      const cause = this.getDatabaseException(e,stack,'sql.Transaction.commit()')
       if (attemptReconnect && cause.lostConnection()) {
         attemptReconnect = false;
         // reconnect() throws cause if it cannot reconnect...
         await this.reconnect(cause,'COMMIT TRANSACTION')
       }
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.commit()')
+      throw this.getDatabaseException(e,stack,'sql.Transaction.commit()')
     }
     
   }
@@ -1295,7 +1341,7 @@ class MsSQLDBI extends YadamuDBI {
 		return
       } catch (e) {
         this.EXPECTED_ROLLBACK = false;
-        let newIssue = this.getDatabaseException(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()')
+        let newIssue = this.getDatabaseException(e,stack,'sql.Transaction.rollback()')
         if (attemptReconnect && newIssue.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -1316,7 +1362,7 @@ class MsSQLDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber(),this.PIPELINE_STATE.written,this.PIPELINE_STATE.cached],``)
 
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
   }
   
@@ -1334,7 +1380,7 @@ class MsSQLDBI extends YadamuDBI {
     // Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
     
     try {
-      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
       super.restoreSavePoint()
     } catch (newIssue) {
 	  if (this.handleCancelledRequest(newIssue)) {
@@ -1378,7 +1424,7 @@ class MsSQLDBI extends YadamuDBI {
     const is = await new Promise((resolve,reject) => {
       const stack = new Error().stack
 	  const inputStream = fs.createReadStream(importFilePath);
-      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,importFilePath) : new FileError(this,err,stack,importFilePath) )})
     })
 
     const loader = new MsSQLFileLoader(this,this.status);
@@ -1411,7 +1457,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async processFile(hndl) {
     
-	const typeMappings = await this.getVendorDataTypeMappings(MsSQLStatementGenerator)
+	const typeMappings = await this.getVendorDataTypeMappings()
     
     const args = { 
             inputs: [{
@@ -1444,7 +1490,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
     const sysInfo =  results.recordsets[0][0];
     const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)  
     const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)    
@@ -1493,10 +1539,6 @@ class MsSQLDBI extends YadamuDBI {
     return results.recordsets[0]
   }
   
-  _getParser(queryInfo,pipelineState) {
-    return new MsSQLParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
-       
   async _getInputStream(queryInfo) {
 
     // if the previous pipleline operation failed, there will be a pending request that needs to cleared otherwise the close pool will hang
@@ -1529,7 +1571,7 @@ class MsSQLDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return is;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -1547,22 +1589,6 @@ class MsSQLDBI extends YadamuDBI {
   ** The following methods are used by the YADAMU DBReader class
   **
   */
-    
-  async generateStatementCache(schema) {
-    /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new this.StatementGenerator(this, this.systemInformation.vendor, schema, this.metadata ,this.LOGGER)
-    this.statementCache = await statementGenerator.generateStatementCache(this.DATABASE_NAME)
-	this.emit(YadamuConstants.CACHE_LOADED)
-	return this.statementCache
-  }
-
-  getOutputStream(tableName,pipelineState) {
-     return super.getOutputStream(MsSQLWriter,tableName,pipelineState)
-  }
-  
-  getOutputManager(tableName,pipelineState) {
-	 return super.getOutputManager(MsSQLOutputManager,tableName,pipelineState)
-  }
   
   async setWorkerConnection() {
     // Override the default implementation provided by YadamuDBI
@@ -1582,15 +1608,6 @@ class MsSQLDBI extends YadamuDBI {
     return pid
   }  
 
-  getSchema(schemaInfo) {
-	return schemaInfo
-  }
-  
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new MsSQLCompare(this,configuration)
-  }
-  
 }
 
 export { MsSQLDBI as default }

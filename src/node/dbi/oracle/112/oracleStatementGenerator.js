@@ -20,7 +20,7 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
   get ORACLE_CSV_SPECIFICATION()     { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
 
   	
-  get STATEMENT_GENERATOR_OPTIONS() {
+  get STATEMENT_GENERATOR_CLASS_OPTIONS() {
 	  
     return `<options>
 	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>

@@ -5,22 +5,22 @@ import {
 }                  from '../../core/yadamuException.js'
 
 class FileError extends DatabaseError {
-  constructor(driverId,cause,stack,file) {
-    super(driverId,cause,stack,file);
+  constructor(dbi,cause,stack,file) {
+    super(dbi,cause,stack,file);
 	this.path = this.sql
 	delete this.sql
   }
 }
 
 class FileNotFound extends FileError {
-  constructor(driverId,cause,stack,file) {
-    super(driverId,cause,stack,file);
+  constructor(dbi,cause,stack,file) {
+    super(dbi,cause,stack,file);
   }
 }
 
 class DirectoryNotFound extends FileError {
-  constructor(driverId,cause,stack,file) {
-    super(driverId,cause,stack,file);
+  constructor(dbi,cause,stack,file) {
+    super(dbi,cause,stack,file);
   }
 }
 

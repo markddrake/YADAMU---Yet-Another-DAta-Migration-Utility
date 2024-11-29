@@ -19,18 +19,20 @@
  ,"parameters"                      : {
     "MODE"                          : "DATA_ONLY"
   }
- ,"jobs"                            : [{
-     "source"                       : {
-        "connection"                : "oracle#1"
-      , "schema"                    : "HR"
-      }
-     ,"target"                      : {
-        "connection"                : "oracle#1"
-      , "schema"                    : "HR1"
-      }
-     ,"parameters"                  : {
-        "MODE"                      : "DATA_ONLY",
-		"TRUNCATE_ON_LOAD"          : true
-      }
-   }]
+ ,"jobs"                            : {
+	"JOB1" : {
+      "source"                      : {
+      "connection"                  : "oracle#1"
+    , "schema"                      : "HR"
+    }
+  , "target"                        : {
+      "connection"                  : "oracle#1"
+    , "schema"                      : "HR1"
+    }
+  , "parameters"                    : {
+      "MODE"                        : "DATA_ONLY",
+	  "TRUNCATE_ON_LOAD"            : true,
+	  "ENCRYPTION"                  : false
+    }
+  }}
 }

@@ -3,11 +3,11 @@ import {DatabaseError} from '../../core/yadamuException.js'
 
 class AWSS3Error extends DatabaseError {
   
-  constructor(driverId,cause,stack,operation) {
+  constructor(dbi,cause,stack,operation) {
 	if (cause.Code && (cause.Code === 'NoSuchKey')) {
 	cause.message = `${cause.message} [${operation}] [${cause.$metadata.httpStatusCode}] `;
 	}
-    super(driverId,cause,stack,operation);
+    super(dbi,cause,stack,operation);
 	this.path = this.sql
 	delete this.sql
   }

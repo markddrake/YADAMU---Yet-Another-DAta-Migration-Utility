@@ -56,7 +56,7 @@ class VerticaWriter extends YadamuWriter {
       stack = new Error().stack
       await fsp.writeFile(filename,sw.toString())
     } catch (e) {
-      throw new VerticaError(this.dbi.DRIVER_ID,e,stack,'writeBatchAsCSV')
+      throw this.dbi.createDatabaseError(e,stack,'writeBatchAsCSV')
     }
   }
 
@@ -203,7 +203,7 @@ class VerticaWriter extends YadamuWriter {
         await this.dbi.releaseSavePoint(); 
       } catch (cause) {
         if (cause.missingFile && cause.missingFile()) {
-          cause = new StagingAreaMisMatch(this.dbi.DRIVER_ID,batchStagingFileName,this.dbi.LOCAL_STAGING_AREA, this.dbi.REMOTE_STAGING_AREA,cause)
+          cause = new StagingAreaMisMatch(this.dbi,batchStagingFileName,this.dbi.LOCAL_STAGING_AREA, this.dbi.REMOTE_STAGING_AREA,cause)
         } 
         this.cleanupStagingFile(stagingFilePath,false);
         await this.reportBatchError(`COPY`,cause,batch[key])

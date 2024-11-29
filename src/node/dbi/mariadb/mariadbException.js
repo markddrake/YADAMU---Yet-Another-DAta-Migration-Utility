@@ -3,8 +3,8 @@ import {DatabaseError} from '../../core/yadamuException.js'
 
 class MariadbError extends DatabaseError {
 
-  constructor(driverId,cause,stack,sql) {
-    super(driverId,cause,stack,sql);
+  constructor(dbi,cause,stack,sql) {
+    super(dbi,cause,stack,sql);
 	if (this.sql.indexOf('?),(?') > 0) {
 	  const startElipises = this.sql.indexOf('?),(?') + 3
 	  const endElipises =  this.sql.lastIndexOf('?),(?') + 3

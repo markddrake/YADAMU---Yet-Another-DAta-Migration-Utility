@@ -7,11 +7,11 @@ import DB2Constants  from './db2Constants.js'
 
 class DB2Error extends DatabaseError {
   
-  constructor(driverId,cause,stack,sql) {
+  constructor(dbi,cause,stack,sql) {
 	const err = new Error();
     Object.assign(err,cause)
 	err.stack = stack
-	super(driverId,err,stack,sql);
+	super(dbi,err,stack,sql);
   }
   
   lostConnection() {

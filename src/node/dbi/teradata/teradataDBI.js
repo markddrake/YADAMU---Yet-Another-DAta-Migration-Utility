@@ -29,20 +29,18 @@ import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                   
+
+import Comparitor                     from './teradataCompare.js'
+import DatabaseError                  from './teradataException.js'
+import DataTypes                      from './teradataDataTypes.js'
+import Parser                         from './teradataParser.js'
+import StatementGenerator             from './teradataStatementGenerator.js'
+import StatementLibrary               from './teradataStatementLibrary.js'
+import OutputManager                  from './teradataOutputManager.js'
+import Writer                         from './teradataWriter.js'
 						          
 import TeradataConstants              from './teradataConstants.js'
-import TeradataDataTypes              from './teradataDataTypes.js'
 import TeradataReader                 from './teradataReader.js'
-import TeradataParser                 from './teradataParser.js'
-import TeradataOutputManager          from './teradataOutputManager.js'
-import TeradataWriter                 from './teradataWriter.js'
-import TeradataStatementGenerator     from './teradataStatementGenerator.js'
-import TeradataStatementLibrary       from './teradataStatementLibrary.js'
-import TeradataCompare                from './teradataCompare.js'
-
-import { 
-  TeradataError 
-}                                     from './teradataException.js'
 
 const MAX_CHARATER_SIZE = 64000
 
@@ -81,8 +79,16 @@ class TeradataDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = TeradataDataTypes
 
+	this.COMPARITOR_CLASS = Comparitor
+	this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer	
+	
+	this.DATA_TYPES = DataTypes
 	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.TERADATA_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
 
     this.connection = undefined;
@@ -93,18 +99,13 @@ class TeradataDBI extends YadamuDBI {
   ** Local methods 
   **
   */
-  
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new TeradataError(driverId,cause,stack,sql)
-  }
-  
-  
+    
   establishConnection(connection) {
       
     return new Promise((resolve,reject) => {
       connection.connect((err,connection) => {
         if (err) {
-          reject(this.getDatabaseException(this.DRIVER_ID,err,`Teradata-sdk.Connection.connect()`))
+          reject(this.getDatabaseException(err,`Teradata-sdk.Connection.connect()`))
         }
         resolve(connection)
       })
@@ -112,13 +113,15 @@ class TeradataDBI extends YadamuDBI {
   } 
 
   async testConnection() {   
+    let stack
     this.setDatabase()
     try {
-      let connection = Teradata.createConnection(this.CONNECTION_PROPERTIES)
+      stack = new Error().stack
+	  let connection = Teradata.createConnection(this.CONNECTION_PROPERTIES)
       connection = await this.establishConnection(connection)
       connection.destroy()
     } catch (e) {
-      throw this.getDatabaseException(this.DRIVER_ID,e,'Teradata-SDK.connection.connect()')
+      throw this.getDatabaseException(e,stack,'Teradata-SDK.connection.connect()')
     }
   }
   
@@ -147,7 +150,7 @@ class TeradataDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection;
     } catch (e) {
-      const err = this.getDatabaseException(this.DRIVER_ID,e,'TeradataConnection.connect()')
+      const err = this.getDatabaseException(e,'TeradataConnection.connect()')
       throw err;
     }
     
@@ -222,7 +225,7 @@ class TeradataDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return cursor;
     } catch (e) {
-      const err = this.getDatabaseException(this.DRIVER_ID,e,`terdata.cursor.callProc(${procedureName})`)
+      const err = this.getDatabaseException(e,`terdata.cursor.callProc(${procedureName})`)
       throw err;
     }
     
@@ -375,10 +378,6 @@ class TeradataDBI extends YadamuDBI {
     return schemaInfo
   }
 
-  _getParser(queryInfo,pipelineState) {
-    return new TeradataParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
-
   async _getInputStream(queryInfo) {
 
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
@@ -396,7 +395,7 @@ class TeradataDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -418,28 +417,9 @@ class TeradataDBI extends YadamuDBI {
     // Create a schema 
     throw new UnimplementedMethod('createSchema()',`YadamuDBI`,this.constructor.name)
   }
-   
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(TeradataStatementGenerator,schema) 
-  }
- 
-  getOutputStream(tableName,pipelineState) {
-     // Get an instance of the YadamuWriter implementation associated for this database
-     return super.getOutputStream(TeradataWriter,tableName,pipelineState)
-  }
-
-  getOutputManager(tableName,pipelineState) {
-     // Get an instance of the YadamuWriter implementation associated for this database
-     return super.getOutputStream(TeradataOutputManager,tableName,pipelineState)
-  }
-  
+    
   classFactory(yadamu) {
 	return new TeradataDBI(yadamu,this,this.connectionParameters,this.parameters)
-  }
-
-  async getComparator(configuration) {
-	 await this.initialize()	 
-	 return new TeradataCompare(this,configuration)
   }
   
 }

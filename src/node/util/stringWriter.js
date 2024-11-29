@@ -1,4 +1,3 @@
-"use strict"
 
 import {Writable} from 'stream';
 

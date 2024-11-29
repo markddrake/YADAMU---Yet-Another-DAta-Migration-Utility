@@ -13,10 +13,16 @@ import {
 import TeradataConnection             from "teradata-nodejs-driver/teradata-connection.js";
 import TeradataExceptions             from "teradata-nodejs-driver/teradata-exceptions.js";
 
+import TeradataConstatns              from '../teradataConstants.js'
 import { TeradataError }              from '../teradataException.js'
 
 class TeradataWorker {
 
+  get DATABASE_KEY()              { return TeradataConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()           { return TeradataConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()           { return TeradataConstants.SOFTWARE_VENDOR};
+  get CONNECTION_NAME()           { return 'TeradataWorker' }
+  
   get DRIVER_ID()  { return this._DRIVER_ID }
   set DRIVER_ID(v) { this._DRIVER_ID = v }
 
@@ -97,7 +103,7 @@ class TeradataWorker {
  	  stack = new Error().stack
       this.teradataConnection.connect(connectionProperties);
     } catch (e) {
-      throw new TeradataError(this.DRIVER_ID,e,stack,operation)
+      throw new TeradataError(this,e,stack,operation)
     }
   }
        
@@ -126,7 +132,7 @@ class TeradataWorker {
          parentPort.postMessage({action: "data", success: true, streamComplete: streamComplete, rows: rowCache, elapsedTime: performance.now() - startTime})
 	   }
 	   else	{
-   	     parentPort.postMessage({action: "data", success: false, streamComplete: streamComplete, cause: new TeradataError(this.DRIVER_ID,e,stack,operation)})
+   	     parentPort.postMessage({action: "data", success: false, streamComplete: streamComplete, cause: new TeradataError(this,e,stack,operation)})
 	   }
 	 }
 	 this.cursor.close()
@@ -148,7 +154,7 @@ class TeradataWorker {
         const firstRows = this.cursor.fetchmany(batchSize)
         return firstRows;
       } catch (e) {
-        throw new TeradataError(this.DRIVER_ID,e,stack,operation)
+        throw new TeradataError(this,e,stack,operation)
       }
 	  
   }
@@ -167,7 +173,7 @@ class TeradataWorker {
    	    this.cursor.close()
 		return results
       } catch (e) {
-        const cause = new TeradataError(this.DRIVER_ID,e,stack,operation)
+        const cause = new TeradataError(this,e,stack,operation)
         throw cause
       }
 	  
@@ -184,7 +190,7 @@ class TeradataWorker {
       }
       this.teradataConnection = undefined
     } catch (e) {
-      throw new TeradataError(this.DRIVER_ID,e,stack,operation)
+      throw new TeradataError(this,e,stack,operation)
     }
 	
   }

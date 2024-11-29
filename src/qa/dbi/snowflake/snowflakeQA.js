@@ -24,27 +24,29 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
     }	
 		
     constructor(yadamu,manager,connectionSettings,parameters) {
-       super(yadamu,manager,connectionSettings,parameters)
+      super(yadamu,manager,connectionSettings,parameters)
     }
 
-    async initializeImport() {
-	  if (this.options.recreateSchema === true) {
-		await this.recreateDatabase();
-		this.options.recreateSchema = false
-	  }
-	  await super.initializeImport();
-    }	
-
-	async recreateDatabase() {
+    async initialize() {
+                
+      // Must (re) create the database before attempting to connection. initialize() will fail if the database does not exist.
+      if ((this.options.recreateSchema === true) && (this.ROLE === 'WRITER')) {
+        await this.recreateDatabase();
+        this.options.recreateSchema = false
+      }
+      await super.initialize();
+      
+    }    
+	
+  async recreateDatabase() {
 
       try {	
 	    const dbi = new SnowflakeMgr(this.yadamu, this.CONNECTION_SETTINGS)
-	    await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE,this.parameters.TO_USER)
+	    await dbi.recreateDatabase(this.parameters.DATABASE,this.parameters.TO_USER)
 	  }	catch (e) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.TO_USER],e);
       }
 	}
-
 
    execute(conn,sqlStatement) {
     
@@ -85,7 +87,8 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
         const res = await this.execute(conn,operation)
         await this.final()
       }).catch(async (e) => {
-        this.yadamu.LOGGER.handleException(tags,new SnowflakeError(this.DRIVER_ID,e,stack,operation));
+		const cause = this.createDatabaseError(e,stack,operation)
+        this.LOGGER.handleException(tags,cause)
 		await this.destroy(e)
       })
     }

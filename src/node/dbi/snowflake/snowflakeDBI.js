@@ -21,15 +21,16 @@ import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */  
 
+import Comparitor                     from './snowflakeCompare.js'
+import DatabaseError                  from './snowflakeException.js'
+import DataTypes                      from './snowflakeDataTypes.js'
+import Parser                         from './snowflakeParser.js'
+import StatementGenerator             from './snowflakeStatementGenerator.js'
+import StatementLibrary               from './snowflakeStatementLibrary.js'
+import OutputManager                  from './snowflakeOutputManager.js'
+import Writer                         from './snowflakeWriter.js'
+
 import SnowflakeConstants             from './snowflakeConstants.js'
-import SnowflakeDataTypes             from './snowflakeDataTypes.js'
-import SnowflakeError                 from './snowflakeException.js'
-import SnowflakeParser                from './snowflakeParser.js'
-import SnowflakeWriter                from './snowflakeWriter.js'
-import SnowflakeOutputManager         from './snowflakeOutputManager.js'
-import SnowflakeStatementGenerator    from './snowflakeStatementGenerator.js'
-import SnowflakeStatementLibrary      from './snowflakeStatementLibrary.js'
-import SnowflakeCompare               from './snowflakeCompare.js'
 
 class SnowflakeDBI extends YadamuDBI {
 
@@ -61,7 +62,7 @@ class SnowflakeDBI extends YadamuDBI {
   get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return SnowflakeConstants.STATEMENT_TERMINATOR };
 
-  get CURRENT_DATABASE()       { return this.parameters.YADAMU_DATABASE ||this.CONNECTION_PROPERTIES.database }
+  get CURRENT_DATABASE()       { return this.parameters.DATABASE ||this.CONNECTION_PROPERTIES.database }
 
   // Enable configuration via command line parameters
 
@@ -100,29 +101,39 @@ class SnowflakeDBI extends YadamuDBI {
 
 	// Convert supplied parameters to format expected by connection mechansim
 		
-    this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
+    this.parameters.DATABASE = this.parameters.DATABASE || this.parameters.DATABASE
 	
     connectionProperties.account                = this.parameters.ACCOUNT                    || connectionProperties.account 
     connectionProperties.username               = this.parameters.USERNAME                   || connectionProperties.username 
     connectionProperties.password               = this.parameters.PASSWORD                   || connectionProperties.password  
-    connectionProperties.warehouse              = this.parameters.WAREHOUSE                  || connectionProperties.warehouse
-    connectionProperties.database               = this.parameters.DATABASE                   || connectionProperties.database   
+    connectionProperties.warehouse              = this.parameters.WAREHOUSE                  || connectionProperties.warehouse                       || this.DBI_PARAMETERS.DEFAULT_WAREHOUSE
+    connectionProperties.database               = this.parameters.DATABASE                   || connectionProperties.database                        || this.DBI_PARAMETERS.DEFAULT_DATABASE
 	connectionProperties.arrayBindingThreshold  = this.parameters.SNOWFLAKE_BUFFER_SIZE      || connectionProperties.arrayBindingThreshold || 100000      
     connectionProperties.insecureConnect        = this.parameters.SNOWFLAKE_INSECURE_CONNECT || connectionProperties.insecureConnect || false      
 
+	this.parameters.DATABASE = connectionProperties.database
+	
 	return connectionProperties
 
   }
     
   constructor(yadamu,manager,connectionSettings,parameters) {	  
+  
     super(yadamu,manager,connectionSettings,parameters)
-    this.DATA_TYPES = SnowflakeDataTypes
-       
+	
+    
+	this.COMPARITOR_CLASS = Comparitor
+	this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer	
+	
+	this.DATA_TYPES = DataTypes   
 	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.SNOWFLAKE_XML_STORAGE_OPTION      || this.DBI_PARAMETERS.XML_STORAGE_OPTION      || this.DATA_TYPES.storageOptions.XML_TYPE
 	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.SNOWFLAKE_JSON_STORAGE_OPTION     || this.DBI_PARAMETERS.JSON_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.JSON_TYPE
 	
-	this.StatementLibrary = SnowflakeStatementLibrary
-	this.statementLibrary = undefined
   }
 
   /*
@@ -131,12 +142,36 @@ class SnowflakeDBI extends YadamuDBI {
   **
   */
   
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new SnowflakeError(driverId,cause,stack,sql)
-  }
+  setSchema(schema,key) {
+	
+	switch (true) {
+      case (schema.hasOwnProperty('owner')):
+        this.parameters[key] = schema.owner
+   	    this.parameters.DATABASE = schema.database 
+   	    break
+      case (schema.hasOwnProperty('database')):
+        this.parameters[key] = schema.schema
+   	    this.parameters.DATABASE = schema.database 
+   	    break
+      default:
+   	    this.parameters[key] = schema.schema
+	    this.parameters.DATABASE = this.parameters.DATABASE || this.CONNECTION_SETTINGS[this.DATABASE_KEY].database || this.DBI_PARAMETERS.DEFAULT_DATABASE
+    }
+	this.DESCRIPTION = `"${this.parameters.DATABASE}"."${this.CURRENT_SCHEMA}"`
+  }  
   
-  getSchemaIdentifer() {
-	return `${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}`
+  getSchema(schema) {
+     
+	 switch (true) {
+	   case (schema.hasOwnProperty('owner')):
+	     return {schema : schema.owner, database: schema.database}
+		 break
+	   case (schema.hasOwnProperty('database')):
+	     return schema
+	   default:
+	     return {schema : schema.schema, database: this.parameters.DATABASE}
+	 }
+
   }  
   
   establishConnection(connection) {
@@ -145,7 +180,7 @@ class SnowflakeDBI extends YadamuDBI {
 	  const stack = new Error().stack
       connection.connect((err,connection) => {
         if (err) {
-          reject(this.getDatabaseException(this.DRIVER_ID,err,stack,`snowflake-sdk.Connection.connect()`))
+          reject(this.getDatabaseException(err,stack,`snowflake-sdk.Connection.connect()`))
         }
         resolve(connection)
       })
@@ -158,13 +193,15 @@ class SnowflakeDBI extends YadamuDBI {
   }
 
   async testConnection() {   
+    let stack
     this.setDatabase()
 	try {
-      let connection = snowflake.createConnection(this.CONNECTION_PROPERTIES)
+      stack = new Error().stack
+	  let connection = snowflake.createConnection(this.CONNECTION_PROPERTIES)
       connection = await this.establishConnection(connection)
       connection.destroy()
 	} catch (e) {
-	  throw e
+	  throw this.createDatabaseError(e,stack,'testConnection.getConnection()')
 	}
   }
   
@@ -197,8 +234,8 @@ class SnowflakeDBI extends YadamuDBI {
   async configureConnection() {    
 
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
-	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
-    results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])    
+	let results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)
+    results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION,[])    
     this._DATABASE_VERSION = results[0].DATABASE_VERSION
 
     if ((this.isManager()) && (this.DATA_TYPES.storageOptions.XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
@@ -237,7 +274,7 @@ class SnowflakeDBI extends YadamuDBI {
       , complete       : async (err,statement,rows) => {
 		                   const sqlEndTime = performance.now()
                            if (err) {
-              		         const cause = this.getDatabaseException(this.DRIVER_ID,err,stack,sqlStatement)
+              		         const cause = this.getDatabaseException(err,stack,sqlStatement)
     		                 if (attemptReconnect && cause.lostConnection()) {
 	      				       attemptReconnect = false
 			   			       try {
@@ -268,7 +305,7 @@ class SnowflakeDBI extends YadamuDBI {
 	let results = []
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%YADAMU_DATABASE%%/g,this.parameters.YADAMU_DATABASE)
+        ddlStatement = ddlStatement.replace(/%%YADAMU_DATABASE%%/g,this.parameters.DATABASE)
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA)
         return this.executeSQL(ddlStatement,[])
       }))
@@ -280,15 +317,15 @@ class SnowflakeDBI extends YadamuDBI {
   }
 
   setDatabase() {  
-    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.CONNECTION_PROPERTIES.database)) {
-      this.CONNECTION_PROPERTIES.database = this.parameters.YADAMU_DATABASE
+    if ((this.parameters.DATABASE) && (this.parameters.DATABASE !== this.CONNECTION_PROPERTIES.database)) {
+      this.CONNECTION_PROPERTIES.database = this.parameters.DATABASE
     }
   }  
   
   async initialize() {
     await super.initialize(true)   
     await this.useDatabase(this.CURRENT_DATABASE)
-	this.statementLibrary = new this.StatementLibrary(this)
+	this.statementLibrary = new this.STATEMENT_LIBRARY_CLASS(this)
 	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }
     
@@ -309,7 +346,7 @@ class SnowflakeDBI extends YadamuDBI {
 	**
 	*/
 	
-     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION,[])
+     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION,[])
      super.beginTransaction()
 
   }
@@ -332,7 +369,7 @@ class SnowflakeDBI extends YadamuDBI {
 	*/
 
 	 super.commitTransaction()
-     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION,[])
+     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_COMMIT_TRANSACTION,[])
 	
   }
 
@@ -361,7 +398,7 @@ class SnowflakeDBI extends YadamuDBI {
      
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION,[])
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_ROLLBACK_TRANSACTION,[])
     } catch (newIssue) {
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)								   
 	}
@@ -393,7 +430,7 @@ class SnowflakeDBI extends YadamuDBI {
 	
   
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION,[])
     const yadamuInstanceId = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTANCE_ID()`,[])
     const yadamuInstallationTimestamp = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTALLATION_TIMESTAMP()`,[])
     
@@ -432,7 +469,7 @@ class SnowflakeDBI extends YadamuDBI {
     
     return await Promise.all(schemaInfo.map(async (tableInfo) => {
     
-      const SQL_DESCRIBE_TABLE = `desc table "${this.parameters.YADAMU_DATABASE}"."${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`
+      const SQL_DESCRIBE_TABLE = `desc table "${this.parameters.DATABASE}"."${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`
 	  
       const columnNames = JSON.parse(tableInfo.COLUMN_NAME_ARRAY)
       let dataTypes = JSON.parse(tableInfo.DATA_TYPE_ARRAY)
@@ -443,7 +480,7 @@ class SnowflakeDBI extends YadamuDBI {
 	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE)
 	    dataTypes.forEach((dataType,idx) => {
           dataTypes[idx] = dataType === 'USER_DEFINED_TYPE' ? descOutput[idx].type : dataType
-          sizeConstraints[idx] = dataType === 'BINARY' ? [ + SnowflakeDataTypes.decomposeDataType(descOutput[idx].type).length ] : sizeConstraints[idx] 
+          sizeConstraints[idx] = dataType === 'BINARY' ? [ + DataTypes.decomposeDataType(descOutput[idx].type).length ] : sizeConstraints[idx] 
         })
 	  }
       /*
@@ -457,7 +494,7 @@ class SnowflakeDBI extends YadamuDBI {
            if (dataType === this.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE) {
              const columnName = columnNames[idx]
              const SQL_ANALYZE_VARIANT = `with SAMPLE_DATA_SET as (
-  select "${columnName}" from "${this.parameters.YADAMU_DATABASE}"."${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}" 
+  select "${columnName}" from "${this.parameters.DATABASE}"."${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}" 
            sample (1000 rows) 
            where "${columnName}" is not null
 )
@@ -501,13 +538,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   
   generateQueryInformation(tableMetadata) { 
     const tableInfo = super.generateQueryInformation(tableMetadata)
-	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${this.parameters.YADAMU_DATABASE}"."${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
+	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${this.parameters.DATABASE}"."${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
 	return tableInfo
   }     
-  
-  _getParser(queryInfo,pipelineState) {
-    return new SnowflakeParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
   
   async _getInputStream(queryInfo) {
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
@@ -526,7 +559,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -548,20 +581,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	// Create a schema 
     throw new Error('Unimplemented Method')
   }
-   
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(SnowflakeStatementGenerator,schema) 
-  }
- 
-  getOutputStream(tableName,pipelineState) {
-	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(SnowflakeWriter,tableName,pipelineState)
-  }
-  
-  getOutputManager(tableName,pipelineState) {
-	 return super.getOutputStream(SnowflakeOutputManager,tableName,pipelineState)
-  }
- 
+      
   async initializeWorker(manager) {
 	await super.initializeWorker(manager)
 	await this.useDatabase(this.CURRENT_DATABASE)
@@ -589,7 +609,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	err.tags = []
 
 	try {
-	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => '_last'))`)
+	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => '_last'))`)
       err.cause = results.map((err) => {
 	    const loadError = new Error(err.error)
 		Object.assign(loadError,err)
@@ -641,15 +661,6 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     const  results = await this.executeSQL(sqlStatement)
   }
 
-  getSchema(schemaInfo) {
-	return schemaInfo
-  }
-  
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new SnowflakeCompare(this,configuration)
-  }
-  
   countBinding(binds) {
 
     if(!Array.isArray(binds))   {
@@ -664,8 +675,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     }
     return count;
   }
-
-    
+   
 }
 
 export { SnowflakeDBI as default }

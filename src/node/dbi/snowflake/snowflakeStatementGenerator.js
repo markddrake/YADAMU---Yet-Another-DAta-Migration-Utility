@@ -26,7 +26,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
       
     // Benoit Dageville's solution using "INSERT ... SELECT JSON_PARSE() FROM VALUES (?,?,...),..."
     
-	return `insert into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" ("${columnNames.join('","')}") ${parserRequired ? `select ${insertOperators.join(',')} from` : ''} values `;
+	return `insert into "${this.dbi.parameters.DATABASE}"."${schema}"."${tableName}" ("${columnNames.join('","')}") ${parserRequired ? `select ${insertOperators.join(',')} from` : ''} values `;
              
     // Batch needs to consist of a single array of values rather than an Array of Arrays when the table contains a VARIANT column
     // Bind list is added at execution time since the full bind list is a function of the number of rows in the batch being inserted. 
@@ -38,7 +38,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
     /*
     let copyOperation 
     if (tableMetadata.dataFile) {
-      copyOperation = `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+      copyOperation = `copy into "${this.dbi.parameters.DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
 	}
     */
 
@@ -48,7 +48,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 		const partitionCount = dataFile.length
         copyOperation = dataFile.map((dataFile,idx) => {
 	      return  {
-	        dml             : `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+	        dml             : `copy into "${this.dbi.parameters.DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
 		  , partitionCount  : partitionCount
 		  , partitionID     : idx+1
 	      }
@@ -56,7 +56,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 	  }
       else {
 	    copyOperation = {
-	     dml         : `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+	     dml         : `copy into "${this.dbi.parameters.DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
 	    }
 	  }
     }

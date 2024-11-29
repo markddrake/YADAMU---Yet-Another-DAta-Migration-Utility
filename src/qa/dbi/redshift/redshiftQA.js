@@ -199,7 +199,8 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		}
       }).catch((e) => {
-        this.yadamu.LOGGER.handleException(tags,new PostgresError(this.DRIVER_ID,e,stack,operation));
+		const cause = this.createDatabaseError(e,stack,operation)
+        this.LOGGER.handleException(tags,cause)
       })
 	}
 	

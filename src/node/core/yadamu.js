@@ -191,8 +191,8 @@ class Yadamu {
   get METRICS() { return this.metrics }
   
   constructor(operation,configParameters) {
-	 
-    this._OPERATION = operation
+	
+	this._OPERATION = operation
     this.activeConnections = new Set();
 	this.mappedDataTypes = new Set();
 	      
@@ -226,26 +226,6 @@ class Yadamu {
 	
   }
 
-  async reset(parameters) {
-	
-    this._IDENTIFIER_MAPPINGS = undefined
-    this._REJECTION_MANAGER = undefined;
-    this._WARNING_MANAGER = undefined;
-	
-    this.STATUS.startTime     = performance.now()
-    this.STATUS.warningRaised = false;
-    this.STATUS.errorRaised   = false;
-    this.STATUS.statusMsg     = 'successfully'
-	this.metrics = {}
-    	
-	this.initializeParameters(parameters)
-	this.initializeLogging();
-	
-    if (parameters && (parameters.PASSPHRASE || (parameters.ENCRYPTION === true))) {		
-	  this.ENCRYPTION_KEY = await this.generateCryptoKey(this.parameters)
-	}
-  }
-  
   yadamuAbort(err,promise) {
 	  
 	if ((err.ignoreUnhandledRejection === true)) {
@@ -296,7 +276,6 @@ class Yadamu {
 	
   }	
   
- 	  
   initializeParameters(configParameters) {
     //  Start with Yadamu Defaults
     // Merge parameters from configuration files
@@ -309,20 +288,25 @@ class Yadamu {
 	, ...configParameters
 	, ...this.COMMAND_LINE_PARAMETERS
 	}).map(([k, v]) => [k.toUpperCase(), v]))
-	
+
   }
 
   reloadParameters(parameters) {
-  
     this.initializeParameters(parameters || {})
     this.initializeLogging();    
   }
   
   updateParameters(parameters) {
+	  
 	this.parameters = {
-	  ...this.parameteres
+	  ...this.parameters
     , ...parameters
     }
+	
+	if (this.parameters.hasOwnProperty('PASSPHRASE')) {
+	  this.generateCryptoKey(this.parameters)
+	}
+	
   }
           
   initializeSQLTrace() {
@@ -346,11 +330,10 @@ class Yadamu {
 		}
 	  }
 	  else {
-        this.STATUS.sqLogger.close();
+        this.STATUS.sqlLogger.close();
 		this.STATUS.sqlLogger = NullWriter.NULL_WRITER
 	  }
 	}
-		  
   }
   
   initializeLogging() {
@@ -381,6 +364,31 @@ class Yadamu {
 		paramteres[parameterName] = parameters[defaultName]
 	 }
   } 
+  
+  async reset(parameters) {
+	  
+	// Call between Jobs
+	  
+    this._IDENTIFIER_MAPPINGS = undefined
+    this._REJECTION_MANAGER = undefined;
+    this._WARNING_MANAGER = undefined;
+	
+    this.STATUS.startTime     = performance.now()
+    this.STATUS.warningRaised = false;
+    this.STATUS.errorRaised   = false;
+    this.STATUS.statusMsg     = 'successfully'
+	this.metrics = {}
+    	
+    this.initializeParameters({
+	  ...parameters
+	, ENCRYPTION_KEY_AVAILABLE : this.ENCRYPTION_KEY_AVAILABLE || false
+    })
+	this.initializeLogging();
+	
+    if (parameters && (parameters.PASSPHRASE || ((parameters.ENCRYPTION === true) && !this.ENCRYPTION_KEY_AVAILABLE))) {		
+	  this.ENCRYPTION_KEY = await this.generateCryptoKey(this.parameters)
+	}
+  }
 
   async requestPassPhrase() {
 	  
@@ -396,9 +404,9 @@ class Yadamu {
   }
   
   async generateCryptoKey(parameters) {
-	  
+	 
 	// Environemnt variables overide configuration files and command line parameters
-	
+	  
     const passphrase = process.env.YADAMU_PASSPHRASE || parameters.PASSPHRASE || await this.requestPassPhrase()
 	const salt = process.env.YADAMU_SALT || parameters.SALT || YadamuConstants.SALT 
 	
@@ -467,7 +475,7 @@ class Yadamu {
   }
   
   reportStatus(status,yadamuLogger) {
-    const endTime = performance.now();
+	const endTime = performance.now();
       
 	const metrics = yadamuLogger.getMetrics();
 	status.statusMsg = status.warningRaised === true ? `with ${metrics.warnings} warnings` : status.statusMsg;
@@ -594,16 +602,12 @@ class Yadamu {
             return false;
     }
   }
-  
-  async finalize(status,yadamuLogger) {
-
-    this.commandPrompt.close();
-    await yadamuLogger.close();
-    status.sqlLogger.end();
-  }
-  
+    
   async close() {
-    await this.finalize(this.STATUS,this.LOGGER);
+	this.commandPrompt.close();
+    await this.LOGGER.close();
+    this.STATUS.sqlLogger.close();
+	this.STATUS.sqlLogger = NullWriter.NULL_WRITER
   }
     
   createQuestion(prompt) {	
@@ -836,10 +840,19 @@ class Yadamu {
           case 'SALT':
             parameters.SALT = parameterValue;
             break;
-          case 'TASK':
-            parameters.TASK = parameterValue;
+          case 'BATCH':		  
+          case '--BATCH':
+          case 'BATCH_NAME':		  
+          case '--BATCH_NAME':
+            parameters.BATCH_NAME = parameterValue;
+            break;   
+          case 'JOB':		  
+          case '--JOB':
+          case 'JOB_NAME':		  
+          case '--JOB_NAME':
+            parameters.JOB_NAME = parameterValue;
             break;
-          default:
+		  default:
 		    if (allowAnyParameter) {
               try {
 				parameters[parameterName] = JSON.parse(parameterValue.toLowerCase());
@@ -1032,6 +1045,7 @@ class Yadamu {
 	  if (!((e instanceof UserError) && (e instanceof FileNotFound))) {
         this.reportError(e,this.parameters,this.STATUS,this.LOGGER);
 	  }
+	  throw e
     } finally { 
       await this.REJECTION_MANAGER.close();
       await this.WARNING_MANAGER.close();
@@ -1041,7 +1055,7 @@ class Yadamu {
   }
     
   async pumpData(source,target) {
-     
+
     if ((source.isDatabase() === true) && (source.parameters.FROM_USER === undefined)) {
       throw new Error('Missing mandatory parameter FROM_USER');
     }
@@ -1052,87 +1066,7 @@ class Yadamu {
 	
     return await this.doPumpOperation(source,target)    
   }
-  
-  async convertFile(fileDBI,encrypt) {
-	const options = {
-	  encryptedInput   : !encrypt
-	, compressedInput  : false
-	, encryptedOutput  : encrypt
-	, compressedOutput : false
-	, filename         : `${this.FILE}.${encrypt ? 'secure' : 'plain'}`
-    }
-	
-	let streamsCompleted
-    try {
-	  const pipelineComponents = await fileDBI.createCloneStream(options)
-	  await pipeline(...pipelineComponents)
-    } catch (e) {
-	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
- 	  await Promise.allSettled(streamsCompleted)
-      throw e;
-    }
-  }
-  
-  async doImport(dbi) {
-    const fileReader = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
-    const metrics = await this.pumpData(fileReader,dbi);
-    await this.close();
-    return metrics
-  }  
- 
-  async doExport(dbi) {
-    const fileWriter = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
-    const metrics = await this.pumpData(dbi,fileWriter);
-    await this.close();
-    return metrics
-  }  
-  
-  async doEncrypt() {
-    const fileDBI = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
-    await this.convertFile(fileDBI,true);
-    await this.close();
-    return
-  }  
-
-  async doDecrypt() {
-    const fileDBI = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
-    await this.convertFile(fileDBI,false);
-    await this.close();
-    return
-  }  
-
-  async doCopy(source,target) {
-    const metrics = await this.pumpData(source,target);
-    await this.close();
-    return metrics
-  }  
-  
-  async cloneFile(pathToFile) {
-
-    const fileReader = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
-    const fileWriter = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
-    const metrics = await this.pumpData(fileReader,fileWriter);
-    await this.close();
-    return metrics
-  }
    
-  getMetrics(log) {
-      
-     const metrics = {}
-     log.forEach((entry) => {
-       switch (Object.keys(entry)[0]) {
-         case 'dml' :
-           metrics[entry.dml.tableName] = {rowCount : entry.dml.rowCount, rowsSkipped: 0, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
-           break;
-         case 'error' :
-           metrics[entry.error.tableName] = {rowCount : -1, rowsSkipped: 0, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
-           break;
-         default:
-       }
-     })
-     return metrics
-  }
-  
   async doUploadOperation(dbi) {
 
     try {
@@ -1183,6 +1117,46 @@ class Yadamu {
     return metrics
   }  
   
+  async doEncrypt() {
+    const fileDBI = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
+    await fileDBI.convertFile(true);
+    await this.close();
+    return
+  }  
+
+  async doDecrypt() {
+    const fileDBI = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
+    await fileDBI.convertFile(false);
+    await this.close();
+    return
+  }  dir
+
+  async cloneFile(pathToFile) {
+
+    const fileReader = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
+    const fileWriter = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
+    const metrics = await this.pumpData(fileReader,fileWriter);
+    await this.close();
+    return metrics
+  }
+   
+  getMetrics(log) {
+      
+     const metrics = {}
+     log.forEach((entry) => {
+       switch (Object.keys(entry)[0]) {
+         case 'dml' :
+           metrics[entry.dml.tableName] = {rowCount : entry.dml.rowCount, rowsSkipped: 0, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
+           break;
+         case 'error' :
+           metrics[entry.error.tableName] = {rowCount : -1, rowsSkipped: 0, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
+           break;
+         default:
+       }
+     })
+     return metrics
+  }
+   
   reportIncorrectMessageSequence() {
   }
   

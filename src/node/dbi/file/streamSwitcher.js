@@ -301,6 +301,7 @@ class StreamSwitcher extends Transform {
 			// Pipe a null object to terminate the tableWriter and flush all pending data.
 			const is = new Readable.from([])
 			await pipeline(is,this.tableWriter)
+			this.PIPELINE_STATE.endTime = performance.now()
 			this.dbi.reportPipelineStatus(this.PIPELINE_STATE)
 		  }
 		  break;

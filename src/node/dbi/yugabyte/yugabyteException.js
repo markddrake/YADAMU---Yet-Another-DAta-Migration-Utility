@@ -2,9 +2,9 @@
 import PostgresError from '../postgres/postgresException.js'
 
 class YugabyteError extends PostgresError {
-  //  const err = new YugabyteError(driverId,driverId,cause,stack,sql)
-  constructor(driverId,cause,stack,sql) {
-    super(driverId,cause,stack,sql);
+  //  const err = new YugabyteError(dbi,dbi,cause,stack,sql)
+  constructor(dbi,cause,stack,sql) {
+    super(dbi,cause,stack,sql);
   }
   
   transactionAborted() {

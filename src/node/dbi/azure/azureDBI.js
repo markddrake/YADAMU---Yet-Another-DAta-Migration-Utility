@@ -22,6 +22,8 @@ import CloudDBI                       from '../cloud/cloudDBI.js';
 import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                    
+
+import DatabaseError                  from './azureException.js'
 							          							          
 import AzureConstants                 from './azureConstants.js';
 import AzureStorageService            from './azureStorageService.js';
@@ -158,11 +160,9 @@ class AzureDBI extends CloudDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {
     // Export File Path is a Directory for in Load/Unload Mode
     super(yadamu,manager,connectionSettings,parameters)
+	
+	this.DATABASE_ERROR = DatabaseError
   }   
-  
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new AzureError(driverId,cause,stack,sql)
-  }
   
   async createConnectionPool() {
 	// this.LOGGER.trace([this.constructor.name],`BlobServiceClient.fromConnectionString()`)

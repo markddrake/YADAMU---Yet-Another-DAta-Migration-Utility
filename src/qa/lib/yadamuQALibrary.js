@@ -57,6 +57,10 @@ class YadamuQALibrary {
 
   static qaMixin = (superclass) => class extends superclass {
     
+    setOption(name,value) {
+	  this.options[name] = value;
+    }
+  
     async initialize() {
 	  await super.initialize();
 	  if (this.yadamu.scheduleLostConnectionTest(this.ROLE,this.getWorkerNumber())) {
@@ -85,7 +89,7 @@ class YadamuQALibrary {
     getTerminationTags(workerId,processId) {
 	  return ['KILL',this.DATABASE_VENDOR,this.ROLE,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.TERMINATION_CONFIGURATION.delay,processId]
     }
-
+  
     async compareResultSets(tableName, sourceSQL, targetSQL) {
 	   	   
       const queryInfo = {}
@@ -107,9 +111,21 @@ class YadamuQALibrary {
 	  return [ resultTable.size === 0 ? [tableName, sourceKeys.count, targetKeys.count, 0, 0] : [tablename, sourceKeys.count, targetKeys.count, -1, -1]]
 	}
   }	
+
+  static fileQAMixin = (superclass) => class extends superclass {
+    
+    setOption(name,value) {
+	  this.options[name] = value;
+    }
+  
+  }
   
   static loaderQAMixin = (superclass) => class extends superclass {
 
+    setOption(name,value) {
+	  this.options[name] = value;
+    }
+  
     async recreateSchema() {
       this.DIRECTORY = this.TARGET_DIRECTORY
       await this.cloudService.createBucketContainer()

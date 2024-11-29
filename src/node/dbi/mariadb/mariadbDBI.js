@@ -20,16 +20,17 @@ import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                   
+
+import Comparitor                     from './mariadbCompare.js'
+import DatabaseError                  from './mariadbException.js'
+import DataTypes                      from './mariadbDataTypes.js'
+import Parser                         from './mariadbParser.js'
+import StatementGenerator             from './mariadbStatementGenerator.js'
+import StatementLibrary               from './mariadbStatementLibrary.js'
+import OutputManager                  from './mariadbOutputManager.js'
+import Writer                         from './mariadbWriter.js'
 							          
 import MariadbConstants               from './mariadbConstants.js'
-import MariadbDataTypes               from './mariadbDataTypes.js'
-import MariadbError                   from './mariadbException.js'
-import MariadbParser                  from './mariadbParser.js'
-import MariadbOutputManager           from './mariadbOutputManager.js'
-import MariadbWriter                  from './mariadbWriter.js'
-import MariadbStatementLibrary        from './mariadbStatementLibrary.js'
-import MariadbStatementGenerator      from './mariadbStatementGenerator.js'
-import MariadbCompare                 from './mariadbCompare.js'
 
 class MariadbDBI extends YadamuDBI {
     
@@ -91,8 +92,16 @@ class MariadbDBI extends YadamuDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {
 
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = MariadbDataTypes
 	
+	this.COMPARITOR_CLASS = Comparitor
+    this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer	
+	
+	this.DATA_TYPES = DataTypes
 	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MARIADB_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
 	this.DATA_TYPES.storageOptions.SET_TYPE     = this.parameters.MARIADB_SET_STORAGE_OPTION     || this.DBI_PARAMETERS.SET_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.SET_TYPE
 	this.DATA_TYPES.storageOptions.ENUM_TYPE    = this.parameters.MARIADB_ENUM_STORAGE_OPTION    || this.DBI_PARAMETERS.ENUM_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.ENUM_TYPE
@@ -100,32 +109,28 @@ class MariadbDBI extends YadamuDBI {
 
     this.pool = undefined;
 	
-    this.StatementLibrary = MariadbStatementLibrary
-    this.statementLibrary = undefined
   }
   
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new MariadbError(driverId,cause,stack,sql)
-  }
-    
   async testConnection() {   
+    let stack
     try {
-      this.connection = await mariadb.createConnection(this.CONNECTION_PROPERTIES)
+      stack = new Error().stack
+	  this.connection = await mariadb.createConnection(this.CONNECTION_PROPERTIES)
 	  await this.connection.end()
 	  this.connection = undefined;
 	} catch (e) {
-	  throw (e)
+      throw this.createDatabaseError(e,stack,'testConnection.getConnection()')
 	} 
   }	
 	     
   async configureConnection() {  
 
-    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)
 
-    let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION)
+    let results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_CONNECTION_INFORMATION)
     this._DATABASE_VERSION = results[0]
 
-    results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
+    results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SHOW_SYSTEM_VARIABLES)
 	results.forEach((row,i) => { 
 	  switch (row[0]) {
 		case 'lower_case_table_names':
@@ -146,13 +151,13 @@ class MariadbDBI extends YadamuDBI {
 	  this.connection = await this.getConnectionFromPool()
 	}
     
-    let results = await this.executeSQL(this.StatementLibrary.SQL_GET_MAX_ALLOWED_PACKET)
+    let results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_MAX_ALLOWED_PACKET)
     if (parseInt(results[0][0]) <  MariadbConstants.MAX_ALLOWED_PACKET) {
 		
 	  // Need to change the setting.
 		
       this.LOGGER.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to ${MariadbConstants.MAX_ALLOWED_PACKET}.`)
-      results = await this.executeSQL(this.StatementLibrary.SQL_SET_MAX_ALLOWED_PACKET)
+      results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SET_MAX_ALLOWED_PACKET)
 	  
 	  if (existingConnection) {
 		// Need to repalce the existsing connection to pick up the change. 
@@ -188,7 +193,7 @@ class MariadbDBI extends YadamuDBI {
 	  connection.ping()
       return connection
 	} catch (e) {
-	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'mariadb.Pool.getConnection()')
+	  throw this.getDatabaseException(e,stack,'mariadb.Pool.getConnection()')
 	}
   }
 
@@ -205,7 +210,7 @@ class MariadbDBI extends YadamuDBI {
 	    this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Mariadb.Connection.end()')
+  	    throw this.getDatabaseException(e,stack,'Mariadb.Connection.end()')
 	  }
 	}
   };
@@ -223,7 +228,7 @@ class MariadbDBI extends YadamuDBI {
 		this.pool = undefined;
       } catch (e) {
         this.pool = undefined;
-  	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'Mariadb.Pool.end()')
+  	    throw this.getDatabaseException(e,stack,'Mariadb.Pool.end()')
 	  }
 	}
 	
@@ -259,7 +264,7 @@ class MariadbDBI extends YadamuDBI {
 		this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -286,7 +291,7 @@ class MariadbDBI extends YadamuDBI {
 		this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -338,7 +343,7 @@ class MariadbDBI extends YadamuDBI {
   async initialize() {
     await super.initialize(true)
     this.setSpatialSerializer(this.SPATIAL_FORMAT)
-	this.statementLibrary = new this.StatementLibrary(this)
+	this.statementLibrary = new this.STATEMENT_LIBRARY_CLASS(this)
 	
   }
   
@@ -399,7 +404,7 @@ class MariadbDBI extends YadamuDBI {
       await this.connection.commit()
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,'mariadb.Connection.commit()')
+	  const cause = this.getDatabaseException(e,stack,'mariadb.Connection.commit()')
 	  if (cause.lostConnection()) {
         await this.reconnect(cause,'COMMIT TRANSACTION')
 	  }
@@ -434,7 +439,7 @@ class MariadbDBI extends YadamuDBI {
       await this.connection.rollback()
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  const newIssue = this.getDatabaseException(this.DRIVER_ID,e,stack,'mariadb.Connection.rollback()')
+	  const newIssue = this.getDatabaseException(e,stack,'mariadb.Connection.rollback()')
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     } 
 	
@@ -443,7 +448,7 @@ class MariadbDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
 	super.createSavePoint()
   }
   
@@ -457,7 +462,7 @@ class MariadbDBI extends YadamuDBI {
 	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
 
 	try {
-	  await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+	  await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
 	  super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
@@ -468,7 +473,7 @@ class MariadbDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RELEASE_SAVE_POINT)    
 	super.releaseSavePoint()
   } 
 
@@ -504,7 +509,7 @@ class MariadbDBI extends YadamuDBI {
   
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION) 
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION) 
     const sysInfo = results[0];
 	
 	return Object.assign(
@@ -545,14 +550,6 @@ class MariadbDBI extends YadamuDBI {
 
   }
 
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(MariadbStatementGenerator,schema) 
-  }
-
-  _getParser(queryInfo,pipelineState) {
-    return new MariadbParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
-    
   async _getInputStream(queryInfo) {
 	  
     if (this.ACTIVE_INPUT_STREAM === true) {
@@ -575,7 +572,7 @@ class MariadbDBI extends YadamuDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -588,14 +585,6 @@ class MariadbDBI extends YadamuDBI {
 	
   }
 
-  getOutputStream(tableName,pipelineState) {
-	 return super.getOutputStream(MariadbWriter,tableName,pipelineState)
-  }
-
-  getOutputManager(tableName,pipelineState) {
-	 return super.getOutputManager(MariadbOutputManager,tableName,pipelineState)
-  }
-
   classFactory(yadamu) {
 	return new MariadbDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
@@ -606,10 +595,6 @@ class MariadbDBI extends YadamuDBI {
     return pid
   }
 
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new MariadbCompare(this,configuration)
-  }
   
 }
 

@@ -5,8 +5,8 @@ import {
 
 class VerticaError extends DatabaseError {
 
-  constructor(driverId,cause,stack,sql) {
-    super(driverId,cause,stack,sql);
+  constructor(dbi,cause,stack,sql) {
+    super(dbi,cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
 	  const startElipises = this.sql.indexOf('),($') + 2 
@@ -36,8 +36,8 @@ class VerticaError extends DatabaseError {
 }
 
 class StagingAreaMisMatch extends VerticaError {
-  constructor(driverId,filename,local,remote,cause) {
-	super(driverId, new Error(`Vertica Copy Operation Failed. File "${filename}" Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Vertica databases.`))
+  constructor(dbi,filename,local,remote,cause) {
+	super(dbi, new Error(`Vertica Copy Operation Failed. File "${filename}" Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Vertica databases.`))
     this.cause = cause
     this.local_staging_area = local
     this.remote_staging_area = remote
@@ -46,8 +46,8 @@ class StagingAreaMisMatch extends VerticaError {
   
 class VertiaCopyOperationFailure extends VerticaError {
 
-  constructor(driverId, accepted, rejected, stack, sql) {
-	super(driverId,  new Error(`Vertica Copy Operation Failed. ${accepted} rows accepted. ${rejected} rows rejected`),stack,sql)
+  constructor(dbi, accepted, rejected, stack, sql) {
+	super(dbi,  new Error(`Vertica Copy Operation Failed. ${accepted} rows accepted. ${rejected} rows rejected`),stack,sql)
   }
 }
 

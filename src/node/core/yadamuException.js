@@ -87,8 +87,8 @@ class YadamuError extends Error {
     }
   }
   
-  constructor(message) {
-    super(message);
+  constructor(message,options) {
+    super(message,options);
   }
 
   cloneStack(stack) {
@@ -107,8 +107,7 @@ class InternalError extends YadamuError {
 
 class ExportError extends YadamuError {
   constructor(tableName,cause,stack) {
-    super(`Export Operation Failed while processing "${tableName}". Cannot create export file. Retry using "Unload" Operation`);
-	this.cause = cause;
+    super(`Export Operation Failed while processing "${tableName}". Cannot create export file. Retry using "Unload" Operation`,{cuase : cause});
 	this.tableName = tableName;
 	this.stack = this.cloneStack(stack)
   }
@@ -142,8 +141,7 @@ class ConfigurationFileError extends UserError {
 
 class ConnectionError extends UserError {
   constructor(cause,redactedConnectionProperties) {
-    super(cause.message);
-	this.cause = cause;
+	super(cause.message,{cause:cause})
 	this.stack = cause.stack
     this.connectionProperties = redactedConnectionProperties
   }
@@ -151,8 +149,7 @@ class ConnectionError extends UserError {
 
 class BatchInsertError extends YadamuError {
   constructor(cause,tableName,batchNumber,batchSize,firstRow,lastRow,info) {
-	super(cause.message)
-	this.cause = cause
+	super(cause.message,{cause:cause})
     this.tableName = tableName
 	this.batchNumber = batchNumber
 	this.batchSize = batchSize
@@ -165,8 +162,7 @@ class BatchInsertError extends YadamuError {
 
 class IterativeInsertError extends YadamuError {
   constructor(cause,tableName,batchSize,rowNumber,row,info) {
-	super(cause.message)
-	this.cause = cause
+	super(cause.message,{cause:cause})
     this.tableName = tableName
     this.rowNumber = `${rowNumber} of ${batchSize}`
 	this.row = row
@@ -197,16 +193,24 @@ class UnimplementedMethod extends YadamuError {
 
 class DatabaseError extends YadamuError {
 	
-	
-  get DRIVER_ID()  { return this._DRIVER_ID }
-  set DRIVER_ID(v) { this._DRIVER_ID = v }
-  
-  constructor(driverId,cause,stack,sql) {
-	let oneLineMessage = cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
-	oneLineMessage = oneLineMessage.indexOf('\n') > 0 ? oneLineMessage.substr(0,oneLineMessage.indexOf('\n')) : oneLineMessage
-    super(oneLineMessage);
-	this._DRIVER_ID = driverId
-	this.cause = cause
+  constructor(dbi,cause,stack,sql) {
+	let oneLineMessage
+	try {
+	  oneLineMessage = cause.message && cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
+	  oneLineMessage = oneLineMessage.indexOf('\n') > 0 ? oneLineMessage.substr(0,oneLineMessage.indexOf('\n')) : oneLineMessage
+	} catch (e) {
+	  cause.internalError = new Error('Database Error: Encountered Internal Error', { cause: e})
+	  oneLineMessage = 'Internal Error encountered while constructing Database Error.'
+	}
+    super(oneLineMessage, {cause : cause });
+	this.driverProperties = {
+	  DRIVER_ID          : dbi.DRIVER_ID
+	, CONNECTION_NAME    : dbi.CONNECTION_NAME
+    , DATABASE_KEY       : dbi.DATABASE_KEY
+    , DATABASE_VENDOR    : dbi.DATABASE_VENDOR
+    , SOFTWARE_VENDOR    : dbi.SOFTWARE_VENDOR
+	, DATABASE_VERSION   : dbi.DATABASE_VERSION
+	}
 	this.stack = this.cloneStack(stack)
 	this.sql = sql
 

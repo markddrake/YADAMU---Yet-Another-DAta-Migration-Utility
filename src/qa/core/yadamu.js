@@ -19,7 +19,6 @@ import YadamuConstants        from '../../node/lib/yadamuConstants.js';
 import DBIConstants           from '../../node/dbi/base/dbiConstants.js';
 import NullWriter             from '../../node/util/nullWriter.js';
 
-import YadamuMetrics          from './yadamuMetrics.js';
 import YadamuLogger           from './yadamuLogger.js';
 
 // const YadamuDefaults = require('./yadamuDefaults.json')
@@ -66,6 +65,10 @@ class Yadamu extends _Yadamu {
     return this._LOGGER
   }
   
+  set LOGGER(v) {
+	 this._LOGGER = v 
+  }
+ 
   get QA_TEST()               { return true }
   
   get YADAMU_PARAMETERS()     { return Yadamu.YADAMU_PARAMETERS }
@@ -89,8 +92,7 @@ class Yadamu extends _Yadamu {
   constructor(configParameters) {
 	
     super('TEST',configParameters)
-	this.testMetrics = new YadamuMetrics();
-    
+	
 	// console.log('Yadamu.YADAMU_PARAMETERS:',Yadamu.YADAMU_PARAMETERS)
 	// console.log('YadamuTest this.YADAMU_PARAMETERS:',this.YADAMU_PARAMETERS)
 	// console.log('Yadamu.DBI_PARAMETERS:',Yadamu.DBI_PARAMETERS)
@@ -98,30 +100,10 @@ class Yadamu extends _Yadamu {
 	
   }
   
-  initializeSQLTrace() {
-	/*
-	**
-	if ((this.STATUS.sqlLogger instanceof NullWriter) && this.parameters.SQL_TRACE) {
-       this.STATUS.sqlLogger = undefined
+  async close(testsComplete) {
+    if (testsComplete === true) {
+	  await super.close()
 	}
-	**
-	*/
-	
-	super.initializeSQLTrace()
-  } 
-  
-  async doExport(dbi,file) {
-    this.parameters.FILE = file
-    const metrics = await super.doExport(dbi);
-    delete this.parameters.FILE
-    return metrics;
-  }
- 
-  async doImport(dbi,file) {
-    this.parameters.FILE = file
-    const metrics = await super.doImport(dbi);
-    delete this.parameters.FILE
-    return metrics;
   }
 
   async doServerImport(dbi,file) {    
@@ -154,7 +136,6 @@ class Yadamu extends _Yadamu {
    	}
   }
 
-  
   recordMetrics(tableName,metrics) {    
 
     if (metrics.read - metrics.committed - metrics.lost - metrics.skipped !== 0) {

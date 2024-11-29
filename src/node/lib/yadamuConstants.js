@@ -23,6 +23,7 @@ class YadamuConstants {
   
   static get READER_ROLE()            { return 'READER' }
   static get WRITER_ROLE()            { return 'WRITER' }
+  static get COMPARE_ROLE()           { return 'COMPARE' }
 
   static get YADAMU_CONFIGURATION() { return YadamuDefaults };
 
@@ -149,6 +150,12 @@ class YadamuConstants {
    return this._FILE_BASED_DRIVERS
   } 
   
+  #DATABASE_QUALIFIED_SCHEMAS = []
+  static get DATABASE_QUALIFIED_SCHEMAS() {
+   this.#DATABASE_QUALIFIED_SCHEMAS = this.#DATABASE_QUALIFIED_SCHEMAS || Object.freeze(['mssql','snowflake'])
+   return this.#DATABASE_QUALIFIED_SCHEMAS
+  } 
+
 }
 
 export { YadamuConstants as default}

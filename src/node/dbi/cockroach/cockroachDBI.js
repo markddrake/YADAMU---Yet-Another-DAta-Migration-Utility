@@ -53,19 +53,17 @@ import {
 }                                    from '../file/fileException.js'
 
 /* Vendor Specific DBI Implimentation */                                   
+
+import Comparitor                     from './cockroachCompare.js'
+import DatabaseError                  from './cockroachException.js'
+import DataTypes                      from './cockroachDataTypes.js'
+import Parser                         from '../postgres/postgresParser.js'
+import StatementGenerator             from './cockroachStatementGenerator.js'
+import StatementLibrary               from './cockroachStatementLibrary.js'
+import OutputManager                  from '../postgres/postgresOutputManager.js'
+import Writer                         from './cockroachWriter.js'
 						          
-import CockroachOutputManager         from '../postgres/postgresOutputManager.js'
-import CockroachParser                from '../postgres/postgresParser.js'
-
-// import CockroachParser                from './cockroachParser.js'
-
-import CockroachError                 from './cockroachException.js'
 import CockroachConstants             from './cockroachConstants.js'
-import CockroachDataTypes             from './cockroachDataTypes.js'
-import CockroachWriter                from './cockroachWriter.js'
-import CockroachStatementLibrary      from './cockroachStatementLibrary.js'
-import CockroachStatementGenerator    from './cockroachStatementGenerator.js'
-import CockroachCompare               from './cockroachCompare.js'
 
 class CockroachDBI extends YadamuDBI {
     
@@ -192,15 +190,21 @@ class CockroachDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = CockroachDataTypes
 
+	this.COMPARITOR_CLASS = Comparitor
+	this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary	
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer
+
+	this.DATA_TYPES = DataTypes
 	// this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.PGSQL_JSON_STORAGE_OPTION    || this.DBI_PARAMETERS.JSON_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.JSON_TYPE
 
     this.pgClient = undefined;
     this.useBinaryJSON = false
     
-    this.StatementLibrary = CockroachStatementLibrary
-    this.statementLibrary = undefined
     this.pipelineAborted = false;
 	
 	this.postgresStack = new Error().stack
@@ -213,17 +217,15 @@ class CockroachDBI extends YadamuDBI {
   **
   */
   
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new CockroachError(driverId,cause,stack,sql)
-  }
-    
   async testConnection() {   
+    let stack
     try {
-      const pgClient = new Client(this.CONNECTION_PROPERTIES)
+      stack = new Error().stack
+	  const pgClient = new Client(this.CONNECTION_PROPERTIES)
       await pgClient.connect()
       await pgClient.end()     							  
 	} catch (e) {
-      throw e;
+      throw this.createDatabaseError(e,stack,'testConnection.getConnection()')
 	}
 	
   }
@@ -255,7 +257,7 @@ class CockroachDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation)
+	  // const pgErr = this.createDatabaseException(err,this.postgresStack,this.postgresOperation)
       this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','POOL'],err.message)
     })
 
@@ -283,7 +285,7 @@ class CockroachDBI extends YadamuDBI {
 	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.connect()')
+	  throw this.getDatabaseException(e,stack,'pg.Pool.connect()')
 	}
   }
 
@@ -308,17 +310,17 @@ class CockroachDBI extends YadamuDBI {
       await this.configureConnection()
       return this.connection
 	} catch (e) {
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
+      throw this.getDatabaseException(e,stack,operation)
 	}
   }
   
   async getPostgisInfo() {
   
     try {
-      const results = await this.executeSQL(this.StatementLibrary.SQL_POSTGIS_INFO)
+      const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_POSTGIS_INFO)
 	  return results.rows[0][0];
 	} catch (e) {
-      if ((e instanceof CockroachError) && e.postgisUnavailable()) {
+      if ((e instanceof DatabaseError) && e.postgisUnavailable()) {
         // ### What to do about SystemInfo.SPATIAL_FORMAT There can be no Geography or Geometry columns without POSTGIS
         return "Not Installed"
       }
@@ -343,13 +345,13 @@ class CockroachDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation)
+	  // const pgErr = this.createDatabaseException(err,this.postgresStack,this.postgresOperation)
       this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','CONNECTION'],err.message)
     })
    
-    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)				
 	
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
     
 	this.POSTGRES_VERSION = results.rows[0][3]
 	this.COCKROACH_VERSION = results.rows[0][5]
@@ -375,7 +377,7 @@ class CockroachDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.getDatabaseException(this.DRIVER_ID,e,stack,'Client.release()')
+		const err = this.getDatabaseException(e,stack,'Client.release()')
 		this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
       }
@@ -394,7 +396,7 @@ class CockroachDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.close()')
+	    throw this.getDatabaseException(e,stack,'pg.Pool.close()')
 	  }
 	}
   }
@@ -454,7 +456,7 @@ class CockroachDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -534,7 +536,7 @@ class CockroachDBI extends YadamuDBI {
 
      // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
+     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION)
 	 super.beginTransaction()
 
   }
@@ -550,7 +552,7 @@ class CockroachDBI extends YadamuDBI {
     // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
-    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_COMMIT_TRANSACTION)
 	
   }
 
@@ -571,7 +573,7 @@ class CockroachDBI extends YadamuDBI {
 
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_ROLLBACK_TRANSACTION)
 	} catch (newIssue) {
   	  if (cause.transactionAborted() && (newIssue.transactionAborted() || newIssue.noActiveTransaction())) {
 	    // A transactionAborted or no transaction in progress exception is permitted if the rollback is the result of an AbortedTransaction
@@ -585,7 +587,7 @@ class CockroachDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
   }
   
@@ -600,7 +602,7 @@ class CockroachDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
       super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue)
@@ -611,7 +613,7 @@ class CockroachDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RELEASE_SAVE_POINT)    
     super.releaseSavePoint()
 
   } 
@@ -645,7 +647,7 @@ class CockroachDBI extends YadamuDBI {
    	  const is = await new Promise((resolve,reject) => {
         const stack = new Error().stack
         const inputStream = fs.createReadStream(importFilePath);
-        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,importFilePath) : new FileError(this,err,stack,importFilePath) )})
       })
 	  
 	  const rl = readline.createInterface({input: is, crlfDelay: Infinity})
@@ -669,7 +671,7 @@ class CockroachDBI extends YadamuDBI {
       return elapsedTime;
     }
     catch (e) {
-      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,copyStatement)
+      const cause = this.getDatabaseException(e,stack,copyStatement)
 	  throw cause
 	}
   }
@@ -682,7 +684,7 @@ class CockroachDBI extends YadamuDBI {
       elapsedTime = await this.loadStagingTable(importFilePath)
     }
     catch (e) {
-	  if ((e instanceof CockroachError) && e.bjsonTooLarge()) {
+	  if ((e instanceof DatabaseError) && e.bjsonTooLarge()) {
         this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable()
@@ -713,7 +715,7 @@ class CockroachDBI extends YadamuDBI {
 	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
-	const typeMappings = await this.getVendorDataTypeMappings(CockroachStatementGenerator)
+	const typeMappings = await this.getVendorDataTypeMappings()
     
   	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
@@ -754,7 +756,7 @@ class CockroachDBI extends YadamuDBI {
 
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
 	return Object.assign(
 	  super.getSystemInformation()
@@ -785,14 +787,10 @@ class CockroachDBI extends YadamuDBI {
   async getSchemaMetadata() {
 	const rowidFilter = this.ID_TRANSFORMATION === 'STRIP' ? `and not(c.column_name = 'rowid' and c.column_default = 'unique_rowid()' and c.data_type = 'bigint')` : ''
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION.replace('%ROWID_FILTER%',rowidFilter),[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT])
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SCHEMA_INFORMATION.replace('%ROWID_FILTER%',rowidFilter),[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT])
 	const metadata = this.generateSchemaInfo(results.rows)
     return metadata
   }
-
-  _getParser(queryInfo,pipelineState) {
-    return new CockroachParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
 
   async _getInputStream(queryInfo) {        
   
@@ -856,7 +854,7 @@ class CockroachDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT)
+		const cause = this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -897,18 +895,6 @@ class CockroachDBI extends YadamuDBI {
 	return results;
   }
    
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(CockroachStatementGenerator, schema)
-  }
-
-  getOutputManager(tableName,copyState) {
-	 return super.getOutputManager(CockroachOutputManager,tableName,copyState)
-  }
-
-  getOutputStream(tableName,copyState) {
-	 return super.getOutputStream(CockroachWriter,tableName,copyState)
-  }
- 
   classFactory(yadamu) {
 	return new CockroachDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
@@ -954,13 +940,7 @@ class CockroachDBI extends YadamuDBI {
   async finalizeCopy() {
 	 await super.finalizeCopy()
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `)
-  }
-  
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new CockroachCompare(this,configuration)
-  }
-	  
+  }  
 
 }
 

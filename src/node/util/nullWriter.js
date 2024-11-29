@@ -20,7 +20,8 @@ class NullWriter {
   seDefaultEncoding() { /* DISABLED */ }
   uncork()            { /* DISABLED */ }
   write()             { /* DISABLED */ }
- 
+  close()             { /* DISABLED */ }
+  
 }
 
 export { NullWriter as default}

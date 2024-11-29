@@ -7,8 +7,8 @@ import MongoConstants   from './mongoConstants.js'
 
 class MongoError extends DatabaseError {
 
-  constructor(driverId,cause,stack,operation) {
-    super(driverId,cause,stack,operation)
+  constructor(dbi,cause,stack,operation) {
+    super(dbi,cause,stack,operation)
   }
     
   lostConnection() {

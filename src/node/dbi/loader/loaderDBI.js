@@ -44,8 +44,10 @@ import {
 
 /* Vendor Specific DBI Implimentation */                                   
 
+import Comparitor                     from './loaderCompare.js'
+
 import LoaderConstants                from './loaderConstants.js'
-import LoaderCompare                  from './loaderCompare.js'
+
 import JSONParser                     from './jsonParser.js'
 import LoaderParser                   from './loaderParser.js'
 import JSONOutputManager              from './jsonOutputManager.js'
@@ -108,7 +110,7 @@ class CloudService {
     return new Promise((resolve,reject) => {
 	  const stack = new Error().stack
       const inputStream = fs.createReadStream(path);
-      inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,path) : new FileError(this.DRIVER_ID,err,stack,path) )})
+      inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,path) : new FileError(this,err,stack,path) )})
     })
   }
 }
@@ -216,7 +218,6 @@ class LoaderDBI extends YadamuDBI {
   get IMPORT_FOLDER()            { return this._IMPORT_FOLDER       || (() => {this._IMPORT_FOLDER = path.join(this.BASE_DIRECTORY,this.CURRENT_SCHEMA); return this._IMPORT_FOLDER})() }
   get EXPORT_FOLDER()            { return this._EXPORT_FOLDER       || (() => {this._EXPORT_FOLDER = path.join(this.BASE_DIRECTORY,this.CURRENT_SCHEMA); return this._EXPORT_FOLDER})() }
   
-  
   get OUTPUT_FORMAT() { 
     this._OUTPUT_FORMAT = this._OUTPUT_FORMAT || (() => {
 	  switch (this.controlFile?.settings.contentType || this.parameters.OUTPUT_FORMAT?.toUpperCase() || 'JSON') {
@@ -279,6 +280,9 @@ class LoaderDBI extends YadamuDBI {
   
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+
+	this.COMPARITOR_CLASS = Comparitor
+
 	this.yadamuProperties = {}
 	this.baseDirectory = path.resolve(this.CONNECTION_PROPERTIES.directory || "")
 	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
@@ -340,7 +344,7 @@ class LoaderDBI extends YadamuDBI {
 		  }
         })
       } catch (err) {
-        throw err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,metadataPath) : new FileError(this.DRIVER_ID,err,stack,metadataPath)
+        throw err.code === 'ENOENT' ? new FileNotFound(this,err,stack,metadataPath) : new FileError(this,err,stack,metadataPath)
 	  }
     }
     return this.metadata;      
@@ -450,7 +454,7 @@ class LoaderDBI extends YadamuDBI {
 	  stack = new Error().stack;
    	  await this.writeFile(this.CONTROL_FILE_PATH,this.controlFile)
 	} catch (err) {
-      throw err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH) : new FileError(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH)
+      throw err.code === 'ENOENT' ? new DirectoryNotFound(this,err,stack,this.CONTROL_FILE_PATH) : new FileError(this,err,stack,this.CONTROL_FILE_PATH)
 	}
 	
     let file
@@ -461,7 +465,7 @@ class LoaderDBI extends YadamuDBI {
         return this.writeFile(file,tableMetadata)   
       }))
 	} catch (err) {
-      throw err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,file) : new FileError(this.DRIVER_ID,err,stack,file)
+      throw err.code === 'ENOENT' ? new DirectoryNotFound(this,err,stack,file) : new FileError(this,err,stack,file)
 	}
 	this.emit(YadamuConstants.DDL_UNNECESSARY)
 	this.LOGGER.info(['IMPORT',this.DATABASE_VENDOR],`Created Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`)
@@ -615,7 +619,7 @@ class LoaderDBI extends YadamuDBI {
       const fileContents = await fsp.readFile(this.CONTROL_FILE_PATH,{encoding: 'utf8'})
       this.controlFile = this.parseJSON(fileContents)
 	} catch (err) {
-      throw err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH) : new FileError(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH)
+      throw err.code === 'ENOENT' ? new FileNotFound(this,err,stack,this.CONTROL_FILE_PATH) : new FileError(this,err,stack,this.CONTROL_FILE_PATH)
 	}
   }
   
@@ -640,7 +644,7 @@ class LoaderDBI extends YadamuDBI {
     const stream = fs.createReadStream(filename)
     const stack = new Error().stack;
     await new Promise((resolve,reject) => {
-	  stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,filename) : new FileError(this.DRIVER_ID,err,stack,filename))})
+	  stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,filename) : new FileError(this,err,stack,filename))})
 	})
     return stream
   }
@@ -794,11 +798,6 @@ class LoaderDBI extends YadamuDBI {
   async closeConnection() { /* OVERRIDE */ }
   
   async closePool() { /* OVERRIDE */ }
-
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new LoaderCompare(this,configuration)
-  }
 	    
   async compareInputStreams(filename) {
          

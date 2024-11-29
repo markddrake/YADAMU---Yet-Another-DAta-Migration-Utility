@@ -2,9 +2,10 @@
 import {DatabaseError} from '../../core/yadamuException.js'
 
 class PostgresError extends DatabaseError {
-  //  const err = new PostgresError(driverId,driverId,cause,stack,sql)
-  constructor(driverId,cause,stack,sql) {
-    super(driverId,cause,stack,sql);
+  //  const err = new PostgresError(dbi,dbi,cause,stack,sql)
+  constructor(dbi,cause,stack,sql) {
+	const primaryCause = Array.isArray(cause.errors) ? cause.errors[0] : cause
+    super(dbi,primaryCause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
 	  const startElipises = this.sql.indexOf('),($') + 2 

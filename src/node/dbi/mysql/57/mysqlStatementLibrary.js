@@ -38,5 +38,4 @@ const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE  =
          and t.table_schema = ?
    ) c
   group by c.table_schema, c.table_name`;
-
-}  
+ 

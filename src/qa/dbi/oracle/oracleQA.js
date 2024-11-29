@@ -110,7 +110,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 			  this.LOGGER.log(tags,`Worker finished prior to termination.`)
  		    }
 			else {
-			  const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,sqlStatement)
+			  const cause = this.createDatabaseError(e,stack,sqlStatement)
 			  this.LOGGER.handleException(tags,cause)
 			}
             if (!e.message.startsWith('DPI-1010')) {

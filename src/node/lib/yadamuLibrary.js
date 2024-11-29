@@ -239,6 +239,8 @@ class YadamuLibrary {
   }
   
   static reportError(e) {
+	if (e.hasOwnProperty('yadamuAlreadyReported')) return
+	e.yadamuAlreadyReported = true
 	if ((e instanceof UserError) || (e instanceof FileNotFound) || (e instanceof CommandLineError)) {
       console.log(e.message);
 	  if (process.env.YADAMU_SHOW_CAUSE === 'TRUE') {	  

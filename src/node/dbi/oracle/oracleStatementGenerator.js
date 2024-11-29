@@ -52,7 +52,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
   get LOADER_CLOB_SIZE()             { return 67108864 }
   get LOADER_CLOB_TYPE()             { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     
-  get STATEMENT_GENERATOR_OPTIONS() {
+  get STATEMENT_GENERATOR_CLASS_OPTIONS() {
 
     const options = {
 	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT // this.SPATIAL_FORMAT
@@ -402,7 +402,7 @@ end;
     
     const startTime = performance.now()
 	
-	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:this.STATEMENT_GENERATOR_OPTIONS});
+	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:this.STATEMENT_GENERATOR_CLASS_OPTIONS});
 	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     
 	await metadata.close()
@@ -410,7 +410,7 @@ end;
 	
     const statementCache = JSON.parse(results.outBinds.sql)
 	
-	// this.debugStatementGenerator(this.STATEMENT_GENERATOR_OPTIONS,statementCache)
+	// this.debugStatementGenerator(this.STATEMENT_GENERATOR_CLASS_OPTIONS,statementCache)
 	
 	const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {

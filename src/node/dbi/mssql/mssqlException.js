@@ -4,8 +4,8 @@ import MsSQLConstants from './mssqlConstants.js'
 
 class MsSQLError extends DatabaseError {
 
-  constructor(driverId,cause,stack,sql) {
-    super(driverId,cause,stack,sql);
+  constructor(dbi,cause,stack,sql) {
+    super(dbi,cause,stack,sql);
   }
 
   getCause() {

@@ -5,12 +5,12 @@ import path                           from 'path';
 import crypto                         from 'crypto';
 					                  
 import {                              
-  finished,                           
   compose,                            
   Readable,                           
   PassThrough                         
 }                                     from 'stream'
 import {                              
+  finished,                           
   pipeline                            
 }                                     from 'stream/promises'
 import {                              
@@ -48,10 +48,11 @@ import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                   
 
+import Comparitor                     from './fileCompare.js'
+
 import JSONParser                     from './jsonParser.js'
 import StreamSwitcher                 from './streamSwitcher.js'
 import JSONOutputManager              from './jsonOutputManager.js'
-import FileCompare                    from './fileCompare.js'
 
 import {
   FileError, 
@@ -230,13 +231,17 @@ class FileDBI extends YadamuDBI {
 
   addVendorExtensions(connectionProperties) {
 
-  // connectionProperties.directory   = this.parameters.DIRECTORY || connectionProperties.directory 
-  return connectionProperties
+    // connectionProperties.directory   = this.parameters.DIRECTORY || connectionProperties.directory 
+    return connectionProperties
 
   }
   
   constructor(yadamu,connectionSettings,parameters) {
+	  
 	super(yadamu,null,connectionSettings,parameters)
+	
+	this.COMPARITOR_CLASS = Comparitor
+
 	this.outputStream = undefined;
     this.inputStream = undefined;
 	this.firstTable = true;
@@ -245,8 +250,10 @@ class FileDBI extends YadamuDBI {
 	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }
 
+  setSchema(schema,key) {}
+
   setDescription(description) {
-    this.DESCRIPTION = description.indexOf(this.baseDirectory) === 0 ? description.substring(this.baseDirectory.length+1) : description
+    this.DESCRIPTION = description.indexOf(this.baseDirectory) === 0 ? description.substring(this.baseDirectory.length) : description
   }
   
   executeDDL(ddl) {
@@ -316,7 +323,7 @@ class FileDBI extends YadamuDBI {
       this.ENCRYPTION_KEY = this.parameters.PASSPHRASE
 	                      // Connection level passphrase specified - Generate a new Key
 	                      ? await this.yadamu.generateCryptoKey(this.parameters)
-				 	      : this.yadamu.parameters.ENCRYPTION_KEY_AVAILABLE 
+				 	      : this.yadamu.ENCRYPTION_KEY_AVAILABLE 
 						  // Use prcoess level encryption key
 				 	      ? this.yadamu.ENCRYPTION_KEY
 						  // Generate a connection level passphrase - Will take it from YADAMU_PASSPHRASE environment variable or prompt
@@ -328,7 +335,7 @@ class FileDBI extends YadamuDBI {
     return new Promise((resolve,reject) => {
 	  const stack = new Error().stack
       const is = fs.createReadStream(this.FILE)
-      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
+      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,this.FILE) : new FileError(this,err,stack,this.FILE) )})
     })
   }
   
@@ -374,7 +381,7 @@ class FileDBI extends YadamuDBI {
 	  this.OUTPUT_STREAM_OFFSET = 0;
 	  const stack = new Error().stack
       ws.on('open',() => {resolve(ws)})
-	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
+	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this,err,stack,this.FILE) : new FileError(this,err,stack,this.FILE) )})
 	})
   }
   
@@ -588,7 +595,7 @@ class FileDBI extends YadamuDBI {
 
     let cause	  
 	try {
-      cause = new FileError(this.DRIVER_ID,new Error(`Unable to load Initialization Vector from "${this.FILE}".`))
+      cause = new FileError(this,new Error(`Unable to load Initialization Vector from "${this.FILE}".`))
 	  const fd = await fsp.open(this.FILE)
       const iv = new Uint8Array(this.IV_LENGTH)
 	  const results = await fd.read(iv,0,this.IV_LENGTH,0)
@@ -770,15 +777,43 @@ class FileDBI extends YadamuDBI {
 	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
 	}
 
-    const outputFilePath = path.resolve(options.filename)
+    const outputFilePath = path.resolve(options.target)
 	const inputFilePath = this.FILE;
     this.FILE = outputFilePath
-	await this.createOutputStream()
-	streams.push(this.outputStream)
+	const ws = await this.createWriteStream()
+	streams.push(ws)
 	this.LOGGER.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE,options.encryptedInput ? 'DECRYPT' : 'ENCRYPT'],`File: "${inputFilePath}" ==> "${outputFilePath}"`)
+	
 	return streams;
   }
-    
+
+  async convertFile(encrypt) {
+	const options = {
+	  encryptedInput   : !encrypt
+	, compressedInput  : false
+	, encryptedOutput  : encrypt
+	, compressedOutput : false
+	, target         : `${this.FILE}.${encrypt ? 'secure' : 'plain'}`
+    }
+	
+	let activeStreams = []
+    try {
+	  const pipelineComponents = await this.createCloneStream(options)
+      activeStreams = pipelineComponents.map((s) => { 
+	    return finished(s).catch((e) => { 
+		  // Under certain circumstance it appears that errors in the streams are not correclty handled in allSettled and escape as unhandled rejections. 
+		  // Flase the error as ignorable (it will be handled by the try/catch on the pipeline operation and swallow it.
+		  e.ignoreUnhandledRejection = true
+		})
+	  })
+	  await pipeline(...pipelineComponents)
+    } catch (e) {
+	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
+ 	  await Promise.allSettled(activeStreams)
+      throw e;
+    }
+  } 
+  
   async createConnectionPool() { /* OVERRIDE */ }
   
   async getConnectionFromPool() { /* OVERRIDE */ }
@@ -786,12 +821,7 @@ class FileDBI extends YadamuDBI {
   async closeConnection() { /* OVERRIDE */ }
   
   async closePool() { /* OVERRIDE */ }
-  
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new FileCompare(this,configuration)
-  }
-  
+    
   async truncateTable() {
 	  
 	if (this.USE_COMPRESSION || this.USE_ENCRYPTION) {
@@ -809,9 +839,10 @@ class FileDBI extends YadamuDBI {
       const ws = fs.createWriteStream(this.outputStream.path,{flags :"a"})
 	  const stack = new Error().stack
       ws.on('open',() => {resolve(ws)})
-	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
+	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this,err,stack,this.FILE) : new FileError(this,err,stack,this.FILE) )})
 	})
   }
+  
 	  
 }
 

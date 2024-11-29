@@ -18,6 +18,8 @@ import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 /* Yadamu DBI */                                    
 
+import DatabaseError                  from './awsS3Exception.js';
+
 import CloudDBI                       from '../cloud/cloudDBI.js';
 import DBIConstants                   from '../base/dbiConstants.js'
 
@@ -25,7 +27,6 @@ import DBIConstants                   from '../base/dbiConstants.js'
 							          							          
 import AWSS3Constants                 from './awsS3Constants.js';
 import AWSS3StorageService            from './awsS3StorageService.js';
-import AWSS3Error                     from './awsS3Exception.js';
 
 class AWSS3DBI extends CloudDBI {
  
@@ -128,12 +129,10 @@ class AWSS3DBI extends CloudDBI {
   
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+
+	this.DATABASE_ERROR = DatabaseError
   }    
    
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new AWSS3Error(driverId,cause,stack,sql)
-  }
-  
   getCredentials(vendorKey) {
 	 
 	switch (vendorKey) {

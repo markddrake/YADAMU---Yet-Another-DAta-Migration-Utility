@@ -102,7 +102,7 @@ class FileCompare extends YadamuCompare {
     })
   }
 
-  async compareFiles(grandparent,parent,child,metrics) {
+  async compareFiles(grandparent = this.configuration.target.files[0],parent = this.configuration.target.files[1],child = this.configuration.target.files[2],metrics = this.configuration.metrics) {
 
 	let colSizes = [128, 18, 12, 12, 12, 12]
  
@@ -167,7 +167,7 @@ class FileCompare extends YadamuCompare {
 	const failedOperations = []
     tables.forEach((table,idx) => {
 	  const tableName = table;
- 	  const mappedTableName = this.dbi.getMappedTableName(tableName,this.dbi.IDENTIFIER_MAPPINGS)
+ 	  const mappedTableName = this.dbi.getMappedTableName(tableName,this.configuration.identifierMappings)
       const tableTimings = (metrics[0][tableName].elapsedTime.toString() + "ms").padStart(10) 
                          + (metrics[1][mappedTableName] ? (metrics[1][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10)
                          + (metrics[2][mappedTableName] ? (metrics[2][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10) 

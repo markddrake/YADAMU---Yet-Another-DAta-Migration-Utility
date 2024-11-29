@@ -45,9 +45,9 @@ class OracleError extends DatabaseError {
 	return args
   }
  
-  constructor(driverId,cause,stack,sql,args,outputFormat) {
+  constructor(dbi,cause,stack,sql,args,outputFormat) {
 	
-	super(driverId,cause,stack,sql);
+	super(dbi,cause,stack,sql);
 
 	if (this.lostConnection() ) {
 	  // this.cause.ignoreUnhandledRejection = true
@@ -136,8 +136,8 @@ class OracleError extends DatabaseError {
 }
 
 class StagingFileError extends OracleError {
-  constructor(driverId,local,remote,cause) {
-	super(driverId,cause,cause.stack,cause.sql,cause.args,cause.outputFormat)
+  constructor(dbi,local,remote,cause) {
+	super(dbi,cause,cause.stack,cause.sql,cause.args,cause.outputFormat)
 	this.message = `Oracle Copy Operation Failed. File Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Oracle databases.`
 	this.stack = cause.stack
     this.cause = cause

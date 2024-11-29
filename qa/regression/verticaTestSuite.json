@@ -4,7 +4,7 @@
 , "tasks"             : "tasks.json"
 , "recreateSchema"    : true
 , "parameters": {
-   "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/verticaMappings.json"
+    "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/verticaMappings.json"
   , "MERGEOUT_INSERT_COUNT"    : 128
   }
 , "tests"               : [{

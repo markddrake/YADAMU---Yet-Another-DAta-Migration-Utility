@@ -20,8 +20,9 @@ class YadamuRejectManager {
     this.filename = filename;
 	
 	this.dbi = new ErrorDBI(yadamu,filename)
-	this.dbi.initialize()
-
+    // Moved to initialize
+	// this.dbi.initialize();
+	
 	// Use a NULL Logger in production.
     // this.logger =  YadamuLogger.consoleLogger();
 	this.logger = YadamuLogger.NULL_LOGGER;
@@ -56,6 +57,7 @@ class YadamuRejectManager {
   
   async initialize(tableName) {
 	this.initialize = async () => { this.sendEndOfData() }
+	await this.dbi.initialize()
     await this.dbi.initializeImport();
 	await this.dbi.initializeData()
 	this.pipeline = pipeline(this.is,...this.dbi.getOutputStreams(tableName,{}),{end:false})

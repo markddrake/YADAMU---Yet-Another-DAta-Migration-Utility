@@ -31,7 +31,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     async initialize() {
                 
       // Must (re) create the database before attempting to connection. initialize() will fail if the database does not exist.
-      if (this.options.recreateSchema === true) {
+      if ((this.options.recreateSchema === true) && (this.ROLE === 'WRITER')) {
         await this.recreateDatabase();
         this.options.recreateSchema = false
       }
@@ -50,12 +50,12 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     */    
 
     async recreateDatabase() {
-
+		
       try { 
         const dbi = new MsSQLDBMgr(this.yadamu,this.CONNECTION_SETTINGS)
-        await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE)
+        await dbi.recreateDatabase(this.parameters.DATABASE)
       } catch (e) {
-        this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.YADAMU_DATABASE],e);
+        this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.DATABASE],e);
         throw e
       }
     }
@@ -88,7 +88,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
               this.LOGGER.log(tags,`Worker finished prior to termination.`)
             }
             else {
-              const cause = this.createDatabaseError(this.DRIVER_ID,e,stack,sqlStatement)
+              const cause = this.createDatabaseError(e,stack,sqlStatement)
               this.LOGGER.handleException(tags,cause)
             }
           } 

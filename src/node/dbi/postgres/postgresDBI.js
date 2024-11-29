@@ -53,16 +53,17 @@ import {
 }                                    from '../file/fileException.js'
 
 /* Vendor Specific DBI Implimentation */                                   
+
+import Comparitor                    from './postgresCompare.js'
+import DatabaseError                 from './postgresException.js'
+import DataTypes                     from './postgresDataTypes.js'
+import Parser                        from './postgresParser.js'
+import StatementGenerator            from './postgresStatementGenerator.js'
+import StatementLibrary              from './postgresStatementLibrary.js'
+import OutputManager                 from './postgresOutputManager.js'
+import Writer                        from './postgresWriter.js'
 						          
 import PostgresConstants             from './postgresConstants.js'
-import PostgresDataTypes             from './postgresDataTypes.js'
-import PostgresError                 from './postgresException.js'
-import PostgresParser                from './postgresParser.js'
-import PostgresOutputManager         from './postgresOutputManager.js'
-import PostgresWriter                from './postgresWriter.js'
-import PostgresStatementGenerator    from './postgresStatementGenerator.js'
-import PostgresStatementLibrary      from './postgresStatementLibrary.js'
-import PostgresCompare               from './postgresCompare.js'
 
 class PostgresDBI extends YadamuDBI {
     
@@ -137,7 +138,7 @@ class PostgresDBI extends YadamuDBI {
   get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED ? this.parameters.SPATIAL_FORMAT || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT : 'GeoJSON' };
   get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 							          
-  get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || PostgresDataTypes.storageOptions.JSON_TYPE }
+  get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || DataTypes.storageOptions.JSON_TYPE }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
@@ -173,18 +174,24 @@ class PostgresDBI extends YadamuDBI {
   }	 
   
   constructor(yadamu,manager,connectionSettings,parameters) {
+	  
     super(yadamu,manager,connectionSettings,parameters)
-	this.DATA_TYPES = PostgresDataTypes
-
+	
+	this.COMPARITOR_CLASS = Comparitor
+    this.DATABASE_ERROR_CLASS = DatabaseError
+    this.PARSER_CLASS = Parser
+    this.STATEMENT_GENERATOR_CLASS = StatementGenerator
+    this.STATEMENT_LIBRARY_CLASS = StatementLibrary
+    this.OUTPUT_MANAGER_CLASS = OutputManager
+    this.WRITER_CLASS = Writer
+	
+	this.DATA_TYPES = DataTypes
 	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.PGSQL_JSON_STORAGE_OPTION    || this.DBI_PARAMETERS.JSON_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.JSON_TYPE
 
     this.pgClient = undefined;
     this.useBinaryJSON = false
     
-    this.StatementLibrary = PostgresStatementLibrary
-    this.statementLibrary = undefined
-	
-	this.postgresStack = new Error().stack
+    this.postgresStack = new Error().stack
     this.postgresOperation = undefined
   }
 
@@ -193,18 +200,16 @@ class PostgresDBI extends YadamuDBI {
   ** Local methods 
   **
   */
-  createDatabaseError(driverId,cause,stack,sql) {
-    return new PostgresError(driverId,cause,stack,sql)
-  }
-  
-  
+
   async testConnection() {   
+    let stack
     try {
+	  stack = new Error().stack
       const pgClient = new Client(this.CONNECTION_PROPERTIES)
       await pgClient.connect()
       await pgClient.end()     							  
 	} catch (e) {
-      throw e;
+      throw this.createDatabaseError(e,stack,'testConnection.getConnection()')
 	}
 	
   }
@@ -218,7 +223,7 @@ class PostgresDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation)
+	  // const pgErr = this.createDatabaseException(err,this.postgresStack,this.postgresOperation)
       this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','POOL'],err.message)
     })
 
@@ -239,7 +244,7 @@ class PostgresDBI extends YadamuDBI {
       this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.connect()')
+	  throw this.getDatabaseException(e,stack,'pg.Pool.connect()')
 	}
   }
 
@@ -261,22 +266,24 @@ class PostgresDBI extends YadamuDBI {
       await this.configureConnection()
       return this.connection
 	} catch (e) {
-      throw this.getDatabaseException(this.DRIVER_ID,e,stack,operation)
+      throw this.getDatabaseException(e,stack,operation)
 	}
   }
   
   async getPostgisInfo() {
   
+    let stack
     try {
-      const results = await this.executeSQL(this.StatementLibrary.SQL_POSTGIS_INFO)
+	  stack = new Error().stack
+      const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_POSTGIS_INFO)
 	  return results.rows[0][0];
-	} catch (e) {
-      if ((e instanceof PostgresError) && e.postgisUnavailable()) {
+	} catch (sqlError) {
+      if ((sqlError instanceof DatabaseError) && sqlError.postgisUnavailable()) {
         // ### What to do about SystemInfo.SPATIAL_FORMAT There can be no Geography or Geometry columns without POSTGIS
         return "Not Installed"
       }
       else {
-        throw e;
+        throw sqlError
       }
     }
   }
@@ -297,13 +304,13 @@ class PostgresDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.createDatabaseException(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation)
+	  // const pgErr = this.createDatabaseException(err,this.postgresStack,this.postgresOperation)
       this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,'ON ERROR','CONNECTION'],err.message)
 	})
    
-    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)				
 	
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
 	this._DATABASE_VERSION = results.rows[0][3];
 	
 	this.POSTGIS_VERSION = await this.getPostgisInfo()
@@ -325,7 +332,7 @@ class PostgresDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.getDatabaseException(this.DRIVER_ID,e,stack,'Client.release()')
+		const err = this.getDatabaseException(e,stack,'Client.release()')
 		this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
       }
@@ -344,7 +351,7 @@ class PostgresDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.getDatabaseException(this.DRIVER_ID,e,stack,'pg.Pool.close()')
+	    throw this.getDatabaseException(e,stack,'pg.Pool.close()')
 	  }
 	}
   }
@@ -385,7 +392,7 @@ class PostgresDBI extends YadamuDBI {
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -418,7 +425,7 @@ class PostgresDBI extends YadamuDBI {
 
      // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
+     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION)
 	 super.beginTransaction()
 
   }
@@ -434,7 +441,7 @@ class PostgresDBI extends YadamuDBI {
     // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
-    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_COMMIT_TRANSACTION)
 	
   }
 
@@ -455,7 +462,7 @@ class PostgresDBI extends YadamuDBI {
 
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_ROLLBACK_TRANSACTION)
 	} catch (newIssue) {
 	  this.checkCause('ROLBACK TRANSACTION',cause,newIssue)								   
 	}
@@ -465,7 +472,7 @@ class PostgresDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
   }
   
@@ -480,7 +487,7 @@ class PostgresDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
       super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue)
@@ -491,7 +498,7 @@ class PostgresDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RELEASE_SAVE_POINT)    
     super.releaseSavePoint()
 
   } 
@@ -525,7 +532,7 @@ class PostgresDBI extends YadamuDBI {
    	  const is = await new Promise((resolve,reject) => {
         const stack = new Error().stack
         const inputStream = fs.createReadStream(importFilePath);
-        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this,err,stack,importFilePath) : new FileError(this,err,stack,importFilePath) )})
       })
 	  
 	  const rl = readline.createInterface({input: is, crlfDelay: Infinity})
@@ -549,7 +556,7 @@ class PostgresDBI extends YadamuDBI {
       return elapsedTime;
     }
     catch (e) {
-      const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,copyStatement)
+      const cause = this.getDatabaseException(e,stack,copyStatement)
 	  throw cause
 	}
   }
@@ -562,7 +569,7 @@ class PostgresDBI extends YadamuDBI {
       elapsedTime = await this.loadStagingTable(importFilePath)
     }
     catch (e) {
-	  if ((e instanceof PostgresError) && e.bjsonTooLarge()) {
+	  if ((e instanceof DatabaseError) && e.bjsonTooLarge()) {
         this.LOGGER.info([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable()
@@ -593,7 +600,7 @@ class PostgresDBI extends YadamuDBI {
 	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU.YADAMU_IMPORT_JSONB' : 'YADAMU.YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
-	const typeMappings = await this.getVendorDataTypeMappings(PostgresStatementGenerator)
+	const typeMappings = await this.getVendorDataTypeMappings()
     
   	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
@@ -634,7 +641,7 @@ class PostgresDBI extends YadamuDBI {
 
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
 	return Object.assign(
 	  super.getSystemInformation()
@@ -670,17 +677,13 @@ class PostgresDBI extends YadamuDBI {
 	, "postgisInstalled"   : this.POSTGIS_INSTALLED
 	}
 	
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,options])
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,options])
 	if ((results.rowCount === 1) && Array.isArray(results.rows[0][6])) { // EXPORT_JSON returned Errors
        this.processLog(results.rows[0][6],`EXPORT_JSON('${this.CURRENT_SCHEMA}','${this.SPATIAL_FORMAT}')`)
 	}
 	// console.dir(results,{depth:null})
     return this.generateSchemaInfo(results.rows)
   }
-
-  _getParser(queryInfo,pipelineState) {
-    return new PostgresParser(this,queryInfo,pipelineState,this.LOGGER)
-  }  
 
   async _getInputStream(queryInfo) {        
   
@@ -743,7 +746,7 @@ class PostgresDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,queryInfo.SQL_STATEMENT)
+		const cause = this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -802,17 +805,9 @@ class PostgresDBI extends YadamuDBI {
 	  this.DATA_TYPES.GEOGRAPHY_TYPE = this.DATA_TYPES.SPATIAL_TYPE
 	  this.DATA_TYPES.GEOMETRY_TYPE = this.DATA_TYPES.SPATIAL_TYPE
 	}	  
-    return await super.generateStatementCache(PostgresStatementGenerator, schema)
+    return await super.generateStatementCache(schema)
   }
 
-  getOutputManager(tableName,pipelineState) {
-	 return super.getOutputManager(PostgresOutputManager,tableName,pipelineState)
-  }
-
-  getOutputStream(tableName,pipelineState) {
-	 return super.getOutputStream(PostgresWriter,tableName,pipelineState)
-  }
- 
   classFactory(yadamu) {
 	return new PostgresDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
@@ -860,10 +855,6 @@ class PostgresDBI extends YadamuDBI {
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `)
   }
 
-  async getComparator(configuration) {
-	 await this.initialize()
-	 return new PostgresCompare(this,configuration)
-  }
 
 }
 

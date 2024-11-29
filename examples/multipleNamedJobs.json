@@ -1,0 +1,60 @@
+{
+    "connections": {
+        "oracle#1": {
+            "oracle": {
+                "user": "SYSTEM",
+                "password": "oracle",
+                "connectString": "YDB21903"
+            }
+        }
+    },
+    "schemas": {
+        "HR": {
+            "schema": "HR"
+        },
+        "HR1": {
+            "schema": "HR1"
+        },
+        "OE": {
+            "schema": "OE"
+        },
+        "OE1": {
+            "schema": "OE1"
+        }
+    },
+    "parameters": {
+        "MODE": "DATA_ONLY"
+    },
+    "jobs": {
+        "JOB1": {
+            "source": {
+                "connection": "oracle#1",
+                "schema": "HR"
+            },
+            "target": {
+                "connection": "oracle#1",
+                "schema": "HR1"
+            },
+            "parameters": {
+                "MODE": "DATA_ONLY",
+                "TRUNCATE_ON_LOAD": true,
+                "ENCRYPTION": false
+            }
+        },
+        "JOB2": {
+            "source": {
+                "connection": "oracle#1",
+                "schema": "OE"
+            },
+            "target": {
+                "connection": "oracle#1",
+                "schema": "OE1"
+            },
+            "parameters": {
+                "MODE": "DATA_ONLY",
+                "TRUNCATE_ON_LOAD": true,
+                "ENCRYPTION": false
+            }
+        }
+    }
+}

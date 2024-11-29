@@ -41,7 +41,7 @@ class TeradataReader extends Readable {
           resolve(response)
         }
         else {
-          reject(response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : new TeradataError(this.DRIVER_ID,response.cause,stack,`${response.action}(${this.sqlStatement})`))
+          reject(response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : new TeradataError(this.worker,response.cause,stack,`${response.action}(${this.sqlStatement})`))
         }
       })
     })
@@ -79,7 +79,7 @@ class TeradataReader extends Readable {
 		  } 
         }
         else {
-          throw data.name === 'TeradataError' ? TeradataError.recreateTeradataError(data.cause) : new TeradataError(this.DRIVER_ID,data.cause,stack,`${data.action}(${this.sqlStatement})`)
+          throw data.name === 'TeradataError' ? TeradataError.recreateTeradataError(data.cause) : new TeradataError(this.worker,data.cause,stack,`${data.action}(${this.sqlStatement})`)
         }
 	  })
 	}

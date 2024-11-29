@@ -1,20 +1,20 @@
 
-import YadamuLibrary      from '../lib/yadamuLibrary.js'
-
-import YadamuCLI          from './yadamuCLI.js'
+import YadamuCLI              from './yadamuCLI.js'
 
 class Copy extends YadamuCLI {}
+
+export { Copy as default}
 
 async function main() {
   
   try {
-	const yadamuCopy = new Copy();
+	const copy = new Copy();
     try {
-      await yadamuCopy.doCopy();
+      await copy.doCopy()
     } catch (e) {
-	  yadamuCopy.reportError(e)
+	  copy.reportError(e)
     }
-    await yadamuCopy.close();
+    await copy.close();
   } catch (e) {
     YadamuLibrary.reportError(e)
   }
@@ -23,4 +23,3 @@ async function main() {
 
 main()
 
-export { Copy as default}

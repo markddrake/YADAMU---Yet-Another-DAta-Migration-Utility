@@ -4,8 +4,8 @@ import MySQLConstants from './mysqlConstants.js'
 
 class MySQLError extends DatabaseError {
   
-  constructor(driverId,cause,stack,sql) {
-    super(driverId,cause,stack,sql);
+  constructor(dbi,cause,stack,sql) {
+    super(dbi,cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if (this.sql.indexOf('),(') > 0) {
 	  const startElipises = this.sql.indexOf('),(') + 2

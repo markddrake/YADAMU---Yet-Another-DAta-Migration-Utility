@@ -17,6 +17,7 @@ class MsSQLCompare extends YadamuCompare {
 	
    async getRowCounts(target) {
      await this.useDatabase(target.database);
+	 this.dbi.SQL_TRACE.traceSQL(MsSQLCompare.SQL_SCHEMA_TABLE_ROWS)
      const results = await this.dbi.pool.request().input('SCHEMA',this.dbi.sql.VarChar,target.owner).query(MsSQLCompare.SQL_SCHEMA_TABLE_ROWS);
      return results.recordset.map((row,idx) => {          
        return [target.owner === 'dbo' ? target.database : target.owner,row.TableName,parseInt(row.RowCount)]

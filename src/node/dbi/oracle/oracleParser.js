@@ -17,25 +17,8 @@ class OracleParser extends YadamuParser {
 
   constructor(dbi,queryInfo,pipelineState,yadamuLogger) {
     super(dbi,queryInfo,pipelineState,yadamuLogger)
-        dbi.PARSER = this
+        dbi.ACTIVE_PARSER = this
   }
-
-  fetchLobContent = (row,idx)  => {
-    row[idx] = new Promise((resolve,reject) => {
-       const stack = new Error().stack
-       row[idx].getData().then((data) => {
-         resolve(data)
-       }).catch((e) => {
-         const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
-         if (cause.lostConnection()) {
-           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
-           resolve(null)
-         }
-         reject(cause)
-       })
-     })
-  }
-
 
   fetchLobContent = (row,idx)  => {
     const stack = new Error().stack
@@ -44,7 +27,7 @@ class OracleParser extends YadamuParser {
   	    row[idx] = data
 	    resolve()
       }).catch((e) => {
-        const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
+        const cause = this.dbi.createDatabaseError(e,stack,'LOB.getData()')
         if (cause.lostConnection()) {
           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
           row[idx] = null
@@ -61,7 +44,7 @@ class OracleParser extends YadamuParser {
   	    row[idx] = data.toString('utf-8')
 	    resolve()
       }).catch((e) => {
-        const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
+        const cause = this.dbi.createDatabaseError(e,stack,'LOB.getData()')
         if (cause.lostConnection()) {
           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
           row[idx] = null
@@ -78,7 +61,7 @@ class OracleParser extends YadamuParser {
 	    row[idx] = YadamuSpatialLibrary.geoJSONtoWKB(JSON.parse(data))
 	    resolve()
       }).catch((e) => {
-        const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,e,stack,'LOB.getData()')
+        const cause = this.dbi.createDatabaseError(e,stack,'LOB.getData()')
         if (cause.lostConnection()) {
           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
           row[idx] = null
@@ -157,7 +140,7 @@ class OracleParser extends YadamuParser {
       return data
     } catch(err) {
       console.log(err)
-      const cause = this.dbi.createDatabaseError(this.dbi.DRIVER_ID,err,new Error().stack,this.constructor.name)
+      const cause = this.dbi.createDatabaseError(err,new Error().stack,this.constructor.name)
       // cause.ignoreUnhandledRejection = true
       throw cause.lostConnection() ? cause : err
     }

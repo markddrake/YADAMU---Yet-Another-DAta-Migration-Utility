@@ -7,10 +7,11 @@ import fsp from 'fs/promises';
 import path from 'path';
 
 import Yadamu              from '../../core/yadamu.js';
+import YadamuQALibrary     from '../../lib/yadamuQALibrary.js'
 
 import FileDBI             from '../../../node/dbi/file/fileDBI.js';
 
-class FileQA extends FileDBI {
+class FileQA extends YadamuQALibrary.fileQAMixin(FileDBI) {
    
   static #DBI_PARAMETERS
 	

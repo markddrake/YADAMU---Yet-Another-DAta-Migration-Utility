@@ -103,7 +103,8 @@ class AWSS3StorageService {
 	    input.params.Body.destroy()
 	    resolve(input.params.Key)
 	  }).catch((err) => {
-        const cause = this.dbi.getDatabaseException(this.dbi.DRIVER_ID,err,stack,operation)
+
+        const cause = this.dbi.getDatabaseException(err,stack,operation)
         this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,input.params.Key],err);
         input.params.Body.destroy(err)
 	    reject(cause)
@@ -128,7 +129,7 @@ class AWSS3StorageService {
 	    stack = new Error().stack
 	    let output = await this.s3Client.send(command)
       } catch (e) {
-		const cause = this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation) 
+		const cause = this.dbi.getDatabaseException(e,stack,operation) 
 		if (cause.notFound()) {
 	      operation = `S3Client.CreateBucketCommand(${JSON.stringify(input)})`
 		  const command = new CreateBucketCommand (input)
@@ -139,7 +140,7 @@ class AWSS3StorageService {
 		throw cause
 	  }
 	} catch (e) { 
-      throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+      throw this.dbi.getDatabaseException(e,stack,operation)
 	}
   }
 
@@ -155,7 +156,7 @@ class AWSS3StorageService {
 	  const output = await this.s3Client.send(command)	 
 	  return output
 	} catch (e) { 
-      throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+      throw this.dbi.getDatabaseException(e,stack,operation)
 	}
   }
   
@@ -182,7 +183,7 @@ class AWSS3StorageService {
 	  const output = await this.s3Client.send(command)	 
 	  return output;
     } catch (e) {
-      throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+      throw this.dbi.getDatabaseException(e,stack,operation)
 	}
   }
     
@@ -199,7 +200,7 @@ class AWSS3StorageService {
 	  const output = await this.s3Client.send(command)	 
 	  return output;
     } catch (e) {
-      throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+      throw this.dbi.getDatabaseException(e,stack,operation)
 	}
   }
 
@@ -227,7 +228,7 @@ class AWSS3StorageService {
 	    const output = await this.s3Client.send(command)	 
   	    return output;
 	  } catch (e) {
-	    const awsError = this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+	    const awsError = this.dbi.getDatabaseException(e,stack,operation)
         if (awsError.notFound() && this.retryOperation(retryCount)) { 
 		  await setTimeout(e.retryDelay)
 		  retryCount++
@@ -262,7 +263,7 @@ class AWSS3StorageService {
 		stack = new Error().stack
 	    folder = await this.s3Client.send(command)	 
       } catch (e) {
-        throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+        throw this.dbi.getDatabaseException(e,stack,operation)
 	  }
 	  if (folder.KeyCount === 0) break;
 	  const deleteinput = {
@@ -275,7 +276,7 @@ class AWSS3StorageService {
         const command = new DeleteObjectsCommand(deleteinput)
         await this.s3Client.send(command)	 
       } catch (e) {
-        throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,operation)
+        throw this.dbi.getDatabaseException(e,stack,operation)
 	  }
 	} while (folder.IsTruncated);
   }
@@ -295,7 +296,7 @@ class AWSS3StorageService {
       stack = new Error().stack
 	  await this.s3Client.deleteObjects(deleteinput).promise();
     } catch (e) {
-      throw this.dbi.getDatabaseException(this.dbi.DRIVER_ID,e,stack,`S3Client.deleteObjects(s3://${this.dbi.BUCKET}/${deleteinput.Delete.Objects.length})`)
+      throw this.dbi.getDatabaseException(e,stack,`S3Client.deleteObjects(s3://${this.dbi.BUCKET}/${deleteinput.Delete.Objects.length})`)
 	}
 	*/
   }

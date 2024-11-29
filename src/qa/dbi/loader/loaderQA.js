@@ -32,7 +32,7 @@ class CloudService {
     return new Promise((resolve,reject) => {
 	  const stack = new Error().stack
       const is = fs.createReadStream(path);
-      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,path) : new FileError(this.DRIVER_ID,err,stack,path) )})
+      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,path) : new FileError(err,stack,path) )})
     })
   }
 }
@@ -51,23 +51,25 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
   }	
 			
   async recreateSchema() {
-	  
+	
+    // Set the TARGET_DIRECTORY
+	
     this.DIRECTORY = this.TARGET_DIRECTORY
-    
+	
 	let stack
 	try {
 	  stack = new Error().stack;
       await fsp.rm(this.IMPORT_FOLDER,{recursive: true, force: true})
 	} catch(err) {
 	  if (err.code !== 'ENOENT') {
-	    throw new FileError(this.DRIVER_ID,err,stack,this.IMPORT_FOLDER);
+	    throw new FileError(err,stack,this.IMPORT_FOLDER);
 	  }
 	}
 	try {
 	  stack = new Error().stack;
       await fsp.mkdir(this.IMPORT_FOLDER,{recursive: true})
 	} catch(err) {
-      throw err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.IMPORT_FOLDER) : new FileError(this.DRIVER_ID,err,stack,this.IMPORT_FOLDER)
+      throw err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.IMPORT_FOLDER) : new FileError(err,stack,this.IMPORT_FOLDER)
 	}
   }
  

@@ -78,7 +78,7 @@ class TeradataDBI extends _TeradataDBI {
 		  resolve(response)
 		}
         else {
-		  reject(this.trackExceptions( response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : this.createDatabaseError(this.DRIVER_ID,response.cause,task.sql)))
+		  reject(this.trackExceptions( response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : this.createDatabaseError(response.cause,task.sql)))
 	    }
       })
 	})
@@ -180,7 +180,7 @@ class TeradataDBI extends _TeradataDBI {
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.getDatabaseException(this.DRIVER_ID,e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

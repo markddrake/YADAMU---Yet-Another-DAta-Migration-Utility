@@ -14,6 +14,12 @@
      }
    , "HR1"                            : {
        "schema"                       : "HR1"
+     }      
+  , "OE"                             : {
+       "schema"                      : "OE"
+     }
+   , "OE1"                            : {
+       "schema"                       : "OE1"
      }       
   }
  ,"parameters"                      : {
@@ -30,7 +36,23 @@
       }
      ,"parameters"                  : {
         "MODE"                      : "DATA_ONLY",
-		"TRUNCATE_ON_LOAD"          : true
+		"TRUNCATE_ON_LOAD"          : true,
+	    "ENCRYPTION"                : false
       }
-   }]
+   },
+  {
+    "source": {
+        "connection": "oracle#1",
+        "schema": "OE"
+    },
+    "target": {
+        "connection": "oracle#1",
+        "schema": "OE1"
+    },
+    "parameters": {
+        "MODE": "DATA_ONLY",
+        "TRUNCATE_ON_LOAD": true,
+        "ENCRYPTION": false
+    }
+}]
 }
