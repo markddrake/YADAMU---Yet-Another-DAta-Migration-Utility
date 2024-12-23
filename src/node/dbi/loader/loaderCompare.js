@@ -49,7 +49,6 @@ class LoaderCompare extends YadamuCompare {
       const rowCounts = await Promise.all(fileList.map(async (file) => {
         const exportFilePath = this.dbi.makeAbsolute(file)
         const streams = []
-		this.dbi.controlFile = controlFile
         try {
           streams.push(...await this.dbi.compareInputStreams(exportFilePath))
         } catch (e) {
@@ -71,7 +70,23 @@ class LoaderCompare extends YadamuCompare {
       return rowCounts.reduce((a, b) => {return a + b}, 0)
       
     }
-    
+	
+	csvRowCount(exportFilePath) {
+      return new Promise((resolve, rejecct) => {
+	      let count = 0
+     	  fs.createReadStream(this.dbi.makeRelative(exportFilePath)).pipe(this.dbi.getCSVParser()).on('data', (data) => {count++}).on('end', () => {resolve(count)}).on('error',(e) => {reject(e)})
+		})
+	}
+	
+    async getCSVRowCount(controlFile, tableInfo) {
+      const fileList = controlFile.data[tableInfo.TABLE_NAME].files || [controlFile.data[tableInfo.TABLE_NAME].file]
+      const rowCounts = await Promise.all(fileList.map(async (file) => {
+        const exportFilePath = this.dbi.makeAbsolute(file)
+        return this.csvRowCount(exportFilePath)
+      }))
+	  return rowCounts.reduce((a, b) => {return a + b}, 0)
+    }
+   	
     async getRowCounts(target) {
 
       this.dbi.DIRECTORY = this.dbi.TARGET_DIRECTORY
@@ -79,6 +94,8 @@ class LoaderCompare extends YadamuCompare {
       
       const fileContents =  await this.dbi.cloudService.getContentAsString(this.dbi.CONTROL_FILE_PATH)     
       const controlFile = this.dbi.parseJSON(fileContents)
+      this.dbi.controlFile = controlFile
+	  
       let counts 
       switch (controlFile.settings.contentType) {
         case 'JSON':
@@ -90,14 +107,9 @@ class LoaderCompare extends YadamuCompare {
             return [target,k,counts[i]]
           })  
         case 'CSV':
-          stack = new Error().stack
-          counts = await Promise.all(Object.values(controlFile.data).map((t) => {
-            return new Promise((resolve,reject) => {
-              let count = 0;
-              fs.createReadStream(this.makeRelative(t.file)).pipe(this.getCSVParser()).on('data', (data) => {count++}).on('end', () => {resolve(count)});
-            })
+          counts = await Promise.all(Object.keys(controlFile.data).map((k) => {
+            return  this.getCSVRowCount(controlFile,{TABLE_NAME:k})
           }))
-           
           return Object.keys(controlFile.data).map((k,i) => {
             return [target,k,counts[i]]
           })  

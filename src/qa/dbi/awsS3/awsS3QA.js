@@ -1,4 +1,5 @@
-"use strict" 
+
+import csv              from 'csv-parser';
 
 import AWSS3DBI          from '../../../node/dbi/awsS3/awsS3DBI.js';
 import AWSS3Constants    from '../../../node/dbi/awsS3/awsS3Constants.js';
@@ -23,7 +24,6 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
     super(yadamu,manager,connectionSettings,parameters)
   }
 
-
   async initializeImport() {
     if (this.options.recreateSchema === true) {
  	  await this.recreateSchema();
@@ -33,6 +33,8 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
 
   classFactory(yadamu) {
     return new AWSS3QA(yadamu,this,this.connectionParameters,this.parameters)
-  }}
+  }
+
+}
  
 export { AWSS3QA as default }

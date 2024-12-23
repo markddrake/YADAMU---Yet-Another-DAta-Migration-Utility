@@ -6,6 +6,15 @@ class CloudCompare extends LoaderCompare {
   constructor(dbi,configuration) {
     super(dbi,configuration)
   }
+  
+  csvRowCount(exportFilePath) {
+	return new Promise((resolve, rejecct) => {
+      let count = 0
+      this.dbi.cloudService.createReadStream(exportFilePath).then((is) => {
+		 is.pipe(this.dbi.getCSVParser().on('data', (data) => {count++}).on('end', () => {resolve(count)}).on('error',(e) => {console.log(e);reject(e)}))
+      })
+	})
+  }
 
   async compareFiles(sourceFile,targetFile) {
 	let props = await this.dbi.cloudService.getObjectProps(sourceFile)

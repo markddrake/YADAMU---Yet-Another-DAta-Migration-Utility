@@ -4,6 +4,7 @@
 #VBoxManage natnetwork stop --netname cfgnet
 #VBoxManage dhcpserver remove --network=cfgnet
 #VBoxManage natnetwork remove --netname cfgnet
+echo "Configure VBox Network"
 VBoxManage natnetwork add --netname cfgnet --dhcp on --network  "10.10.10.0/24" --enable
 VBoxManage natnetwork modify --netname cfgnet --port-forward-4 "ssh:tcp:[]:1022:[10.10.10.101]:22"
 VBoxManage natnetwork modify --netname cfgnet --port-forward-4 "tdata:tcp:[]:1025:[10.10.10.101]:1025"
@@ -12,6 +13,7 @@ VBoxManage natnetwork start --netname cfgnet
 VBoxManage list --long natnets
 VBoxManage list --long dhcpservers
 #VBoxManage createvm  --name TDATA-17 --ostype OpenSUSE_64 --register --default
+echo "Importing Teradata VM"
 VBoxManage import Teradata_Database_17.10.02.01_SLES12_SP3_on_VMware_20210603130901.ova --vsys 0 --vmname TDATA-17  --basefolder /root/VBox/Appliances
 VBoxManage modifyvm TDATA-17 --memory 8192 --vram 64
 VBoxManage modifyvm TDATA-17 --nic1 none
@@ -26,16 +28,24 @@ VBoxManage createmedium disk --filename  "/root/VBox/Appliances/TDATA-17/disk-2.
 VBoxManage storageattach TDATA-17 --storagectl SATA --port 0 --medium  "/root/VBox/Appliances/TDATA-17/disk-0.vmdk" --type hdd
 VBoxManage storageattach TDATA-17 --storagectl SATA --port 1 --medium  "/root/VBox/Appliances/TDATA-17/disk-1.vmdk" --type hdd
 VBoxManage storageattach TDATA-17 --storagectl SATA --port 2 --medium  "/root/VBox/Appliances/TDATA-17/disk-2.vmdk" --type hdd
+echo "Starting Teradata VM"
 VBoxManage startvm TDATA-17 --type=headless
-tail -f ./.config/VirtualBox/VBoxSVC.log &
-tail -f ./VBox/Appliances/TDATA-17/Logs/VBox.log &
+echo "VBOX Service Log"
+cat ./.config/VirtualBox/VBoxSVC.log 
+echo "VBOX Log"
+cat ./VBox/Appliances/TDATA-17/Logs/VBox.log 
+echo "Teradata VM State"
 VBoxManage showvminfo TDATA-17
-sshpass -p iubm123 ssh -p 1022 -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" root@127.0.0.1 <<EOF
+echo "Creating Teradata Database"
+sshpass -p iubm123 ssh -p 1022 -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" root@127.0.0.1 /bin/bash  <<EOF
 tdvm-init
 America/Los_Angeles
 time.nist.gov
 iumb123
 EOF
-echo 'Created Teradata instance'
+echo 'Created Teradata Database'
+tail -f ./.config/VirtualBox/VBoxSVC.log &
+tail -f ./VBox/Appliances/TDATA-17/Logs/VBox.log &
 #VBoxManage controlvm TDATA-17 acpipowerbutton
+echo "Sleeping"
 sleep 365d

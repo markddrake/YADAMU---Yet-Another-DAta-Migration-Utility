@@ -118,7 +118,7 @@ const _SQL_GATHER_SCHEMA_STATS = `begin dbms_stats.gather_schema_stats(ownname =
 // LEFT Join works in 11.x databases where 'EXTERNAL' column does not exist in ALL_TABLES
 
 const _SQL_SCHEMA_TABLE_ROWS = `select att.TABLE_NAME, NUM_ROWS 
-                              from ALL_TABLES att 
+                              from ALL_ALL_TABLES att 
 							  LEFT JOIN ALL_EXTERNAL_TABlES axt 
 							         on att.OWNER = axt.OWNER and att.TABLE_NAME = axt.TABLE_NAME 
 					    where att.OWNER = :target 

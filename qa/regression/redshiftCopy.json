@@ -7,11 +7,22 @@
 	"reloadStagingArea" : false,
 	"parameters": {
 		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/redshiftMappings.json",
-        "REMOTE_STAGING_AREA"     : "aws/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+        "REMOTE_STAGING_AREA"     : "aws/loader/%targetConnection%/csv/%sourceConnection%",
+		"DIRECTORY"               : "loader/csv/%sourceConnection%",
 		"TIMESTAMP_PRECISION"     : 6
 	},
 	"tests": [{
+            "operation": "copy",
+            "source": "redshift#1",
+            "target": "loader-staging",
+            "parameters": {
+		       "SPATIAL_FORMAT"          : "WKT",
+               "OUTPUT_FORMAT"           : "CSV"
+	         },
+	         "tasks": [
+                "oracle","mssql","mysql"
+            ]
+       },{
 			"source": "oracle#1",
 			"target": "redshift#1",
 			"tasks": [

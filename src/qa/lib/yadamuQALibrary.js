@@ -14,6 +14,7 @@ import {
   Writable
 }                      from 'stream'
 
+import csv             from 'csv-parser';
 
 import YadamuLibrary   from '../../node/lib/yadamuLibrary.js';
 import NullWriter      from '../../node/util/nullWritable.js';
@@ -157,7 +158,9 @@ class YadamuQALibrary {
       this.yadamu.parameters.ENCRYPTION = options.encryption
     }
 
-
+    getCSVParser() {
+	  return csv({headers: false})
+    }
   }  
 }
 

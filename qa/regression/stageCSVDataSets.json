@@ -1,0 +1,141 @@
+{
+	"operation": "copy",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"targetSchemaSuffix" : "",
+	"parameters": {
+		"DIRECTORY"               : "loader/csv/%sourceConnection%",
+        "OUTPUT_FORMAT"           : "CSV"
+	},
+	"tests": [{
+            "source": "oracle#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle19c",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle18c",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle12c",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle11g",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mssql19",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "postgres#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mysql#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mariadb#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "mongodb#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+            "source": "vertica#1",
+            "target": "loader-staging",
+	         "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "vertica10",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
+		    "source": "oracle#1",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ],
+	        "parameters": {
+		      "DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+   			  "SPATIAL_FORMAT"          : "WKT"
+	        }
+    },{
+		    "source": "oracle19c",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ],
+	        "parameters": {
+		      "DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+   			  "SPATIAL_FORMAT"          : "WKT"
+	        }
+    },{
+		    "source": "oracle18c",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ],
+	        "parameters": {
+		      "DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+   			  "SPATIAL_FORMAT"          : "WKT"
+	        }
+    },{
+		    "source": "oracle12c",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ],
+	        "parameters": {
+		      "DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+   			  "SPATIAL_FORMAT"          : "WKT"
+	        }
+    },{
+		    "source": "oracle11g",
+            "target": "loader-staging",
+            "tasks": [
+                "oracle","mssql","mysql"
+            ],
+	        "parameters": {
+		      "DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+   			  "SPATIAL_FORMAT"          : "WKT",
+              "OUTPUT_FORMAT"           : "CSV"
+	        }
+    }]
+}

@@ -107,9 +107,9 @@ class YadamuCopyManager {
 	return results
   }  
   
-  async copyStagedData(vendor,controlFile,metadata) {
+  async stagedDataCopy(vendor,controlFile,metadata) {
 
-    // this.LOGGER.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'copyStagedData()')
+    // this.LOGGER.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'stagedDataCopy()')
 
     this.dbi.verifyStagingSource(vendor)
 	

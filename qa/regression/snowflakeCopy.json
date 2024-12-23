@@ -6,8 +6,8 @@
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
 	"parameters": {
-        "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+        "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/csv/%sourceConnection%",
+		"DIRECTORY"               : "loader/csv/%sourceConnection%",
 		"SPATIAL_FORMAT"          : "WKT"
 	},
 	"tests": [{

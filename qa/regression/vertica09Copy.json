@@ -7,10 +7,21 @@
 	"reloadStagingArea" : false,
 	"parameters": {
 		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
-		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv"
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
+		"DIRECTORY"               : "loader/csv/%sourceConnection%",
 	},
 	"tests": [{
+            "operation": "copy",
+            "source": "vertica09",
+            "target": "loader-staging",
+            "parameters": {
+		       "SPATIAL_FORMAT"          : "WKT",
+               "OUTPUT_FORMAT"           : "CSV"
+	         },
+	         "tasks": [
+                "oracle","mssql","mysql"
+            ]
+       },{
 			"source": "vertica09",
 			"targets": [
 			   "vertica09"
@@ -95,9 +106,9 @@
 			"targets": [
 			   "vertica10"
 		    ],
-			"parameters": {
-  	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
-            },
+	        "parameters": {
+ 	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"
+	        },
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
@@ -106,9 +117,9 @@
 			"targets": [
 			   "vertica#1"
 		    ],
-			"parameters": {
-  	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
-            },
+	        "parameters": {
+ 	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"
+	        },
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
@@ -117,9 +128,9 @@
 			"targets": [
 			   "vertica09"
 		    ],
-			"parameters": {
-  	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
-            },
+	        "parameters": {
+ 	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"
+	        },
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
@@ -128,9 +139,9 @@
 			"targets": [
 			   "vertica09"
 		    ],
-			"parameters": {
-  	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
-            },
+	        "parameters": {
+ 	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"
+	        },
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

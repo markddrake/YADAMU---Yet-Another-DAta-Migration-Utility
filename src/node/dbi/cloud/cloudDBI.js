@@ -101,7 +101,7 @@ class CloudDBI extends LoaderDBI {
   }
 
   
-  async loadMetadataFiles(copyStagedData) {
+  async loadMetadataFiles(stagedDataCopy) {
     // this.LOGGER.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
  	const metadata = {}
     if (this.controlFile.metadata) {
@@ -112,7 +112,7 @@ class CloudDBI extends LoaderDBI {
         const json = this.parseJSON(content)
         metadata[json.tableName] = json;
         // json.dataFile = this.getDataFileName(json.tableName)
-        if (copyStagedData) {
+        if (stagedDataCopy) {
           json.dataFile = this.controlFile.data[json.tableName].files || this.controlFile.data[json.tableName].file 
         }
       })

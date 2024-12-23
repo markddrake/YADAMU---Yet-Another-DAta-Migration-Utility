@@ -5,8 +5,8 @@ import YadamuDataTypes        from '../base/yadamuDataTypes.js'
 class CSVParser extends YadamuParser {
 
   constructor(dbi,tableInfo,pipelineState,yadamuLogger) {
+	  console.log(1)
 	super(dbi,tableInfo,pipelineState,yadamuLogger)
-
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
       if (YadamuDataTypes.isBinary(dataType)) {

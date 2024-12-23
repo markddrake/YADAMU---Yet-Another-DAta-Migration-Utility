@@ -4,110 +4,147 @@
 	"tasks": "tasks.json",
 	"stagingArea": "loader-staging",
 	"recreateSchema": true,
-	"reloadStagingArea" : false,
+	"reloadStagingArea": false,
 	"parameters": {
-		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
-		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv"
+		"IDENTIFIER_MAPPING_FILE": "qa/mappings/verticaMappings.json",
+		"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
+		"DIRECTORY": "loader/csv/%sourceConnection%"
 	},
-	"tests": [{
+	"tests": [
+		{
 			"source": "vertica10",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "oracle#1",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "oracle18c",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "oracle12c",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "oracle11g",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "mssql#1",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "mssql19",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "postgres#1",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "mysql#1",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "mariadb#1",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "mongodb#1",
 			"targets": [
-			   "vertica10"
-		    ],
+				"vertica10"
+			],
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		},{
+		},
+		{
 			"source": "vertica#1",
 			"targets": [
-			   "vertica10"
-		    ],
-			"parameters": {
-  	          "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/loader/%targetConnection%/%sourceConnection%/csv"
-            },
+				"vertica10"
+			],
+	        "parameters": {
+ 	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"
+	        },
 			"tasks": [
-				"oracle","mssql","mysql"
+				"oracle",
+				"mssql",
+				"mysql"
 			]
-		}]
+		}
+	]
 }

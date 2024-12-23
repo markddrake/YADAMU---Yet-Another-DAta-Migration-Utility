@@ -6,11 +6,22 @@
     "stagingArea": "loader-staging",
     "reloadStagingArea" : false,
     "parameters": {
-      "REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-      "DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+      "REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
+      "DIRECTORY"               : "loader/csv/%sourceConnection%",
       "COMMIT_RATIO"            : 0
     },          
     "tests": [{
+            "operation": "copy",
+            "source": "oracle21c",
+            "target": "loader-staging",
+            "parameters": {
+		       "SPATIAL_FORMAT"          : "WKT",
+               "OUTPUT_FORMAT"           : "CSV"
+	         },
+	         "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
             "source": "oracle21c",
             "target": "oracle21c",
             "tasks": [

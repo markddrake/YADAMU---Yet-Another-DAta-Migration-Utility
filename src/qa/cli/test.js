@@ -177,6 +177,59 @@ class Test extends YadamuCLI {
     return dbi;
   }
 
+
+  /*
+  **
+  ** Compare the Conttrol File with the System Information section from the SourceDBI to check that the data set is usable
+  **
+  */
+  
+  async dataIsPreStaged(sourceDatabase,sourceConnection,sourceSchema,stagingDatabase,stagingConnection,stagingSchema,parameters) {
+	  
+	 let sourceDBI
+     let stagingDBI	  
+	  
+     try {
+  	   const sourceDBI = await this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,parameters)
+       sourceDBI.setSchema(sourceSchema,'FROM_USER')
+       await sourceDBI.initialize()
+       const sourceInstance = await sourceDBI.getYadamuInstanceInfo() 
+       await sourceDBI.final()
+	   
+	   const stagingDBI = await this.getDatabaseInterface(this.yadamu,stagingDatabase,stagingConnection,parameters)
+	   stagingDBI.setSchema(stagingSchema,'FROM_USER')
+       await stagingDBI.initialize()
+	   try {
+         await stagingDBI.loadControlFile()
+	   } catch (e) {
+		 // Unable to load control file - Probably does not exist but regardless pre-staged data is not not available
+		 return false
+	   }
+       const stagingInstance = await stagingDBI.getYadamuInstanceInfo() 
+       await stagingDBI.final()
+       
+	   if (stagingDBI.controlFile.settings.contentType === 'CSV') {
+         if ((sourceInstance.yadamuInstanceID === stagingInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === stagingInstance.yadamuInstallationTimestamp)) {
+           this.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY'],`Using existing Data Set "${stagingDBI.CONTROL_FILE_PATH}" with ID "${stagingInstance.yadamuInstanceID}".`);
+           return true;
+         } 
+         else {
+           this.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY'],`Cannot use existing Data Set "${stagingDBI.CONTROL_FILE_PATH}". Exepected ID "${sourceInstance.yadamuInstanceID}", found ID "${stagingDBI.yadamuInstanceID}".`);
+         }
+       }
+       else {
+         this.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY'],`Cannot use existing Data Set "${stagingDBI.CONTROL_FILE_PATH}". Exepected format "CSV", found format "${stagingDBI.controlFile.settings.contentType}".`);
+       }
+	 } catch (e) {
+	   this.LOGGER.handleException([sourceDBI?.DATABASE_VENDOR,stagingDBI?.DATABASE_VENDOR,'COPY'],e)
+	   try {
+		 sourceDBI && await sourceDBI.final()
+		 stagingDBI && await stagingDBI.final()
+	   } catch (e) { /* If anything goes wrong the staged data is not valid  */ console.log(e) } 
+	 }
+	 return false     
+  }
+
   getConnection(connectionList, connectionName) {
    
     const connection = connectionList[connectionName]
@@ -191,12 +244,12 @@ class Test extends YadamuCLI {
     return prefix ? `${prefix}_${schema}` : schema
   }
  
-  getSourceMapping(vendor,operation) {
+  getSourceMapping(vendor,task) {
       
     let schema
     let database
-    const schemaInfo = (typeof operation.source === 'string') ? { schema : operation.source } : {...operation.source}; 
-    switch (operation.vendor) {
+    const schemaInfo = (typeof task.source === 'string') ? { schema : task.source } : {...task.source}; 
+    switch (task.vendor) {
       case 'mssql': 
         // MsSQL style schema information
         switch (vendor) {
@@ -208,12 +261,12 @@ class Test extends YadamuCLI {
             break;
           case 'mongo':
             let database = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-            database = this.getPrefixedSchema(operation.schemaPrefix,database) 
+            database = this.getPrefixedSchema(task.schemaPrefix,database) 
             return { "database" : database }
             break;
           default:
             let schema = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-            schema = this.getPrefixedSchema(operation.schemaPrefix,schema) 
+            schema = this.getPrefixedSchema(task.schemaPrefix,schema) 
             return { "schema" : schema }
         }
         break;
@@ -225,7 +278,7 @@ class Test extends YadamuCLI {
         // Mongo 
         switch (vendor) {
           case 'mssql':
-            database = this.getPrefixedSchema(operation.schemaPrefix,schemaInfo.database) 
+            database = this.getPrefixedSchema(task.schemaPrefix,schemaInfo.database) 
             return {"database": database, "owner" : "dbo"}
             break;
           case 'snowflake':
@@ -243,11 +296,11 @@ class Test extends YadamuCLI {
         // Oracle, Mysql, MariaDB, Postgress 
         switch (vendor) {
           case 'mssql':
-            database = this.getPrefixedSchema(operation.schemaPrefix,schemaInfo.schema) 
+            database = this.getPrefixedSchema(task.schemaPrefix,schemaInfo.schema) 
             return {"database": database, "owner" : "dbo"}
             break;
           case 'snowflake':
-            return {database : operation.vendor.toUpperCase(), schema : schemaInfo.schema}
+            return {database : task.vendor.toUpperCase(), schema : schemaInfo.schema}
             break;
           case 'mongo':
             return {"database" : schemaInfo.schema};
@@ -258,16 +311,16 @@ class Test extends YadamuCLI {
     }
   }
  
-  getTargetMapping(vendor,operation,modifier = '') {
+  getTargetMapping(vendor,task,modifier = '') {
     let schema
     let database
-    let schemaInfo = this.getSourceMapping(vendor,operation)
+    let schemaInfo = this.getSourceMapping(vendor,task)
 
     switch (vendor) {
       case 'mssql': 
-        return schemaInfo.owner === 'dbo' ? {database: `${schemaInfo.database}${modifier}`,  owner:schemaInfo.owner}  : { database: `${this.getPrefixedSchema(operation.schemaPrefix, schemaInfo.owner)}${modifier}`, owner: 'dbo'}
+        return schemaInfo.owner === 'dbo' ? {database: `${schemaInfo.database}${modifier}`,  owner:schemaInfo.owner}  : { database: `${this.getPrefixedSchema(task.schemaPrefix, schemaInfo.owner)}${modifier}`, owner: 'dbo'}
       case 'snowflake':
-        return schemaInfo.schema === 'dbo' ? {database: `${this.getPrefixedSchema(operation.schemaPrefix, schemaInfo.database)}${modifier}`, schema:schemaInfo.schema}  : {database: schemaInfo.database, schema: `${schemaInfo.schema}${modifier}`}    
+        return schemaInfo.schema === 'dbo' ? {database: `${this.getPrefixedSchema(task.schemaPrefix, schemaInfo.database)}${modifier}`, schema:schemaInfo.schema}  : {database: schemaInfo.database, schema: `${schemaInfo.schema}${modifier}`}    
       case 'mongo':
         return {"database" : `${schemaInfo.database}${modifier}`};
      default:
@@ -423,59 +476,6 @@ class Test extends YadamuCLI {
   
   }
   
-  /*
-  **
-  ** Compare the Conttrol File with the System Information section from the SourceDBI to check that the data set is usable
-  **
-  */
-  
-  async dataIsPreStaged(sourceDatabase,sourceConnection,sourceSchema,stagingDatabase,stagingConnection,parameters) {
-	 
-	 let sourceDBI
-     let stagingDBI	  
-	  
-     try {
-  	   const sourceDBI = await this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,parameters)
-       sourceDBI.setSchema(sourceSchema,'FROM_USER')
-       await sourceDBI.initialize()
-       const sourceInstance = await sourceDBI.getYadamuInstanceInfo() 
-       await sourceDBI.final()
-	   
-	   const stagingDBI = await this.getDatabaseInterface(this.yadamu,stagingDatabase,stagingConnection,parameters)
-	   stagingDBI.setSchema(sourceSchema,'FROM_USER')
-       await stagingDBI.initialize()
-	   try {
-         await stagingDBI.loadControlFile()
-	   } catch (e) {
-		 // Unable to load control file - Probably does not exist but regardless pre-staged data is not not available
-		 return false
-	   }
-       const stagingInstance = await stagingDBI.getYadamuInstanceInfo() 
-       await stagingDBI.final()
-       
-	   if (stagingDBI.controlFile.settings.contentType === 'CSV') {
-         if ((sourceInstance.yadamuInstanceID === stagingInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === stagingInstance.yadamuInstallationTimestamp)) {
-           this.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY'],`Using existing Data Set "${stagingDBI.CONTROL_FILE_PATH}" with ID "${stagingInstance.yadamuInstanceID}".`);
-           return true;
-         } 
-         else {
-           this.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY'],`Cannot use existing Data Set "${stagingDBI.CONTROL_FILE_PATH}". Exepected ID "${sourceInstance.yadamuInstanceID}", found ID "${stagingDBI.yadamuInstanceID}".`);
-         }
-       }
-       else {
-         this.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY'],`Cannot use existing Data Set "${stagingDBI.CONTROL_FILE_PATH}". Exepected format "CSV", found format "${stagingDBI.controlFile.settings.contentType}".`);
-       }
-	 } catch (e) {
-	   this.LOGGER.handleException([sourceDBI?.DATABASE_VENDOR,stagingDBI?.DATABASE_VENDOR,'COPY'],e)
-	   try {
-		 sourceDBI && await sourceDBI.final()
-		 stagingDBI && await stagingDBI.final()
-	   } catch (e) { /* If anything goes wrong the staged data is not valid  */ console.log(e) } 
-	 }
-	 return false     
-  }
-
-
   async dbRoundtrip(task,configuration,test,targetConnectionName,parameters) {
       
     /*
@@ -633,7 +633,7 @@ class Test extends YadamuCLI {
         , OUTPUT_FORMAT       : 'CSV'
 		}
 		
-		const dataStaged  = await this.dataIsPreStaged(sourceDatabase,sourceConnection,schemas.source,stagingDatabase,stagingConnection,parameters)
+		const dataStaged  = await this.dataIsPreStaged(sourceDatabase,sourceConnection,schemas.source,stagingDatabase,stagingConnection,stagingSchema,parameters)
 		  
         if (!dataStaged) {
           /*
@@ -1626,7 +1626,7 @@ class Test extends YadamuCLI {
     , failed : []
     , elapsedTime : elapsedTime
     }
-  
+    
     targetRowCounts.forEach((targetTable) => {
 	  const metrics = testResults[jobName].metrics
       if (metrics.hasOwnProperty(targetTable[1])) {

@@ -325,7 +325,7 @@ class LoaderDBI extends YadamuDBI {
     return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
   }
 
-  async loadMetadataFiles(copyStagedData) {
+  async loadMetadataFiles(stagedDataCopy) {
   	this.metadata = {}
     if (this.controlFile.metadata) {
 	  let stack
@@ -339,7 +339,7 @@ class LoaderDBI extends YadamuDBI {
         metdataRecords.forEach((content) =>  {
           const json = this.parseJSON(content)
 		  this.metadata[json.tableName] = json;
-          if (copyStagedData) {
+          if (stagedDataCopy) {
             json.dataFile = this.controlFile.data[json.tableName].files || this.controlFile.data[json.tableName].file 
 		  }
         })
@@ -392,7 +392,7 @@ class LoaderDBI extends YadamuDBI {
 	this.controlFile = { 
   	  settings : {
   	    contentType        : this.OUTPUT_FORMAT
-      , compression        : this.yadamu.COMPRESSION
+      , compression        : this.COMPRESSION
 	  , encryption         : this.USE_ENCRYPTION ? this.CIPHER : 'NONE'
 	  , baseFolder         : this.IMPORT_FOLDER
       },

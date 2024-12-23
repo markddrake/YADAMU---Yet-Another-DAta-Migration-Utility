@@ -19,7 +19,7 @@ class SnowflakeCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NA
          
       results = await this.dbi.executeSQL(SnowflakeCompare.SQL_SCHEMA_TABLE_ROWS,[target.schema]); 
       return results.map((row,idx) => {          
-        return [target.schema,row.TABLE_NAME,row.ROW_COUNT]
+        return [target.schema,row.TABLE_NAME,parseInt(row.ROW_COUNT)]
       })
     }
     

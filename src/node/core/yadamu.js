@@ -935,7 +935,7 @@ class Yadamu {
 
     const copyManager = new YadamuCopyManager(target,source.getCredentials(target.DATABASE_KEY),this.LOGGER);
 	try {
-	  const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata)
+	  const results = await copyManager.stagedDataCopy(source.DATABASE_KEY,controlFile,metadata)
       this.reportStatus(this.STATUS,this.LOGGER)
 	  await source.final()
 	  await target.final()

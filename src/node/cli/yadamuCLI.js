@@ -594,7 +594,7 @@ class YadamuCLI {
 	return dbi
 	
   }
-	    
+
   async doCompare() {
      const compareDBI = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
 	 const comparator = await compareDBI.getComparator({});

@@ -390,7 +390,7 @@ class FileDBI extends YadamuDBI {
     const streams = []
 	
     if (this.USE_COMPRESSION) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
     }
 
     if (this.USE_ENCRYPTION) {
@@ -407,6 +407,8 @@ class FileDBI extends YadamuDBI {
 	
 	const ws = await this.createWriteStream()
 	streams.push(ws)
+    // this.LOGGER.trace([this.constructor.name,'COMPOSE'],`${streams.map((s) => { return s.constructor.name }).join(' => ')}`)
+
 	const os = streams.length === 1 ? streams[0] : compose(...streams)
 	
 	
@@ -640,7 +642,7 @@ class FileDBI extends YadamuDBI {
 	}
 
 	if (this.USE_COMPRESSION) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
 	const jsonParser = new JSONParser(this.MODE, this.FILE, pipelineState, this.LOGGER)
@@ -763,11 +765,11 @@ class FileDBI extends YadamuDBI {
 	}
 	
 	if (options.compressedInput) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
       
 	if (options.compressedOutput) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
 	}
 	
 	if (options.encryptedOutput) {

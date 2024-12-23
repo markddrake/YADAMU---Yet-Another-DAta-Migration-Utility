@@ -5,6 +5,7 @@ class PostgresError extends DatabaseError {
   //  const err = new PostgresError(dbi,dbi,cause,stack,sql)
   constructor(dbi,cause,stack,sql) {
 	const primaryCause = Array.isArray(cause.errors) ? cause.errors[0] : cause
+    primaryCause.message = primaryCause.detail ? `${primaryCause.message} [${primaryCause.detail}]` : primaryCause.message
     super(dbi,primaryCause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
