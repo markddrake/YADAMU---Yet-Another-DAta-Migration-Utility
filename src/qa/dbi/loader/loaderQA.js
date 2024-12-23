@@ -62,14 +62,14 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
       await fsp.rm(this.IMPORT_FOLDER,{recursive: true, force: true})
 	} catch(err) {
 	  if (err.code !== 'ENOENT') {
-	    throw new FileError(err,stack,this.IMPORT_FOLDER);
+	    throw new FileError(this,err,stack,this.IMPORT_FOLDER);
 	  }
 	}
 	try {
 	  stack = new Error().stack;
       await fsp.mkdir(this.IMPORT_FOLDER,{recursive: true})
 	} catch(err) {
-      throw err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.IMPORT_FOLDER) : new FileError(err,stack,this.IMPORT_FOLDER)
+      throw err.code === 'ENOENT' ? new DirectoryNotFound(this,err,stack,this.IMPORT_FOLDER) : new FileError(this,err,stack,this.IMPORT_FOLDER)
 	}
   }
  
@@ -78,7 +78,7 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
   }
 
   async initializeImport() {
-	if (this.options.recreateSchema === true) {
+	if (this.options.recreateSchema === true && (this.ROLE === 'WRITER')) {
 		await this.recreateSchema();
 	}
 	await super.initializeImport();
@@ -95,10 +95,6 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
   
   classFactory(yadamu) {
     return new LoaderQA(yadamu,this,this.connectionParameters,this.parameters)
-  }
-  
-  getCSVParser() {
-	 return csv({headers: false})
   }
 
   async finalize() { /* OVERRIDE */ }

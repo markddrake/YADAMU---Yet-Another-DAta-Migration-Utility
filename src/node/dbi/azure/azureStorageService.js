@@ -159,6 +159,32 @@ class AzureStorageService {
   
 
   async createReadStream(key,params) {
+
+	let operation
+    let retryOn404 = true
+	const stack = new Error().stack
+	while (true) {
+      try {
+		operation = `Azure.containerClient.getBlockBlobClient(${key})`
+        const blockBlobClient = this.containerClient.getBlockBlobClient(key);
+  	    operation = `Azure.blockBlobClient.getProperties(${key})`
+	    const props = await blockBlobClient.getProperties()
+  	    operation = `Azure.blockBlobClient.download(${key})`
+	    const downloadBlockBlobResponse = await blockBlobClient.download(0);
+		return this.isTextContent(props.contentType) ? compose(downloadBlockBlobResponse.readableStreamBody, new StringDecoderStream()) : downloadBlockBlobResponse.readableStreamBody
+	  } catch (e) {
+		if ((retryOn404) && (e.statusCode && (e.statusCode === 404))) {
+   		  retryOn404 = false
+  		  await setTimeout(100)
+		  this.LOGGER.qaWarning([AzureConstants.DATABASE_VENDOR,'READ',`RETRY`,key],`Retrying after 404`);		
+		  continue
+		}
+	    throw this.dbi.getDatabaseException(e,stack,operation)
+	  }
+	}
+  }
+
+  async createReadEncryptedStream(key,params) {
 	  
 	let operation
     let retryOn404 = true
@@ -171,7 +197,7 @@ class AzureStorageService {
 	    const props = await blockBlobClient.getProperties()
   	    operation = `Azure.blockBlobClient.download(${key})`
 	    const downloadBlockBlobResponse = await blockBlobClient.download(0);
-		return compose(downloadBlockBlobResponse.readableStreamBody,this.isTextContent(props.contentType) ? new StringDecoderStream() : new PassThrough())
+		return downloadBlockBlobResponse.readableStreamBody
 	  } catch (e) {
 		if ((retryOn404) && (e.statusCode && (e.statusCode === 404))) {
    		  retryOn404 = false

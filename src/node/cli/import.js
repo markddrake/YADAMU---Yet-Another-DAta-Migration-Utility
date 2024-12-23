@@ -1,6 +1,5 @@
 
 import YadamuLibrary      from '../lib/yadamuLibrary.js'
-
 import YadamuCLI          from './yadamuCLI.js'
 
 class Import extends YadamuCLI {}

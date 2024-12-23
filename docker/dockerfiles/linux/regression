@@ -11,7 +11,6 @@ COPY src src
 COPY utilities utilities
 COPY qa/connections/connections.json qa/regression
 ENV TNS_ADMIN=/usr/src/YADAMU
-ENV YADAMU_PASSPHRASE=yabasc
 RUN mkdir -p mnt/log \
 &&  mkdir -p mnt/longRegress \	
 &&  mkdir -p mnt/shortRegress \	

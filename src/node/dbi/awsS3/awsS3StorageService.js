@@ -30,6 +30,7 @@ import {
 import StringWriter           from '../../util/stringWriter.js';
 
 import AWSS3Constants         from './awsS3Constants.js';
+import DatabaseError          from './awsS3Exception.js';
 
 class ByteCounter extends PassThrough {
 
@@ -85,7 +86,7 @@ class AWSS3StorageService {
 	    Bucket      : this.dbi.BUCKET
 	  , Key         : key
 	  , ContentType : contentType
-	  , queueSize   : this.dbi.parameters.PARALLEL  
+	  , queueSize   : this.dbi.yadamu.PARALLEL  
 	  , Params      : 'new PassThrough()'
 	  }
     }
@@ -103,8 +104,7 @@ class AWSS3StorageService {
 	    input.params.Body.destroy()
 	    resolve(input.params.Key)
 	  }).catch((err) => {
-
-        const cause = this.dbi.getDatabaseException(err,stack,operation)
+        const cause = err instanceof DatabaseError ? err : this.dbi.getDatabaseException(err,stack,operation)
         this.LOGGER.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,input.params.Key],err);
         input.params.Body.destroy(err)
 	    reject(cause)
@@ -128,9 +128,9 @@ class AWSS3StorageService {
 		const command = new HeadBucketCommand(input)
 	    stack = new Error().stack
 	    let output = await this.s3Client.send(command)
-      } catch (e) {
-		const cause = this.dbi.getDatabaseException(e,stack,operation) 
-		if (cause.notFound()) {
+      } catch (err) {
+		const cause = err instanceof DatabaseError ? err : this.dbi.getDatabaseException(err,stack,operation)
+        if (cause.notFound()) {
 	      operation = `S3Client.CreateBucketCommand(${JSON.stringify(input)})`
 		  const command = new CreateBucketCommand (input)
           stack = new Error().stack

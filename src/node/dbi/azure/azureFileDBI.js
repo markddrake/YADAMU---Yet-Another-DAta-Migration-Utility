@@ -1,46 +1,28 @@
 
-import path                           from 'path';
-
-import { 
-  performance 
-}                                     from 'perf_hooks';
-
-/* Database Vendors API */                                    
+import path                           from 'path'
+import mime                           from 'mime-types';
 
 import { 
   BlobServiceClient
 }                                     from '@azure/storage-blob';
 
-/* Yadamu Core */                                    
-							          
 import YadamuConstants                from '../../lib/yadamuConstants.js'
-import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js';
 
-/* Yadamu DBI */                                    
-
-import CloudDBI                       from '../cloud/cloudDBI.js';
 import DBIConstants                   from '../base/dbiConstants.js'
 
-/* Vendor Specific DBI Implimentation */                                    
+import FileDBI                        from '../file/fileDBI.js'
+import AzureStorageService            from './azureStorageService.js'
+import AzureConstants                 from './azureConstants.js'
 
-import DatabaseError                  from './azureException.js'
-							          							          
-import AzureConstants                 from './azureConstants.js';
-import AzureStorageService            from './azureStorageService.js';
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                     from '../file/fileException.js'
 
-class AzureDBI extends CloudDBI {
+class AzureFileDBI extends FileDBI {
  
-  /*
-  **
-  ** Extends CloudDBI enabling operations on Azure Blob Containers rather than a local file system.
-  ** 
-  ** !!! Make sure your head is wrapped around the following statements before touching this code.
-  **
-  ** An Export operaton involves reading data from the Azure Blob store
-  ** An Import operation involves writing data to the Azure Blob store
-  **
-  */
-
   static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
@@ -52,14 +34,14 @@ class AzureDBI extends CloudDBI {
   }
    
   get DBI_PARAMETERS() {
-	return AzureDBI.DBI_PARAMETERS
+	return AZUREFileDBI.DBI_PARAMETERS
   }
 
-  get DATABASE_KEY()          { return AzureConstants.DATABASE_KEY};
+  get DATABASE_KEY()          { return AzureConstants.DATABASE_KEY + "File"};
   get DATABASE_VENDOR()       { return AzureConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()       { return AzureConstants.SOFTWARE_VENDOR};
   get PROTOCOL()              { return AzureConstants.PROTOCOL }
-
+  
   get CONTAINER() {
     this._CONTAINER = this._CONTAINER || (() => { 
 	  const container = this.parameters.CONTAINER || AzureConstants.CONTAINER
@@ -71,6 +53,12 @@ class AzureDBI extends CloudDBI {
   
   get STORAGE_ID() { return this.CONTAINER }
  
+  get FILE()                     {
+	const file = super.FILE
+    this._CLOUD_FILE = this._CLOUD_FILE || this.UNRESOLVED_FILE.replace(/^[A-Za-z]:\\/, '').split(path.sep).join(path.posix.sep)
+	return this._CLOUD_FILE
+  }
+  
   redactPasswords() {
    
     const connectionProperties = structuredClone(this.CONNECTION_PROPERTIES)
@@ -152,44 +140,76 @@ class AzureDBI extends CloudDBI {
 	   ...connectionProperties,
 	   ...connectionInfo
 	}
-	
 	return connectionProperties
 	
   }
+
+  constructor(yadamu,connectionSettings,parameters) {
+	super(yadamu,connectionSettings,parameters)
+  }
   
-  constructor(yadamu,manager,connectionSettings,parameters) {
-    // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu,manager,connectionSettings,parameters)
-	
-	this.DATABASE_ERROR_CLASS = DatabaseError
-  }   
-  
-  async createConnectionPool() {
-	// this.LOGGER.trace([this.constructor.name],`BlobServiceClient.fromConnectionString()`)
+  async initialize() {
     this.cloudConnection = BlobServiceClient.fromConnectionString(this.CONNECTION_PROPERTIES.connection);
 	this.cloudService = new AzureStorageService(this,{})
+	await super.initialize()
   }
   
-  getContentLength(props) {
-    return props.contentLength
+  _getInputStream() {  
+    // Return the inputStream and the transform streams required to process it.
+    // const stats = fs.statSync(this.FILE)
+    // const fileSizeInBytes = stats.size
+    this.LOGGER.info([this.DATABASE_VENDOR,YadamuConstants.READER_ROLE],`Processing file "${this.FILE}".`)
+	return this.inputStream
   }
 
-  classFactory(yadamu) {
-	return new AzureDBI(yadamu,this,this.connectionParameters,this.parameters)
-  }
-   
-  async createInputStream(filename) {
+  async createInputStream() {
+    const file = this.FILE
     // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,],`Creating readable stream on ${file)}`)
-    const stream = this.USE_ENCRYPTION ? await this.cloudService.createReadEncryptedStream(filename) : await this.cloudService.createReadStream(filename)
+    const stream = this.USE_ENCRYPTION ? await this.cloudService.createReadEncryptedStream(file) : await this.cloudService.createReadStream(file)
 	return stream
   }
-    
   
-  async _getInputStream(filename) {
-
-    const stream = this.USE_ENCRYPTION ? await this.cloudService.createReadEncryptedStream(filename) : await this.cloudService.createReadStream(filename)
-	return stream
+  async createWriteStream() {
+    // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,],`Creating writeable stream on ${file})`)
+    const file = this.FILE
+    const extension = path.extname(file);
+    const contentType = mime.lookup(extension) || 'application/octet-stream'
+    const outputStream = this.cloudService.createWriteStream(file,contentType,this.activeWriters)
+	return outputStream
   }
-}
+  
+  async loadInitializationVector() {
 
-export {AzureDBI as default }
+    let inputStream
+	try {
+	  inputStream = await this.createInputStream()
+      const iv = new Uint8Array(this.IV_LENGTH);
+      let bytesRead = 0;
+
+      for await (const chunk of inputStream) {
+        const chunkBytes = chunk.subarray(0, this.IV_LENGTH - bytesRead);
+        iv.set(chunkBytes, bytesRead);
+        bytesRead += chunkBytes.length;
+
+        if (bytesRead >= this.IV_LENGTH) {
+          break;
+        }
+      }
+
+      if (bytesRead < this.IV_LENGTH) {
+        throw new Error("Unexpected end of stream while reading Initialization Vector.");
+      }
+  
+      this.INITIALIZATION_VECTOR = iv;
+    } catch (e) {
+      const cause = new FileError(this, new Error(`Unable to load Initialization Vector.`));
+      cause.cause = e;
+      throw cause;
+    } finally {
+      inputStream.destroy();
+    }
+  }
+}	
+	  
+export { AzureFileDBI as default }
+

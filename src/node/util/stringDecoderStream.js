@@ -1,4 +1,3 @@
-"use strict"
 
 import { StringDecoder } from 'string_decoder';
 import {Transform} from 'stream';

@@ -5,6 +5,7 @@ class PostgresError extends DatabaseError {
   //  const err = new PostgresError(dbi,dbi,cause,stack,sql)
   constructor(dbi,cause,stack,sql) {
 	const primaryCause = Array.isArray(cause.errors) ? cause.errors[0] : cause
+    primaryCause.message = primaryCause.detail ? `${primaryCause.message} [${primaryCause.detail}]` : primaryCause.message
     super(dbi,primaryCause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
@@ -17,6 +18,11 @@ class PostgresError extends DatabaseError {
   lostConnection() {
 	const knownErrors = ['Connection terminated unexpectedly','Client has encountered a connection error and is not queryable']
 	return ((this.cause.severity && (this.cause.severity === 'FATAL')) && (this.cause.code && (this.cause.code === '57P01')) || ((this.cause.name === 'Error') && (knownErrors.indexOf(this.cause.message) > -1)))
+  }
+  
+  connectionTerminated() {
+	const knownErrors = ['Connection terminated']
+	return knownErrors.indexOf(this.cause.message) > -1
   }
   
   serverUnavailable() {
@@ -39,6 +45,7 @@ class PostgresError extends DatabaseError {
   prettyPrintedJSON() {
 	return ((this.cause.severity && (this.cause.severity === 'ERROR')) && (this.cause.code && (this.cause.code === '22P02')))
   }
+  
 }
 
 export { PostgresError as default }

@@ -130,7 +130,7 @@ class AWSS3DBI extends CloudDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
 
-	this.DATABASE_ERROR = DatabaseError
+	this.DATABASE_ERROR_CLASS = DatabaseError
   }    
    
   getCredentials(vendorKey) {

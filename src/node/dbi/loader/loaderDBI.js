@@ -5,7 +5,6 @@ import path                           from 'path';
 import crypto                         from 'crypto';
 					                  
 import {                              
-  finished,                           
   PassThrough                         
 }                                     from 'stream'
 import {                              
@@ -21,6 +20,8 @@ import {
 import {                              
   performance                         
 }                                     from 'perf_hooks';
+
+import csv                            from 'csv-parser';
 
 /* Yadamu Core */                                    
 							          
@@ -49,11 +50,12 @@ import Comparitor                     from './loaderCompare.js'
 import LoaderConstants                from './loaderConstants.js'
 
 import JSONParser                     from './jsonParser.js'
-import LoaderParser                   from './loaderParser.js'
+import JSONTransform                  from './jsonTransform.js'
 import JSONOutputManager              from './jsonOutputManager.js'
 import ArrayOutputManager             from './arrayOutputManager.js'
 import CSVOutputManager               from './csvOutputManager.js'
 import CSVParser                      from './csvParser.js'
+import CSVTransform                   from './csvTransform.js'
 
 /*
 **
@@ -160,7 +162,6 @@ class LoaderDBI extends YadamuDBI {
   get DATABASE_KEY()               { return LoaderDBI.DATABASE_KEY };
   get DATABASE_VENDOR()            { return LoaderDBI.DATABASE_VENDOR };
   get SOFTWARE_VENDOR()            { return LoaderDBI.SOFTWARE_VENDOR };
-  get DATA_STAGING_SUPPORTED()     { return true } 
   get PARTITION_LEVEL_OPERATIONS() { return true }
   get PROTOCOL()                   { return LoaderDBI.PROTOCOL };
   
@@ -271,6 +272,9 @@ class LoaderDBI extends YadamuDBI {
   get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR }
   get IV_LENGTH()              { return 16 }  
   
+  get ENCRYPTION_KEY()         { return this.isManager() ? super.ENCRYPTION_KEY : this.manager.ENCRYPTION_KEY }
+  set ENCRYPTION_KEY(v)        { super.ENCRYPTION_KEY = v }
+  
   addVendorExtensions(connectionProperties) {
 
     // connectionProperties.directory   = this.parameters.DIRECTORY || connectionProperties.directory 
@@ -324,8 +328,13 @@ class LoaderDBI extends YadamuDBI {
   getDataFileName(tableName,partitionNumber) {	 
     return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
   }
+  
+  async isValidCopyFormat(supportedFormats) {
+	 await this.loadControlFile();
+	 return supportedFormats.includes(this.controlFile.settings.contentType)
+  }
 
-  async loadMetadataFiles(copyStagedData) {
+  async loadMetadataFiles(stagedDataCopy) {
   	this.metadata = {}
     if (this.controlFile.metadata) {
 	  let stack
@@ -339,7 +348,7 @@ class LoaderDBI extends YadamuDBI {
         metdataRecords.forEach((content) =>  {
           const json = this.parseJSON(content)
 		  this.metadata[json.tableName] = json;
-          if (copyStagedData) {
+          if (stagedDataCopy) {
             json.dataFile = this.controlFile.data[json.tableName].files || this.controlFile.data[json.tableName].file 
 		  }
         })
@@ -392,7 +401,7 @@ class LoaderDBI extends YadamuDBI {
 	this.controlFile = { 
   	  settings : {
   	    contentType        : this.OUTPUT_FORMAT
-      , compression        : this.yadamu.COMPRESSION
+      , compression        : this.COMPRESSION
 	  , encryption         : this.USE_ENCRYPTION ? this.CIPHER : 'NONE'
 	  , baseFolder         : this.IMPORT_FOLDER
       },
@@ -629,7 +638,7 @@ class LoaderDBI extends YadamuDBI {
 	
 	await this.loadControlFile()
     if ((this.MODE != 'DDL_ONLY') && (this.controlFile.settings.contentType === 'CSV')) {
-      throw new YadamuError('Loading of "CSV" data sets not supported')
+      // throw new YadamuError('Loading of "CSV" data sets not supported')
     }
 	this.LOGGER.info(['EXPORT',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`)
 
@@ -656,10 +665,6 @@ class LoaderDBI extends YadamuDBI {
 	await fd.close()
 	return iv;
   }	
-  
-  getCSVParser() {
-    throw new YadamuError('Loading of "CSV" data sets not supported')
-  }
   
   async getInputStreams(tableInfo,pipelineState) {
 	  
@@ -703,12 +708,13 @@ class LoaderDBI extends YadamuDBI {
 	
 	switch (this.controlFile.settings.contentType) {
 	  case 'CSV':
-	    parser = this.getCSVParser()
-		transform =  new CSVTransform(this,tableInfo, pipelineState, this.LOGGER)
+	    parser = csv({headers: false})
+		parser.STREAM_STATE = pipelineState
+	    transform = new CSVTransform(this,tableInfo, pipelineState, this.LOGGER)
 		break;
 	  case 'JSON':
 	    parser =  new JSONParser(this.MODE, filename, pipelineState, this.LOGGER )
-	    transform = new LoaderParser(this,tableInfo, pipelineState, this.LOGGER)
+	    transform = new JSONTransform(this,tableInfo, pipelineState, this.LOGGER)
 	}  
 
     const parserStreamState = parser.STREAM_STATE
@@ -771,7 +777,6 @@ class LoaderDBI extends YadamuDBI {
     this.CONTROL_FILE_PATH = this.manager.CONTROL_FILE_PATH
 	this.controlFile = this.manager.controlFile
 	this.statementCache = this.manager.statementCache
-	this.ENCRYPTION_KEY = this.manager.ENCRYPTION_KEY
   }
   
   reloadControlFile() {

@@ -10,7 +10,7 @@ async function main() {
   try {
     const yadamuDirectLoad = new DirectLoad();
     try {
-      await yadamuDirectLoad.doCopyStagedData();
+      await yadamuDirectLoad.doLoadStagedData();
     } catch (e) {
       yadamuDirectLoad.reportError(e)
 	}

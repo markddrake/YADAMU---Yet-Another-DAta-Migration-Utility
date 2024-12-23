@@ -6,7 +6,6 @@ class CSVParser extends YadamuParser {
 
   constructor(dbi,tableInfo,pipelineState,yadamuLogger) {
 	super(dbi,tableInfo,pipelineState,yadamuLogger)
-
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
       if (YadamuDataTypes.isBinary(dataType)) {

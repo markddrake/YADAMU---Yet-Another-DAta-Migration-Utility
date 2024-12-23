@@ -62,8 +62,10 @@ class ExampleDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
-
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
+  
   constructor(yadamu,manager,connectionSettings,parameters) {
 	  
     super(yadamu,manager,connectionSettings,parameters)

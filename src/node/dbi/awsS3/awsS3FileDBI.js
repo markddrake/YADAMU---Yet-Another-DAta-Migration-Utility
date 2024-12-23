@@ -16,6 +16,12 @@ import FileDBI                        from '../file/fileDBI.js'
 import AWSS3StorageService            from './awsS3StorageService.js'
 import AWSS3Constants                 from './awsS3Constants.js'
 
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                     from '../file/fileException.js'
+
 class AWSS3FileDBI extends FileDBI {
  
   static #DBI_PARAMETERS
@@ -134,6 +140,38 @@ class AWSS3FileDBI extends FileDBI {
 	return outputStream
   }
   
-}
- 
+  async loadInitializationVector() {
+
+    let inputStream
+	try {
+	  inputStream = await this.createInputStream()
+      const iv = new Uint8Array(this.IV_LENGTH);
+      let bytesRead = 0;
+
+      for await (const chunk of inputStream) {
+        const chunkBytes = chunk.subarray(0, this.IV_LENGTH - bytesRead);
+        iv.set(chunkBytes, bytesRead);
+        bytesRead += chunkBytes.length;
+
+        if (bytesRead >= this.IV_LENGTH) {
+          break;
+        }
+      }
+
+      if (bytesRead < this.IV_LENGTH) {
+        throw new Error("Unexpected end of stream while reading Initialization Vector.");
+      }
+  
+      this.INITIALIZATION_VECTOR = iv;
+    } catch (e) {
+      const cause = new FileError(this, new Error(`Unable to load Initialization Vector.`));
+      cause.cause = e;
+      throw cause;
+    } finally {
+      inputStream.destroy();
+    }
+  }
+}	
+	  
 export { AWSS3FileDBI as default }
+

@@ -102,7 +102,8 @@ class MsSQLDBI extends YadamuDBI {
   get DATABASE_KEY()                  { return MsSQLConstants.DATABASE_KEY};
   get DATABASE_VENDOR()               { return MsSQLConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()               { return MsSQLConstants.SOFTWARE_VENDOR};
-  // get SQL_COPY_OPERATIONS()           { return true }
+  get SQL_COPY_OPERATIONS()           { return true }
+  
   get STATEMENT_TERMINATOR()          { return MsSQLConstants.STATEMENT_TERMINATOR };
   get STATEMENT_SEPERATOR()           { return '\ngo\n--\n' }
 
@@ -114,6 +115,10 @@ class MsSQLDBI extends YadamuDBI {
   get DATABASE_NAME()                 { return this.parameters.DATABASE ? this.parameters.DATABASE : this.CONNECTION_PROPERTIES.database }
   get DEFAULT_COLATION()              { return this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8' }
 
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
+  
   // get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS || this.TEDIOUS_TRANSACTION_ISSUE  }
   // set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
 
@@ -289,7 +294,7 @@ class MsSQLDBI extends YadamuDBI {
   
   reportTransactionState(operation) {
     const e = new Error(`Unexpected ${operation} operation`)
-    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],this.createDatabaseError(e,e.stack,this.constructor.name))    
+    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation,this.getWorkerNumber()],this.createDatabaseError(e,e.stack,this.constructor.name))    
   }
 
   getTransactionManager() {
@@ -1608,7 +1613,43 @@ class MsSQLDBI extends YadamuDBI {
     return pid
   }  
 
-}
+async copyOperation(tableName,copyOperation,copyState) {
+    
+    /*
+    **
+    ** Generic Basic Imementation - Override as required for error reporting etc
+    **
+    */
+    
+    try {
+      copyState.startTime = performance.now()
+	  
+	  
+	  
+      let results = await this.beginTransaction()
+      results = await this.executeSQL(copyOperation.dml)
+      copyState.read = results.rowsAffected[0]
+      copyState.written = results.rowsAffected[0]
+      copyState.endTime = performance.now()
+      results = await this.commitTransaction()
+      copyState.committed = copyState.written 
+      copyState.written = 0
+    } catch(e) {
+      this.LOGGER.handleException([this.DATABASE_VENDOR,'COPY',tableName, this.getWorkerNumber()],e)
+	  // console.log(e)
+      copyState.writerError = e
+      try {
+		await this.cancelRequest(true)
+        let results = await this.rollbackTransaction()
+		this.transaction = this.getTransactionManager() 
+      } catch (e) {
+        e.cause = copyState.writerError
+        copyState.writerError = e
+      }
+    }
+    return copyState
+  }
+  }
 
 export { MsSQLDBI as default }
 

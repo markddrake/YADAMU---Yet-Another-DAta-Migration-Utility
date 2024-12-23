@@ -48,6 +48,21 @@ class RedshiftCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NAM
       return columnLists
     }
 
+	async getRowCounts(target) {
+	
+	  let results = await this.dbi.executeSQL(`select table_name from information_schema.tables where table_schema = '${target}'`)
+	  results = results.rows.map((result) => { return Object.values(result)})
+	  if (results.length > 0 ) {
+	    const sqlCountRows = results.map((row) => { return `select cast('${target}' as VARCHAR(128)), cast('${row[0]}' as VARCHAR(128)), count(*) from "${target}"."${row[0]}"`}).join('\nunion all \n')
+	    results = await this.dbi.executeSQL(sqlCountRows)
+		results.rows.forEach((row) => {
+		  row[2] = parseInt(row[2])
+		})
+	    results = results.rows.map((result) => { return Object.values(result)})
+	  }
+	  return results
+    }  
+	
     async compareSchemas(source,target,rules) {
 
       const report = {

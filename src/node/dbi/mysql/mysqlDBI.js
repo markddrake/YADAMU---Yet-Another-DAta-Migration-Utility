@@ -92,8 +92,10 @@ class MySQLDBI extends YadamuDBI {
   set LOWER_CASE_TABLE_NAMES(v)      { this._LOWER_CASE_TABLE_NAMES = v }
   get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
   
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
-
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
+    
   redactPasswords() {
 
     const infileStreamFactory = this.CONNECTION_PROPERTIES.infileStreamFactory
@@ -332,7 +334,7 @@ class MySQLDBI extends YadamuDBI {
   async executeSQL(sqlStatement,args) {
     
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-
+	
     let stack
 	let results
     this.SQL_TRACE.traceSQL(sqlStatement)

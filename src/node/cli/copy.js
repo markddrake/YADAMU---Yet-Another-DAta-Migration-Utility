@@ -1,5 +1,6 @@
 
-import YadamuCLI              from './yadamuCLI.js'
+import YadamuLibrary      from '../lib/yadamuLibrary.js'
+import YadamuCLI          from './yadamuCLI.js'
 
 class Copy extends YadamuCLI {}
 

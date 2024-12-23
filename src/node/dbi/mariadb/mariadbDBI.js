@@ -80,8 +80,10 @@ class MariadbDBI extends YadamuDBI {
   set LOWER_CASE_TABLE_NAMES(v)      { this._LOWER_CASE_TABLE_NAMES = v }
   get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
 
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
-
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
+    
   addVendorExtensions(connectionProperties) {
 
     Object.assign(connectionProperties,MariadbConstants.CONNECTION_PROPERTY_DEFAULTS)

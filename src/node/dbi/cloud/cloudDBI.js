@@ -88,20 +88,12 @@ class CloudDBI extends LoaderDBI {
 	this.COMPARITOR_CLASS = Comparitor
   }    
   
-  async createInitializationVector() {
-    throw new YadamuError(`Encyption option not currently supported for "${this.DATABASE_VENDOR}"`);
-  }	
-
-  async loadInitializationVector(filename) {
-    throw new YadamuError(`Encyption option not currently supported for "${this.DATABASE_VENDOR}"`);
-  }	
-   
   makeCloudPath(target) {
 	return target.split(path.sep).join(path.posix.sep)
   }
 
   
-  async loadMetadataFiles(copyStagedData) {
+  async loadMetadataFiles(stagedDataCopy) {
     // this.LOGGER.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
  	const metadata = {}
     if (this.controlFile.metadata) {
@@ -112,7 +104,7 @@ class CloudDBI extends LoaderDBI {
         const json = this.parseJSON(content)
         metadata[json.tableName] = json;
         // json.dataFile = this.getDataFileName(json.tableName)
-        if (copyStagedData) {
+        if (stagedDataCopy) {
           json.dataFile = this.controlFile.data[json.tableName].files || this.controlFile.data[json.tableName].file 
         }
       })
@@ -233,7 +225,46 @@ class CloudDBI extends LoaderDBI {
     await this.cloudService.removeFile(dataFilePath)
 	
   }
-	  
+
+  async createInputStream(file) {
+    // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,],`Creating readable stream on ${file)}`)
+    const stream = await this.cloudService.createReadStream(file)
+	return stream
+  }
+    
+
+  async loadInitializationVector(filename) {
+
+    let inputStream
+	try {
+	  inputStream = await this.createInputStream(filename)
+      const iv = new Uint8Array(this.IV_LENGTH);
+      let bytesRead = 0;
+
+      for await (const chunk of inputStream) {
+        const chunkBytes = chunk.subarray(0, this.IV_LENGTH - bytesRead);
+        iv.set(chunkBytes, bytesRead);
+        bytesRead += chunkBytes.length;
+
+        if (bytesRead >= this.IV_LENGTH) {
+          break;
+        }
+      }
+
+      if (bytesRead < this.IV_LENGTH) {
+        throw new Error("Unexpected end of stream while reading Initialization Vector.");
+      }
+      return iv;
+    } catch (e) {
+      const cause = new FileError(this, new Error(`Unable to load Initialization Vector.`));
+      cause.cause = e;
+	  console.log(cause)
+      throw cause;
+    } finally {
+      inputStream.destroy();
+    }
+  }
+
 }
 
 export {CloudDBI as default }

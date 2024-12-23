@@ -6,12 +6,22 @@
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
 	"parameters": {
-		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
+		"DIRECTORY"               : "loader/csv/%sourceConnection%",
 		"TIMESTAMP_PRECISION"     : 6
 	},
 	
 	"tests": [{
+            "operation": "copy",
+            "source": "yugabyte#1",
+            "target": "loader-staging",
+            "parameters": {
+               "OUTPUT_FORMAT"           : "CSV"
+	         },
+	         "tasks": [
+                "oracle","mssql","mysql"
+            ]
+    },{
             "source": "yugabyte#1",
             "target": "yugabyte#1",
             "tasks": [

@@ -39,7 +39,7 @@
     "pg-query-stream": "^4.5.3",
     "readable-stream": "^4.4.2",
     "snowflake-sdk": "^1.14.0",
-    "uuid": "^10.0.0",
+    "uuid": "^11.0.3",
     "wkx": "^0.5.0"
   },
   "devDependencies": {

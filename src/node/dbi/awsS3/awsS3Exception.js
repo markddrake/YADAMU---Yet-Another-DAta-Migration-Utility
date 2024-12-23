@@ -5,7 +5,7 @@ class AWSS3Error extends DatabaseError {
   
   constructor(dbi,cause,stack,operation) {
 	if (cause.Code && (cause.Code === 'NoSuchKey')) {
-	cause.message = `${cause.message} [${operation}] [${cause.$metadata.httpStatusCode}] `;
+	  cause.message = `${cause.message} [${operation}] [${cause.$metadata.httpStatusCode}] `;
 	}
     super(dbi,cause,stack,operation);
 	this.path = this.sql

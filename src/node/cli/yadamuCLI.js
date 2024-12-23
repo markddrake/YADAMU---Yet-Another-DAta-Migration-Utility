@@ -18,6 +18,7 @@ import YadamuCompare      from '../dbi/base/yadamuCompare.js'
 
 
 import {
+  YadamuError,
   CommandLineError, 
   ConfigurationFileError
 }                         from '../core/yadamuException.js';
@@ -284,7 +285,7 @@ class YadamuCLI {
 	}		
 
     this.yadamu = this.createYadamu()
-    
+	
     this.yadamuLogger = this.yadamu.LOGGER
 
 	try {
@@ -292,7 +293,7 @@ class YadamuCLI {
 	} catch (e) {
       try {
 		// Should this be 'awaited'...
-	    this.yadamu.close()
+	    this.yadamu.close(true)
       } catch(e) {
 	    console.log(e)
 	  }
@@ -594,17 +595,29 @@ class YadamuCLI {
 	return dbi
 	
   }
-	    
-  async doCompare() {
-     const compareDBI = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-	 const comparator = await compareDBI.getComparator({});
-	 await comparator.doCompare()
-  }
-	   
+
   printResults(jobName,sourceDescription,targetDescription,elapsedTime) {
     this.yadamuLogger.info([`YADAMU`,jobName],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`)
   }
 
+  async executeCompareJob(yadamu,configuration,job,jobName = 'JOB') {
+
+	this.CONFIGURATION = configuration
+
+	const jobParameters = {
+	  ...configuration.parameters || {}
+    , ...job.parameters || {} 
+    }
+	
+    yadamu.updateParameters(jobParameters);
+		      			  
+    const compareDBI = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const comparator = await compareDBI.getComparator(job.compareConfiguration);
+    await comparator.doCompare()
+	await compareDBI.final()
+
+  }
+	   
   async executeJob(yadamu,configuration,job,jobName = 'JOB') {
 
     // console.log(configuration,job,jobName,yadamu.parameters)
@@ -616,7 +629,6 @@ class YadamuCLI {
     , ...job.parameters || {} 
     }
 	
-    // yadamu.reloadParameters(jobParameters);
     yadamu.updateParameters(jobParameters);
 		      		
  	// Initialize constructor parameters with values from configuration file and merge job specific parameters
@@ -686,64 +698,51 @@ class YadamuCLI {
     }
   }
   
-  async doLoadStagedData1() {
+  async doLoadStagedData() {
 
-	this.CONFIGURATION = {
+	await this.yadamu.initialize()
+
+    // Load the DBI class for the target. The default staging plaform is defined by the static getter DEFAULT_STAGING_PLATFORM
+	
+	const DBI = (await import(this.DATABASE_DRIVERS[this.yadamu.RDBMS])).default
+	if (!DBI.DEFAULT_STAGING_PLATFORM) {
+	  throw new YadamuError(`Target database "${this.yadamu.RDBMS}" does not define a default platform for staging COPY operations.`)
+	}
+	
+	const configuration = {
 	  connections             : {
-	    target                : { [this.yadamu.RDBMS] : { /* All Paramaters come from command line Arguments */ }}
+		source                : { [DBI.DEFAULT_STAGING_PLATFORM]: {}}
+	  , target                : { [this.yadamu.RDBMS] : { /* All Paramaters come from command line Arguments */ }}
 	  }
 	, schemas                 : {
-		source                : {  /* All Paramaters come from command line Arguments */ }
-      , target                : { schema : this.yadamu.COMMAND_LINE_PARAMETERS.FROM_USER }
+		source                : { schema : this.yadamu.COMMAND_LINE_PARAMETERS.FROM_USER }
+      , target                : { schema : this.yadamu.COMMAND_LINE_PARAMETERS.TO_USER }
 	  }
 	}
 	
 	const job = {
-      source      : {
-	  }
-    , target      : {
-	  }
+	  source        : {
+	    connection  : 'source'
+	  , schema      : 'source'
+      }
+	, target        : {
+	    connection  : 'target'
+	  , schema      : 'target'
+      }
 	}
-	
+
 	const jobParameters = {
-	  ...configuration.parameters || {}
-    , ...job.parameters || {} 
+      ...job.parameters || {} 
     }
 	
-    // yadamu.reloadParameters(jobParameters);
-    yadamu.updateParameters(jobParameters);
-	
-	// The source is obtained from the target
-	
-	const targetDBI = await this.getTargetConnection(yadamu,job)
-    this.CONFIGURATION.source = {
-	  [dbi.STAGING_PLATFORM] : {}
-	}
-	
-	const sourceDBI = await this.getSourceConnection(yadamu,job)
-    
-	const startTime = performance.now()
-    // const metrics = await this.pumpData(yadamu,sourceDBI,targetDBI);        
-	const metrics = await yadamu.pumpData(sourceDBI,targetDBI);        
-	const endTime = performance.now();
-	const elapsedTime = endTime - startTime
-
-    const sourceDescription = this.getDescription(job.source.connection,sourceDBI)
-    const targetDescription = this.getDescription(job.target.connection,targetDBI)
-          
-    this.printResults(jobName,sourceDescription,targetDescription,elapsedTime)   
-	  
-    return {
-      startTime            : startTime
-	, endTime              : endTime
-	, elapsedTime          : YadamuLibrary.stringifyDuration(elapsedTime)
-    , source               : this.getSourceState(sourceDBI,sourceDescription)
- 	, target               : this.getTargetState(targetDBI,targetDescription)
-   	, metrics              : metrics
-	}
+	await this.executeJob(this.yadamu,configuration,job,'UPLOAD')	
+    await this.yadamu.close()
   }
     
   async doUpload() {
+
+	await this.yadamu.initialize()
+
 	const configuration = {
 	  connections             : {
 	    target                : { [this.yadamu.RDBMS] : { /* All Paramaters come from command line Arguments */ }}
@@ -757,13 +756,16 @@ class YadamuCLI {
 	    connection  : 'target'
 	  , schema      : 'target'
       }
-	, parser       : "SQL"
+	, parser        : "SQL"
 	}
 	await this.executeJob(this.yadamu,configuration,job,'UPLOAD')	
     await this.yadamu.close()
   }
     
   async doUnload() {
+
+	await this.yadamu.initialize()
+
 	const configuration = {
 	  connections             : {
 	    [this.yadamu.RDBMS]   : { [this.yadamu.RDBMS] : { /* All Paramaters come from command line Arguments */ }}
@@ -790,6 +792,9 @@ class YadamuCLI {
   }
 
   async doLoad() {
+
+	await this.yadamu.initialize()
+
 	const configuration = {
 	  connections             : {
 		loader                : { loader : { /* All Paramaters come from command line Arguments */ }}
@@ -815,6 +820,9 @@ class YadamuCLI {
   }
 
   async doExport() {
+
+	await this.yadamu.initialize()
+
 	const configuration = {
 	  connections             : {
 	    [this.yadamu.RDBMS]   : { [this.yadamu.RDBMS] : { /* All Paramaters come from command line Arguments */ }}
@@ -840,6 +848,9 @@ class YadamuCLI {
   }
    
   async doImport() {
+
+	await this.yadamu.initialize()
+
 	const configuration = {
 	  connections             : {
 		file                  : { file : { /* All Paramaters come from command line Arguments */ }}
@@ -861,6 +872,29 @@ class YadamuCLI {
       }
 	}
 	await this.executeJob(this.yadamu,configuration,job,'IMPORT')	
+    await this.yadamu.close()
+  }
+
+  async doCompare() {
+
+	await this.yadamu.initialize()
+
+	const configuration = {
+	  connections             : {
+	    target                : { [this.yadamu.RDBMS] : { /* All Paramaters come from command line Arguments */ }}
+	  }
+	, schemas                 : {
+		source                : this.getSchemaDefinition('FROM_USER')
+      , target                : this.getSchemaDefinition('TO_USER')
+	  }
+	}
+	const job = {
+	  target        : {
+	    schema1     : 'source'
+	  , schema2     : 'target'
+      }
+	}
+	await this.executeCompareJob(this.yadamu,configuration,job,'UPLOAD')	
     await this.yadamu.close()
   }
 
@@ -1045,6 +1079,8 @@ class YadamuCLI {
   }
   
   async doCopy() {
+
+	await this.yadamu.initialize()
 	    
     this.CONFIGURATION = this.loadConfigurationFile()
 	if (this.yadamu.COMMAND_LINE_PARAMETERS.BATCH_NAME && this.yadamu.COMMAND_LINE_PARAMETERS.JOB_NAME) {

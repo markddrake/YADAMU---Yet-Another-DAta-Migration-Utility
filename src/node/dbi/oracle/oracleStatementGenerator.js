@@ -281,6 +281,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
   }
  
   generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions) {
+	  
 	 return `
 CREATE TABLE ${externalTableName} (
   ${externalColumnDefinitions.join(',')}
@@ -303,7 +304,7 @@ ORGANIZATION EXTERNAL (
 	'${tableMetadata.partitionCount ? `${tableMetadata.dataFile.map((filename) => { return path.basename(filename).split(path.sep).join(path.posix.sep)}).join("','")}` : path.basename(tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}'
   )
 ) 
-${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > this.dbi.PARALLEL) ? this.dbi.PARALLEL : tableMetadata.partitionCount}` : ''}
+${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > this.dbi.yadamu.PARALLEL) ? this.dbi.yadamu.PARALLEL : tableMetadata.partitionCount}` : ''}
 ` 
   }
   
@@ -314,9 +315,9 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
   generateCopyStatement2(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql,externalInsertOperations) {
 	return `
 declare 
-  V_INSERT_COUNT PLS_INTEGER := 0;
-  V_REJECT_COUNT PLS_INTEGER := 0;
-  V_REJECT_LIMIT PLS_INTEGER := 0;
+  V_INSERT_COUNT NUMBER := 0;
+  V_REJECT_COUNT NUMBER := 0;
+  V_REJECT_LIMIT NUMBER := 0;
   cursor fetchData is ${plsql ? `WITH\n${plsql}\n` : ''}select ${externalColumnNames.join(",")} from ${externalTableName};
 begin
   V_REJECT_LIMIT := :1;

@@ -37,7 +37,8 @@ import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
-  YadamuError
+  YadamuError,
+  YadamuShutdown
 }                                    from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
@@ -140,8 +141,10 @@ class PostgresDBI extends YadamuDBI {
 							          
   get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || DataTypes.storageOptions.JSON_TYPE }
   
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
-
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
+  
   addVendorExtensions(connectionProperties) {
 
 	// PG Environment variables override command line parameters or configuration file supplied variables
@@ -322,7 +325,7 @@ class PostgresDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
+    // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${this.connection === undefined})`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -333,7 +336,7 @@ class PostgresDBI extends YadamuDBI {
       } catch (e) {
         this.connection = undefined;
 		const err = this.getDatabaseException(e,stack,'Client.release()')
-		this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
+  	    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
       }
 	}
@@ -368,7 +371,7 @@ class PostgresDBI extends YadamuDBI {
   */
   
   async executeSQL(sqlStatement,args) {
-	
+		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
 	if (typeof sqlStatement === 'string') {
@@ -393,6 +396,7 @@ class PostgresDBI extends YadamuDBI {
 		return results;
       } catch (e) {
 		const cause = this.getDatabaseException(e,stack,sqlStatement)
+		if (cause.connectionTerminated() && this.DESTROYED) throw new YadamuShutdown(this,cause,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -413,6 +417,19 @@ class PostgresDBI extends YadamuDBI {
 
   async initialize() {
     await super.initialize(true)
+  }
+
+  async resetIdentityColumns() {
+	const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_IDENTITY_COLUMNS,[this.CURRENT_SCHEMA])
+	const updatedIdentityValues = await Promise.all(results.rows.map((row) => {
+	  return this.executeSQL(row[0])
+	}))
+  }
+
+  async finalizeImport() {
+	if (this.RESET_IDENTITY) {
+	  await this.resetIdentityColumns()
+	}
   }
   
   /*
@@ -666,7 +683,9 @@ class PostgresDBI extends YadamuDBI {
   */
 
   async getDDLOperations() {
-    return undefined
+	const schema = this.CURRENT_SCHEMA === this.CURRENT_SCHEMA.toLowerCase() ? this.CURRENT_SCHEMA : `"${this.CURRENT_SCHEMA}"`
+	const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_DDL_STATEMENTS,[schema])
+	return results.rows.map((row) => { return row[0] })
   }
   
   async getSchemaMetadata() {
@@ -771,19 +790,30 @@ class PostgresDBI extends YadamuDBI {
   
   async _executeDDL(ddl) {
 	
-   let results = []
-   //  await this.createSchema(this.CURRENT_SCHEMA)
-	
-	try {
-      results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA)
-		// this.SQL_TRACE.traceSQL(ddlStatement))
-        return this.executeSQL(ddlStatement)
-      }))
+    let results = []
+    //  await this.createSchema(this.CURRENT_SCHEMA)
+   
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.DISABLE_FUNCTION_COMPILATION)
+
+	const schema = this.CURRENT_SCHEMA === this.CURRENT_SCHEMA.toLowerCase() ? this.CURRENT_SCHEMA : `"${this.CURRENT_SCHEMA}"`
+   
+    try {
+	  for (let ddlStatement of ddl) {
+	    if (ddlStatement) {
+          ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema)
+		  ddlStatement = ddlStatement.replaceAll(` ${this.systemInformation.schema}.`,` ${schema}.`)
+		  ddlStatement = ddlStatement.replaceAll(`(${this.systemInformation.schema}.`,`(${schema}.`)
+		  ddlStatement = ddlStatement.replaceAll(` "${this.systemInformation.schema}"."`,` "${this.CURRENT_SCHEMA}"."`)
+		  ddlStatement = ddlStatement.replaceAll(` ("${this.systemInformation.schema}"."`,` ("${this.CURRENT_SCHEMA}"."`)
+		  results.push (await this.executeSQL(ddlStatement))
+	    }
+      }
     } catch (e) {
-	 this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
-	 results = e;
+	  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
+	  results = e;
     }
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.ENABLE_FUNCTION_COMPILATION)
+
 	return results;
   }
    

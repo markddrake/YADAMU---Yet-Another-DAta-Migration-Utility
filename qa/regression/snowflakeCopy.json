@@ -1,80 +1,113 @@
 {
-	"operation": "dbRoundTrip",
-	"connections": "connections.json",
-	"tasks": "tasks.json",
-	"stagingArea": "awsS3-staging",
-	"recreateSchema": true,
-	"reloadStagingArea" : false,
-	"parameters": {
-        "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
-		"SPATIAL_FORMAT"          : "WKT"
-	},
-	"tests": [{
+    "operation": "dbRoundTrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "stagingArea": "awsS3-staging",
+    "recreateSchema": true,
+    "reloadStagingArea": false,
+    "parameters": {
+        "REMOTE_STAGING_AREA": "yadamu/aws/loader/csv/WKT/%sourceConnection%",
+        "DIRECTORY": "loader/csv/WKT/%sourceConnection%"
+    },
+    "tests": [
+        {
             "source": "snow#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
+        },
+        {
             "source": "oracle#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "oracle18c",
+        },
+        {
+            "source": "oracle18c",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "oracle12c",
+        },
+        {
+            "source": "oracle12c",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "oracle11g",
+        },
+        {
+            "source": "oracle11g",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "mssql#1",
+        },
+        {
+            "source": "mssql#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "mssql19",
+        },
+        {
+            "source": "mssql19",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "postgres#1",
+        },
+        {
+            "source": "postgres#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "mysql#1",
+        },
+        {
+            "source": "mysql#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "mariadb#1",
+        },
+        {
+            "source": "mariadb#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    },{
-		    "source": "mongodb#1",
+        },
+        {
+            "source": "mongodb#1",
             "target": "snow#1",
             "tasks": [
-                "oracle","mssql","mysql"
+                "oracle",
+                "mssql",
+                "mysql"
             ]
-    }]
+        }
+    ]
 }

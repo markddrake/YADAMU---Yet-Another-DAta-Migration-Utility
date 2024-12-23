@@ -1,4 +1,4 @@
-FROM node:22.2
+FROM node:22.12
 WORKDIR /usr/src/YADAMU
 ADD https://download.oracle.com/otn_software/linux/instantclient/2350000/oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm .
 COPY src/package*.json ./

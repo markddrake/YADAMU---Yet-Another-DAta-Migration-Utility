@@ -390,7 +390,7 @@ class FileDBI extends YadamuDBI {
     const streams = []
 	
     if (this.USE_COMPRESSION) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
     }
 
     if (this.USE_ENCRYPTION) {
@@ -407,6 +407,8 @@ class FileDBI extends YadamuDBI {
 	
 	const ws = await this.createWriteStream()
 	streams.push(ws)
+    // this.LOGGER.trace([this.constructor.name,'COMPOSE'],`${streams.map((s) => { return s.constructor.name }).join(' => ')}`)
+
 	const os = streams.length === 1 ? streams[0] : compose(...streams)
 	
 	
@@ -491,7 +493,6 @@ class FileDBI extends YadamuDBI {
   async finalizeData() {
     
 	// this.LOGGER.trace([this.constructor.name],`finalizeData(${YadamuLibrary.isEmpty(this.metadata)})`)
-	
 	if (!YadamuLibrary.isEmpty(this.metadata)) {
       const finalizeExport = new ExportWriter('}}')
 	  // Restore the default listeners to the outputStreams
@@ -593,15 +594,14 @@ class FileDBI extends YadamuDBI {
   
   async loadInitializationVector() {
 
-    let cause	  
 	try {
-      cause = new FileError(this,new Error(`Unable to load Initialization Vector from "${this.FILE}".`))
 	  const fd = await fsp.open(this.FILE)
       const iv = new Uint8Array(this.IV_LENGTH)
 	  const results = await fd.read(iv,0,this.IV_LENGTH,0)
 	  this.INITIALIZATION_VECTOR = iv;
 	  await fd.close()
 	} catch (e) {
+      const cause = new FileError(this,new Error(`Unable to load Initialization Vector from "${this.FILE}".`))
 	  cause.cause = e
 	  throw cause
     }
@@ -640,7 +640,7 @@ class FileDBI extends YadamuDBI {
 	}
 
 	if (this.USE_COMPRESSION) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
 	const jsonParser = new JSONParser(this.MODE, this.FILE, pipelineState, this.LOGGER)
@@ -763,11 +763,11 @@ class FileDBI extends YadamuDBI {
 	}
 	
 	if (options.compressedInput) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
       
 	if (options.compressedOutput) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+      streams.push(this.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
 	}
 	
 	if (options.encryptedOutput) {
@@ -802,7 +802,7 @@ class FileDBI extends YadamuDBI {
       activeStreams = pipelineComponents.map((s) => { 
 	    return finished(s).catch((e) => { 
 		  // Under certain circumstance it appears that errors in the streams are not correclty handled in allSettled and escape as unhandled rejections. 
-		  // Flase the error as ignorable (it will be handled by the try/catch on the pipeline operation and swallow it.
+		  // Flag the error as ignorable (it will be handled by the try/catch on the pipeline operation) and swallow it.
 		  e.ignoreUnhandledRejection = true
 		})
 	  })

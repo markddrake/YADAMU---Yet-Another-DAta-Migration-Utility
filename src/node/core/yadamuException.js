@@ -276,8 +276,8 @@ class DatabaseError extends YadamuError {
 }
 
 class ContentTooLarge extends DatabaseError {
-  constructor(driverId,cause,stack,operation,vendor,tableName,maxLength) {
-    super(driverId,cause,stack,operation);
+  constructor(dbi,cause,stack,operation,vendor,tableName,maxLength) {
+    super(dbi,cause,stack,operation);
 	this.message = `Table "${tableName}": Row length ${length} exceeeds maximum permitted (${maxLength}).`
 	this.vendor = vendor
 	this.tableName = tableName
@@ -288,14 +288,20 @@ class ContentTooLarge extends DatabaseError {
 }
 
 class ColumnTooLarge extends ContentTooLarge {
-  constructor(driverId,cause,stack,operation,vendor,tableName,maxLength,columnName,dataLength) {
-    super(driverId,cause,stack,operation,vendor,tableName,maxLength);
+  constructor(dbi,cause,stack,operation,vendor,tableName,maxLength,columnName,dataLength) {
+    super(dbi,cause,stack,operation,vendor,tableName,maxLength);
 	this.message = `Column "${columnName}" in table "${tableName}": Content length ${length} exceeeds maximum permitted (${maxLength}).`
 	this.columnName = columnName
 	this.dataLength = dataLength
 	this.tags.push(this.columnName,this.dataLength)
   }
    
+}
+
+class YadamuShutdown extends DatabaseError {
+  constructor(dbi,cause,stack,operation) {
+    super(dbi,cause,stack,operation);
+  }
 }
 
 class InputStreamError extends DatabaseError {
@@ -321,4 +327,5 @@ export {
 , InvalidMessageSequence
 , CopyOperationAborted
 , UnimplementedMethod
+, YadamuShutdown
 }

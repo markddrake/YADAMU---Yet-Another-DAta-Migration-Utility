@@ -14,7 +14,10 @@ class CockroachCompare extends YadamuCompare {
 	  if (results.length > 0 ) {
 	    const sqlCountRows = results.map((row) => { return `select cast('${target}' as VARCHAR(128)), cast('${row[0]}' as VARCHAR(128)), count(*) from "${target}"."${row[0]}"`}).join('\nunion all \n')
 	    results = await this.dbi.executeSQL(sqlCountRows)
-		results = results.rows.map((result) => { return Object.values(result)})
+		results.rows.forEach((row) => {
+		  row[2] = parseInt(row[2])
+		})
+	    results = results.rows.map((result) => { return Object.values(result)})
 	  }
 	  return results
     }    

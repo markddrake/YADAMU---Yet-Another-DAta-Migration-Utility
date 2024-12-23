@@ -5,8 +5,8 @@ import _JSONParser from '../file/jsonParser.js';
 
 class JSONParser extends _JSONParser {
   
-  constructor(yadamuLogger, mode, exportFilePath) {    
-    super(yadamuLogger, mode, exportFilePath);  
+  constructor(yadamuLogger, mode, exportFilePath, logger) {
+    super(yadamuLogger, mode, exportFilePath, logger);  
   }
   
   registerEvents(parser) {

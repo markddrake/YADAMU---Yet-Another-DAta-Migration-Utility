@@ -17,6 +17,7 @@ class DBIConstants {
 	, "REMOTE_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "STAGING_FILE_RETENTION"     : "FAILED"
 	, "BYTE_TO_CHAR_RATIO"         : 1
+	, "RESET_IDENTITY"             : true
     })
     return this._STATIC_PARAMETERS;
   }
@@ -74,6 +75,7 @@ class DBIConstants {
   static get REMOTE_STAGING_AREA()        { return this.DBI_PARAMETERS.REMOTE_STAGING_AREA };
   static get STAGING_FILE_RETENTION()     { return this.DBI_PARAMETERS.STAGING_FILE_RETENTION };
   static get BYTE_TO_CHAR_RATIO()         { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
+  static get RESET_IDENTITY()             { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   
   static get BATCH_COMPLETED()            { return 'batchCompleted' }
   static get BATCH_RELEASED()             { return 'batchReleased' }
@@ -88,21 +90,15 @@ class DBIConstants {
 	 return this.#STAGING_UNSUPPORTED
   }
   
-  static #LOADER_STAGING
+  static #LOADER_STAGING                 = Object.freeze(['loader'])
+  static get LOADER_STAGING()            { return this.#LOADER_STAGING }
 
-  static get LOADER_STAGING()             { 
-     this.#LOADER_STAGING  = this.#LOADER_STAGING || Object.freeze(['loader'])
-	 return this.#LOADER_STAGING
-  }
+  static #CLOUD_STAGING                  = Object.freeze(['awsS3','azure'])
+  static get CLOUD_STAGING()             { return this.#CLOUD_STAGING }
 
-  static #CLOUD_STAGING
+  static #CSV_FORMAT                     = Object.freeze(['CSV'])
+  static get CSV_FORMAT()                { return this.#CSV_FORMAT }
 
-  static get CLOUD_STAGING()             { 
-     this.#CLOUD_STAGING  = this.#CLOUD_STAGING || Object.freeze(['awsS3','azure'])
-	 return this.#CLOUD_STAGING
-  }
- 
- 
 }
 
 export { DBIConstants as default}

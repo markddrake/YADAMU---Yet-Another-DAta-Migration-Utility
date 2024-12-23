@@ -16,6 +16,7 @@
 		"awsS3": "../../qa/dbi/awsS3/awsS3QA.js",
 		"awsS3File": "../../qa/dbi/awsS3/awsS3FileQA.js",
 		"azure": "../../qa/dbi/azure/azureQA.js",
+		"azureFile": "../../qa/dbi/azure/azureFileQA.js",
 		"oracle": "../../qa/dbi/oracle/oracleQA.js",
 		"postgres": "../../qa/dbi/postgres/postgresQA.js",
 		"vertica": "../../qa/dbi/vertica/verticaQA.js",

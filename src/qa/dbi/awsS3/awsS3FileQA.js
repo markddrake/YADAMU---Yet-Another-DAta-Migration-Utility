@@ -4,8 +4,9 @@ import Yadamu              from '../../core/yadamu.js';
 
 import AWSS3FileDBI        from '../../../node/dbi/awsS3/awsS3FileDBI.js';
 import AWSS3Constants      from '../../../node/dbi/awsS3/awsS3Constants.js';
+import YadamuQALibrary     from '../../lib/yadamuQALibrary.js'
 
-class AWSS3FileQA extends AWSS3FileDBI {
+class AWSS3FileQA extends YadamuQALibrary.fileQAMixin(AWSS3FileDBI)  {
    
   static #DBI_PARAMETERS
   

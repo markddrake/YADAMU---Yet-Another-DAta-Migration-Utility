@@ -157,7 +157,9 @@ class CockroachDBI extends YadamuDBI {
 							          						          
   get JSON_DATA_TYPE()                { return 'jsonb' }
   
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
   
   get ID_TRANSFORMATION() {
     this._ID_TRANSFORMATION = this._ID_TRANSFORMATION || ((this.COCKROACH_STRIP_ROWID === true) ? 'STRIP' : 'PRESERVE')

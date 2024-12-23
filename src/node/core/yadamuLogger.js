@@ -13,7 +13,7 @@ import ErrorDBI      from '../dbi/file/errorDBI.js';
 import {FileError}   from '../dbi/file/fileException.js';
 
 import DBWriter      from './dbWriter.js';
-import {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  from './yadamuException.js';
+import {InternalError, DatabaseError, IterativeInsertError, BatchInsertError, YadamuShutdown}  from './yadamuException.js';
 
 
 class YadamuLogger {
@@ -144,6 +144,10 @@ class YadamuLogger {
     }
   }
 
+  #ACTIVE_PROMPT = new Promise((resolve) => {resolve()})
+  set ACTIVE_PROMPT(p) { this.#ACTIVE_PROMPT = p }
+  get ACTIVE_PROMPT()  { return this.#ACTIVE_PROMPT }
+
   constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
    
     this.os = outputStream !== undefined ? outputStream : process.out
@@ -178,6 +182,21 @@ class YadamuLogger {
 	}
   }
   
+  
+  log(args,msg) {
+
+    const ts = new Date().toISOString()
+	this.ACTIVE_PROMPT.then(() => { 
+	  this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	}).catch((e) => {
+	  if (e.message === `TypeError: Cannot read property 'write' of undefined`) {
+        this.os = process.out
+	    this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	  }
+    })    
+    return ts
+  }
+
   log(args,msg) {
 
     const ts = new Date().toISOString()
@@ -192,6 +211,7 @@ class YadamuLogger {
     return ts
   }
   
+
   info(args,msg) {
     args.unshift('INFO')
     return this.log(args,msg)
@@ -383,21 +403,23 @@ class YadamuLogger {
 
   handleException(args,e) {
     // Handle Exception does not produce any output if the exception has already been processed by handleException or logException
-    if (e.yadamuAlreadyReported === true) {
-      if (this.YADAMU_STACK_TRACE === true) {
-        this.log(['YADAMU_STACK_TRACE',...args],e)
+	if (!(e instanceof YadamuShutdown)) {
+      if (e.yadamuAlreadyReported === true) {
+        if (this.YADAMU_STACK_TRACE === true) {
+          this.log(['YADAMU_STACK_TRACE',...args],e)
+        }
       }
-    }
-    else {
-      const largs = [...args]
-      const ts = this.error(args,e.message);
-      const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
-      this.generateDataFile(exceptionFile,e);
-      this.writeExceptionToFile(exceptionFile,ts,args,e)
-      this.info(largs,`Exception logged to "${exceptionFile}".`)
-      e.yadamuAlreadyReported = true;
-	  return exceptionFile
-    }
+      else {
+        const largs = [...args]
+        const ts = this.error(args,e.message);
+        const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
+        this.generateDataFile(exceptionFile,e);
+        this.writeExceptionToFile(exceptionFile,ts,args,e)
+        this.info(largs,`Exception logged to "${exceptionFile}".`)
+        e.yadamuAlreadyReported = true;
+	    return exceptionFile
+      }
+	}
   }
   
   handleWarning(args,e) {

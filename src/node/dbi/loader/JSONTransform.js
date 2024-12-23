@@ -2,7 +2,7 @@
 import YadamuDataTypes  from '../base/yadamuDataTypes.js'
 import YadamuParser     from '../base/yadamuParser.js'
 
-class LoaderParser extends YadamuParser {
+class JSONTransform extends YadamuParser {
   
   constructor(dbi,tableInfo,pipelineState,yadamuLogger) {
 	  
@@ -48,4 +48,4 @@ class LoaderParser extends YadamuParser {
   
 }
 
-export {LoaderParser as default }
+export {JSONTransform as default }

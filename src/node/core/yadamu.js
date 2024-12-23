@@ -26,6 +26,7 @@ import DBIConstants           from '../dbi/base/dbiConstants.js';
 import YadamuDataTypes        from '../dbi/base/yadamuDataTypes.js';
 import YadamuCopyManager      from '../dbi/base/yadamuCopyManager.js';
 import NullWriter             from '../util/nullWriter.js';
+import ExternalPromise        from '../util/externalPromise.js';
 
 import {
   FileNotFound, 
@@ -109,7 +110,7 @@ class Yadamu {
   set ENCRYPTION_KEY(v)               { this._ENCRYPTION_KEY = v}
  
   get COMPRESSION()                   { return this.parameters.COMPRESSION || 'NONE' }
-  get DATA_STAGING_ENABLED()          { return this.parameters.hasOwnProperty('DATA_STAGING_ENABLED') ? this.parameters.DATA_STAGING_ENABLED : true }
+  get DIRECT_COPY_ENABLED()           { return this.parameters.hasOwnProperty('DIRECT_COPY') ? this.parameters.DIRECT_COPY : true }
   get CREATE_TARGET_DIRECTORY()       { return this.parameters.hasOwnProperty('CREATE_TARGET_DIRECTORY') ? this.parameters.CREATE_TARGET_DIRECTORY : false } 
   
   get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
@@ -189,6 +190,54 @@ class Yadamu {
   }
   
   get METRICS() { return this.metrics }
+
+  #PROMPT = { 
+	text : null
+  } 
+  
+  get PROMPT() { return this.#PROMPT }
+  set PROMPT(text) { this.#PROMPT.text = text }
+  
+  #COMMAND_LINE_PROMPT = undefined
+
+  // Initialize on first use  
+  get COMMAND_LINE_PROMPT() { return this.#COMMAND_LINE_PROMPT || (() => { 
+      this.#COMMAND_LINE_PROMPT = readline.createInterface({input: process.stdin, output: process.stdout});
+      this.#COMMAND_LINE_PROMPT._writeToOutput = (charsToWrite) => {
+	    if (charsToWrite.startsWith(this.PROMPT.text)) {
+          this.#COMMAND_LINE_PROMPT.output.write(this.PROMPT.text + '*'.repeat(charsToWrite.length-this.PROMPT.text.length))
+        } 
+	    else {
+	      this.#COMMAND_LINE_PROMPT.output.write(charsToWrite.length > 1 ? charsToWrite : "*")
+        }
+	  }
+	  return this.#COMMAND_LINE_PROMPT
+    })()
+  }
+  
+
+  #PASSPHRASE = undefined
+  
+  get PASSPHRASE() { 
+    this.#PASSPHRASE = this.#PASSPHRASE || (() => {
+      this.#PASSPHRASE = new Promise((resolve) => {
+	   
+      })
+	})()
+	return this.#PASSPHRASE
+  }
+  
+  get PASSPHRASE() { 
+    return this.#PASSPHRASE || (() => {
+      this.#PASSPHRASE = new ExternalPromise((res,reject) => {})
+	  process.nextTick(() => {
+ 	    const prompt = `Enter passphrase to be used when encrypting and decypting data files: `
+        const pwQuery = this.createQuestion(prompt);
+		pwQuery.then((passphrase) => {this.#PASSPHRASE.resolve(passphrase)})
+	  })
+      return this.#PASSPHRASE
+    })() 
+  }
   
   constructor(operation,configParameters) {
 	
@@ -208,21 +257,6 @@ class Yadamu {
 	this.metrics = {}
 	
 	// Use an object to pass the prompt to ensure changes to prompt are picked up insde the writeToOutput function closure()
-
-    this.cli = { 
-	  "prompt" : null
-	} 
-
-    this.commandPrompt = readline.createInterface({input: process.stdin, output: process.stdout});
-    this.commandPrompt._writeToOutput = (charsToWrite) => {
-	  if (charsToWrite.startsWith(this.cli.prompt)) {
-        this.commandPrompt.output.write(this.cli.prompt + '*'.repeat(charsToWrite.length-this.cli.prompt.length))
-      } 
-	  else {
-	    this.commandPrompt.output.write(charsToWrite.length > 1 ? charsToWrite : "*")
-     
-	 }
-    }
 	
   }
 
@@ -237,7 +271,7 @@ class Yadamu {
     this.LOGGER.handleException(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
 	this.STATUS.errorRaised = true;
     this.reportStatus(this.STATUS,this.LOGGER)
-	this.close();
+	this.close(true);
     if (!this.INTERACTIVE) {
   	  setTimeout(5000,null,{ref: false}).then(() => {
 	    // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
@@ -389,29 +423,28 @@ class Yadamu {
 	  this.ENCRYPTION_KEY = await this.generateCryptoKey(this.parameters)
 	}
   }
-
-  async requestPassPhrase() {
-	  
-	 if (process.env.YADAMU_PASSPHRASE) {
-	   this.LOGGER.info(['YADAMU'],'Passphrase used for Encryption and Decryption operations supplied using environemnt variable YADAMU_PASSPHRASE.')
-	   return process.env.YADAMU_PASSPHRASE
-	 }
-	   
-     const prompt = `Enter passphrase to be used when encrypting and decypting data files: `
-     const pwQuery = this.createQuestion(prompt);
-     return await pwQuery;
-  
-  }
   
   async generateCryptoKey(parameters) {
 	 
 	// Environemnt variables overide configuration files and command line parameters
-	  
-    const passphrase = process.env.YADAMU_PASSPHRASE || parameters.PASSPHRASE || await this.requestPassPhrase()
+
+    let passphrase
+    switch (true) {
+	  case process.env.hasOwnProperty('YADAMU_PASSPHRASE'):
+        this.LOGGER.info(['YADAMU'],'Passphrase used for Encryption and Decryption operations supplied using environemnt variable YADAMU_PASSPHRASE.')
+	    passphrase = process.env.YADAMU_PASSPHRASE
+	    break
+	  case parameters.hasOwnProperty('PASSPHRASE'):
+	    passphrase = parameters.PASSPHRASE
+   	    // Prevent the PASSPHRASE from being 'Inspected'
+	    delete parameters.PASSPHRASE
+ 	    break
+      default:
+	    passphrase = await this.PASSPHRASE
+	}
+
 	const salt = process.env.YADAMU_SALT || parameters.SALT || YadamuConstants.SALT 
 	
-	// Prevent the PASSPHRASE from being 'Inspected'
-	delete parameters.PASSPHRASE
     return await new Promise((resolve,reject) => {
 	  crypto.scrypt(passphrase, salt , this.CIPHER_KEY_SIZE, (err,key) => {
 		parameters.ENCRYPTION_KEY_AVAILABLE = false
@@ -603,19 +636,29 @@ class Yadamu {
     }
   }
     
-  async close() {
-	this.commandPrompt.close();
+  async close(force) {
+	this.COMMAND_LINE_PROMPT.close();
     await this.LOGGER.close();
     this.STATUS.sqlLogger.close();
 	this.STATUS.sqlLogger = NullWriter.NULL_WRITER
   }
     
   createQuestion(prompt) {	
-	this.cli.prompt = prompt;
-    return new Promise((resolve,reject) => {
-      this.commandPrompt.question(this.cli.prompt, (answer) => {
-		resolve(answer);
+	this.PROMPT = prompt;
+	const question = new Promise((resolve,reject) => {
+      this.COMMAND_LINE_PROMPT.question(this.PROMPT.text, (answer) => {
+        this.LOGGER.ACTIVE_PROMPT = new Promise((resolve) => {resolve()})
+	    resolve(answer);
 	  })
+	})
+    this.LOGGER.ACTIVE_PROMPT = question
+	return question
+  }
+
+  askSyncQuestion(prompt) {	
+	this.PROMPT = prompt;
+	return this.COMMAND_LINE_PROMPT.question(this.PROMPT.text, (answer) => {
+      return answer
 	})
   }
 
@@ -808,6 +851,9 @@ class Yadamu {
 	      case 'TRUNCATE_ON_LOAD':		  
 	        parameters.TRUNCATE_ON_LOAD = this.getBooleanValue(parameterName,parameterValue)
 		    break;
+	      case 'RESET_IDENTITY':		  
+	        parameters.RESET_IDENTITY = this.getBooleanValue(parameterName,parameterValue)
+		    break;
           case 'IDENTIFIER_MAPPING_FILE':
             parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);
             break;
@@ -935,7 +981,7 @@ class Yadamu {
 
     const copyManager = new YadamuCopyManager(target,source.getCredentials(target.DATABASE_KEY),this.LOGGER);
 	try {
-	  const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata)
+	  const results = await copyManager.stagedDataCopy(source.DATABASE_KEY,controlFile,metadata)
       this.reportStatus(this.STATUS,this.LOGGER)
 	  await source.final()
 	  await target.final()
@@ -975,9 +1021,22 @@ class Yadamu {
 	  yadamuPipeline.push(...await(dbReader.getInputStreams(DBIConstants.PIPELINE_STATE)))
 	  yadamuPipeline.push(dbWriter)
 
-      
+      /*
+	  **
+	  **
+	  
       // The components that make up the pipeline may not have finished _final and destroy when the pipeline completes. Need to wait for all components to Finish before closing connections
-	  // activeStreams.push(...yadamuPipeline.map((s) => { return finished(s) }))
+	  activeStreams.push(...yadamuPipeline.map((s) => { 
+	      return finished(s).catch((e) => { 
+		  // Under certain circumstance it appears that errors in the streams are not correclty handled in allSettled and escape as unhandled rejections. 
+		  // Flag the error as ignorable (it will be handled by the try/catch on the pipeline operation) and swallow it.
+		  e.ignoreUnhandledRejection = true
+		})
+	  }))
+	  
+	  **
+	  **
+	  */
 
       // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}`)
  	  // this.LOGGER.trace([this.constructor.name,`PIPELINE`,dbReader.dbi.DATABASE_VENDOR,dbWriter.dbi.DATABASE_VENDOR,process.arch,process.platform,process.version],'Starting Pipeline')
@@ -994,7 +1053,7 @@ class Yadamu {
 	  if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
 	    e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
 	  }
-  	  this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
+  	  // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
       // this.LOGGER.trace([this.constructor.name,'doPipelineOperation()'],`Waiting for Streams to finish. [${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}]`);
 	  // await Promise.allSettled(activeStreams)
 	  // this.LOGGER.trace([this.constructor.name,'doPipelineOperation()'],`Streams Finished. [${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}]`);
@@ -1003,6 +1062,17 @@ class Yadamu {
 	}
   }
   
+  async copyOptionAvailablle(source,target) {
+
+	// this.LOGGER.trace([this.constructor.name,'COPY',this.DIRECT_COPY_ENABLED,target.isValidCopySource(source.DATABASE_KEY),(await source.isValidCopyFormat(target.SUPPORTED_STAGING_FORMATS)),target.isValidStagingLocation(source.CONTROL_FILE_FOLDER)],'')
+
+    return this.DIRECT_COPY_ENABLED 
+	    && target.isValidCopySource(source.DATABASE_KEY) 
+		&& (await source.isValidCopyFormat(target.SUPPORTED_STAGING_FORMATS))
+		&& target.isValidStagingLocation(source.CONTROL_FILE_FOLDER)
+		
+  }
+	
   async doPumpOperation(source,target) {
 	     
 	let results;
@@ -1015,17 +1085,11 @@ class Yadamu {
 
       await source.initialize();
       await target.initialize();
-		
-      if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_OPERATIONS) {
-		await source.loadControlFile()
-		if (target.validStagedDataSet(source.DATABASE_KEY,source.CONTROL_FILE_PATH,source.controlFile)) {
-		  // TODO: If all copy operations fail due to issues accessing file fallback to Pipeline.
-          await this.doCopyOperation(source,target)
-		}
-		else {
-		  await this.doPipelineOperation(source,target)
-	    }
-	  }	
+	  
+      if (await this.copyOptionAvailablle(source,target)) {
+        this.LOGGER.info([target.DATABASE_VENDOR,'COPY',`${source.controlFile.settings.contentType}`],`Using COPY operations to load content from ${source.CONTROL_FILE_FOLDER}" `)
+        await this.doCopyOperation(source,target)
+	  }
 	  else {
 	    await this.doPipelineOperation(source,target)
       }		  
@@ -1113,21 +1177,21 @@ class Yadamu {
   
   async doUpload(dbi) {
     const metrics = await this.uploadData(dbi);
-    await this.close();
+    await  await this.close();
     return metrics
   }  
   
   async doEncrypt() {
     const fileDBI = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
     await fileDBI.convertFile(true);
-    await this.close();
+    await  await this.close();
     return
   }  
 
   async doDecrypt() {
     const fileDBI = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
     await fileDBI.convertFile(false);
-    await this.close();
+    await  await this.close();
     return
   }  dir
 
@@ -1136,7 +1200,7 @@ class Yadamu {
     const fileReader = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
     const fileWriter = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
     const metrics = await this.pumpData(fileReader,fileWriter);
-    await this.close();
+    await  await this.close();
     return metrics
   }
    

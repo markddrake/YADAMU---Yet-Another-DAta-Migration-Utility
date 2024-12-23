@@ -1,24 +1,21 @@
 
-import YadamuParser           from '../base/yadamuParser.js'
-import YadamuDataTypes        from '../base/yadamuDataTypes.js'
+import YadamuDataTypes  from '../base/yadamuDataTypes.js'
+import YadamuParser     from '../base/yadamuParser.js'
 
-class CSVTransform extends YadamuParser {
-
-  constructor(dbi,tableInfo,yadamuLogger,parseDelay) {
-	super(dbi,tableInfo,yadamuLogger,parseDelay)
+class JSONTransform extends YadamuParser {
+  
+  constructor(dbi,tableInfo,pipelineState,yadamuLogger) {
+	  
+    super(dbi,tableInfo,pipelineState,yadamuLogger);      
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
-      if (YadamuDataTypes.isBinary(dataType)) {
-        return (row,idx) =>  {
-  		  row[idx] = Buffer.from(row[idx],'hex')
-		}
-      }
-
-	  switch (dataType.toUpperCase()) {
-        case "GEOMETRY":
-        case "GEOGRAPHY":
-        case '"MDSYS"."SDO_GEOMETRY"':
+      switch (true) {
+        case (YadamuDataTypes.isBinary(dataType)) :
+          return (row,idx) =>  {
+  		    row[idx] = Buffer.from(row[idx],'hex')
+		  }
+		case (YadamuDataTypes.isSpatial(dataType)) :
           if (tableInfo.SPATIAL_FORMAT.endsWith('WKB')) {
             return (row,idx)  => {
   		      row[idx] = row[idx] === null ? null : Buffer.from(row[idx],'hex')
@@ -39,29 +36,17 @@ class CSVTransform extends YadamuParser {
         }
       }) 
     }
-   }
-   
+    
+  }
+
   async doTransform(data) {
-    data = Object.values(data)
-	data.forEach((col,idx) => {
-	  if (col.length === 0) {
-		data[idx] = null;
-	  }
-	})
-	this.rowTransformation(data)
-  } 
+	 // if (this.rowCount === 1) console.log('_transform',data)	
+    const row = Object.values(data)
+    this.rowTransformation(row)
+    // if (this.rowCount === 1) console.log('Push',data)
+    return row
+  }
   
-  _final(callback) {
-	// this.LOGGER.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
-	this.endTime = performance.now();
-    this.push({
-      eod: {
-	    startTime : this.startTime
-	  , endTime   : performance.now()
-	  }
-    })
-	callback()
-  } 
 }
 
-export {CSVTransform as default }
+export {JSONTransform as default }

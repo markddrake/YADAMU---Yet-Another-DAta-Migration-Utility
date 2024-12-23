@@ -106,8 +106,10 @@ class RedshiftDBI extends YadamuDBI {
 	return this._BUCKET
   }
 
-  get SUPPORTED_STAGING_PLATFORMS()   { return RedshiftConstants.STAGED_DATA_SOURCES }
-
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
+  
   addVendorExtensions(connectionProperties) {
 
 	// PG Environment variables override command line parameters or configuration file supplied variables

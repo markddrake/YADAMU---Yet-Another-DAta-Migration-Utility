@@ -6,8 +6,8 @@
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
 	"parameters": {
-		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
+		"DIRECTORY"               : "loader/csv/%sourceConnection%",
 		"TIMESTAMP_PRECISION"     : 6
 	},
 	"tests": [{

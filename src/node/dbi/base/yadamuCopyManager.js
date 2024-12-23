@@ -88,9 +88,9 @@ class YadamuCopyManager {
     const taskCount = taskList.length
     const maxWorkerCount = parseInt(this.dbi.yadamu.PARALLEL)
     const workerCount = taskList.length < maxWorkerCount ? taskList.length : maxWorkerCount
-    
+	
 	await this.dbi.dbConnected
-    const workers = workerCount === 0 ? [this] : new Array(workerCount).fill(0).map((x,idx) => { return this.dbi.workerDBI(idx) })
+    const workers = workerCount === 0 ? [this.dbi] : new Array(workerCount).fill(0).map((x,idx) => { return this.dbi.workerDBI(idx) })
 	const concurrency = workerCount > 0 ? `PARALLEL (${workerCount})` : 'SEQUENTIAL'
 	
 	const copyOperations = workers.map((worker,idx) => { 
@@ -107,11 +107,11 @@ class YadamuCopyManager {
 	return results
   }  
   
-  async copyStagedData(vendor,controlFile,metadata) {
+  async stagedDataCopy(vendor,controlFile,metadata) {
 
-    // this.LOGGER.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'copyStagedData()')
+    // this.LOGGER.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'stagedDataCopy()')
 
-    this.dbi.verifyStagingSource(vendor)
+    // this.dbi.verifyStagingSource(vendor)
 	
 	this.dbi.setSystemInformation(controlFile.systemInformation)
 	await this.dbi.initializeImport()

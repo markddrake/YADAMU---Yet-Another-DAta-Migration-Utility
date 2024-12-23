@@ -66,6 +66,8 @@ import {StagingFileError}             from './oracleException.js'
 
 class OracleDBI extends YadamuDBI {
 
+  static get STAGING_PLATFORM()      { return undefined }
+
   static #DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  {
@@ -256,7 +258,9 @@ class OracleDBI extends YadamuDBI {
 	return options;
   }
   
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
   
   #ACTIVE_PARSER                             = undefined
   set ACTIVE_PARSER(v)                       { this.#ACTIVE_PARSER = v }
@@ -943,7 +947,6 @@ class OracleDBI extends YadamuDBI {
 	    
 
   async _executeDDL(ddl) {
-
 	let results = []
 	const jsonColumns = JSON.parse(ddl.shift())
 

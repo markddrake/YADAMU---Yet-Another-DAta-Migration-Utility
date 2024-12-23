@@ -1,10 +1,20 @@
 
 import LoaderCompare    from '../loader/loaderCompare.js'
+import csv              from 'csv-parser';
 
 class CloudCompare extends LoaderCompare {
 
   constructor(dbi,configuration) {
     super(dbi,configuration)
+  }
+  
+  csvRowCount(exportFilePath) {
+	return new Promise((resolve, rejecct) => {
+      let count = 0
+      this.dbi.cloudService.createReadStream(exportFilePath).then((is) => {
+		 is.pipe(csv({headers: false}).on('data', (data) => {count++}).on('end', () => {resolve(count)}).on('error',(e) => {reject(e)}))
+      })
+	})
   }
 
   async compareFiles(sourceFile,targetFile) {

@@ -171,6 +171,10 @@ class YadamuCompare {
      
 	const rowCounts = await this.getRowCounts(this.configuration.target.schema)
 	
+    const rowCountResults = {
+      failed : []
+	}
+	 
     rowCounts.forEach((row,idx) => {          
       const unmappedTableName = this.unmapTableName(row[1],this.configuration.identifierMappings)
       const tableMetrics = this.configuration.metrics[unmappedTableName] || this.configuration.metrics[row[1]]
@@ -221,12 +225,19 @@ class YadamuCompare {
                                      + ` ${(row[5] - row[2]).toString().padStart(colSizes[6])} |`
                                      + '\n');         
       }
+	  
+	  if (row[2] !== row[5]) {
+		rowCountResults.failed.push([row[0],row[0],row[1],row[3],row[2],row[4],row[5],row[3] === -1 ? 'Missing Source' : row[2] === -1 ? 'Missing Target' : 'Row Mismatch'])
+	  }
+	  
     })
 
     if (rowCounts.length > 0) {
      this.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }     
 
+    return rowCountResults
+	
   }
   
   printCompareResults(results) {
@@ -396,8 +407,9 @@ class YadamuCompare {
 	  const LoaderDBI = (await import(LoaderDBIPath)).default
 	  
       if (this.configuration.includeRowCounts) {
-		await this.reportRowCounts() 
+		await this.reportRowCounts()
       } 
+	  
       const startTime = performance.now();
       const compareResults = await this.compareSchemas(this.configuration.source.schema,this.configuration.target.schema,this.configuration.rules);
       
@@ -412,7 +424,7 @@ class YadamuCompare {
 
       compareResults.failed = compareResults.failed.filter((row) => {return this.configuration.rules.TABLES === undefined || this.configuration.rules.TABLES.length === 0 || this.configuration.rules.TABLES.includes(row[2])})
       compareResults.isFileBased = (this.dbi instanceof LoaderDBI)
-
+	  
       this.printCompareResults(compareResults)
       return compareResults
 	  

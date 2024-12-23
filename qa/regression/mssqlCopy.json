@@ -6,67 +6,68 @@
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
 	"parameters": {
-		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
-		"DIRECTORY"               : "loader/csv/%sourceConnection%",
-		"TIMESTAMP_PRECISION"     : 6
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/WKT/%sourceConnection%",
+		"DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+		"TIMESTAMP_PRECISION"     : 6,
+		"SPATIAL_FORMAT"          : "WKT"
 	},
 	"tests": [{
-			"source": "mariadb#1",
-			"target": "mariadb#1",
+			"source": "mssql#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle#1",
-			"target": "mariadb#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle18c",
-			"target": "mariadb#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle12c",
-			"target": "mariadb#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "oracle11g",
-			"target": "mariadb#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "mssql#1",
-			"target": "mariadb#1",
-			"tasks": [
-				"oracle","mssql","mysql"
-			]
-		},{
-			"source": "mssql19",
-			"target": "mariadb#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "postgres#1",
-			"target": "mariadb#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mssql19",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mysql#1",
-			"target": "mariadb#1",
+			"target": "mssql#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mariadb#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "mariadb#1",
+			"target": "mssql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

@@ -1,79 +1,77 @@
 {
-    "operation": "dbRoundTrip",
-    "connections": "connections.json",
-    "tasks": "tasks.json",
-    "recreateSchema": true,
-    "stagingArea": "loader-staging",
-    "reloadStagingArea" : false,
-    "parameters": {
-      "REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv/%sourceConnection%",
-      "DIRECTORY"               : "loader/csv/%sourceConnection%",
-      "COMMIT_RATIO"            : 0
-    },          
-    "tests": [{
-            "source": "oracle19c",
-            "target": "oracle19c",
+	"operation": "copy",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"targetSchemaSuffix" : "",
+	"parameters": {
+		"DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
+		"SPATIAL_FORMAT"          : "WKT",
+        "OUTPUT_FORMAT"           : "CSV"
+	},
+	"tests": [{
+		    "source": "snow#1",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
             "source": "oracle#1",
-            "target": "oracle19c",
-            "homogeneousOperation" : true,
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "oracle18c",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "oracle12c",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "oracle11g",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mssql#1",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mssql19",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "postgres#1",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mysql#1",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mariadb#1",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
 		    "source": "mongodb#1",
-            "target": "oracle19c",
+            "target": "awsS3-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]

@@ -95,9 +95,11 @@ class VerticaDBI extends YadamuDBI {
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()     { return DBIConstants.CSV_FORMAT }
   
-  get CSV_NUMBER_PARSING_ISSUE()  { return this._CSV_NUMBER_PARSING_ISSUE || false   }
-  set CSV_NUMBER_PARSING_ISSUE(v) { this._CSV_NUMBER_PARSING_ISSUE = v}
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
   
   addVendorExtensions(connectionProperties) {
 

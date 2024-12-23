@@ -93,7 +93,9 @@ class SnowflakeDBI extends YadamuDBI {
     }  
   }    
 
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.CLOUD_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.CLOUD_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
   
   get ARRAY_BINDING_THRESHOLD() { return this.CONNECTION_PROPERTIES.arrayBindingThreshold }
   

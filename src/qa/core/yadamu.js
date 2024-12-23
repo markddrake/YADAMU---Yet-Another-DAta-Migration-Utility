@@ -100,8 +100,8 @@ class Yadamu extends _Yadamu {
 	
   }
   
-  async close(testsComplete) {
-    if (testsComplete === true) {
+  async close(force) {
+    if (force === true) {
 	  await super.close()
 	}
   }

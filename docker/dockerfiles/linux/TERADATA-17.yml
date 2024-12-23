@@ -3,7 +3,7 @@ services:
 
  TDATA17-01:
    container_name: TDATA17-01
-   image:  teradata/17
+   image:  yadamu/teradata
    security_opt:
       - label:disable    
    privileged: true

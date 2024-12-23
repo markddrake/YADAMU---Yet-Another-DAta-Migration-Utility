@@ -400,7 +400,6 @@ class OracleOutputManager extends YadamuOutputManager {
       this.PIPELINE_STATE.cached++
       // if (this.PIPELINE_STATE.received === 1) {console.log('Cache Row (2)\n',row)}
     } catch (cause) {
-	  console.log(row)
       this.handleIterativeError('CACHE ONE',cause,this.PIPELINE_STATE.cached+1,row);
     }
 

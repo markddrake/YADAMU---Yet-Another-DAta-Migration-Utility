@@ -1,28 +1,6 @@
 version: "2.4"
 services:
 
-  YADAMU-SVC:
-    container_name: YADAMU-SVC
-    image:  yadamu/service
-    command: [ "/usr/src/YADAMU/bin/service.sh",
-               "CONFIG=src/node/cfg/serviceConfiguration.json",
-               "ENCRYPTION=false"]
-    mem_limit: '4gb'
-    shm_size: '64mb'
-    security_opt:
-      - seccomp:unconfined
-    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
-    environment:
-      TNS_ADMIN: /usr/src/YADAMU
-      YADAMU_PASSPHRASE: yabasc
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "3000:3000"
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-    restart: always
-
   # ORA2303-01: 1521
   
   ORA1120-01: 

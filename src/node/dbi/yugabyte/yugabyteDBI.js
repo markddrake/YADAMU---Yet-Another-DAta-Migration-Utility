@@ -154,7 +154,9 @@ class YugabyteDBI extends YadamuDBI {
 							          
   get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || DataTypes.storageOptions.JSON_TYPE }
   
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+  static get DEFAULT_STAGING_PLATFORM() { return DBIConstants.LOADER_STAGING[0]}
+  get SUPPORTED_STAGING_PLATFORMS()     { return DBIConstants.LOADER_STAGING }
+  get SUPPORTED_STAGING_FORMATS()       { return DBIConstants.CSV_FORMAT }
 
   addVendorExtensions(connectionProperties) {
 

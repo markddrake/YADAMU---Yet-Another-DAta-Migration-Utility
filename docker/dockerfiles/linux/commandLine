@@ -2,6 +2,7 @@ FROM yadamu/regression:latest
 WORKDIR /usr/src/YADAMU
 ADD https://download.oracle.com/otn_software/linux/instantclient/2350000/oracle-instantclient-sqlplus-23.5.0.24.07-1.el9.x86_64.rpm .
 ENV ACCEPT_EULA=Y
+ENV YADAMU_PASSPHRASE=yabasc
 RUN apt install apt-transport-https \
  && curl -sSL https://packages.microsoft.com/config/ubuntu/20.04/prod.list | tee /etc/apt/sources.list.d/microsoft-prod.list \
  && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \

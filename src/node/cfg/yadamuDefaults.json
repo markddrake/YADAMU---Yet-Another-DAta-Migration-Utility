@@ -17,6 +17,7 @@
 		"awsS3": "../dbi/awsS3/awsS3DBI.js",
 		"awsS3File": "../dbi/awsS3/awsS3FileDBI.js",
 		"azure": "../dbi/azure/azureDBI.js",
+		"azureFile": "../dbi/awsS3/azureFileDBI.js",
 		"cockroach": "../dbi/cockroach/cockroachDBI.js",
 		"oracle": "../dbi/oracle/oracleDBI.js",
 		"postgres": "../dbi/postgres/postgresDBI.js",

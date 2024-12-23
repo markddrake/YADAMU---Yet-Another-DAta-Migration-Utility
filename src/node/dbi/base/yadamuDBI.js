@@ -88,7 +88,7 @@ class SQLTrace {
   
   traceTiming(startTime,endTime) {      
     const sqlOperationTime = endTime - startTime;
-    this.trace(`--\n-- ${this.MARKER} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.}${this.STATEMENT_SEPERATOR}`)
+    this.trace(`--\n-- ${this.MARKER} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s. ${this.STATEMENT_SEPERATOR}`)
     this.recordTime(sqlOperationTime)
     return sqlOperationTime
   }
@@ -112,7 +112,7 @@ class SQLTrace {
 class YadamuDBI extends EventEmitter {
 
   // Instance level getters.. invoke as this.METHOD
-
+  
   get DATABASE_KEY()                 { return 'yadamu' };
   get DATABASE_VENDOR()              { return 'YADAMU' };
   get SOFTWARE_VENDOR()              { return 'YABASC - Yet Another Bay Area Software Company'};
@@ -124,7 +124,6 @@ class YadamuDBI extends EventEmitter {
   get DRIVER_ID()                    { return this._DRIVER_ID }
   set DRIVER_ID(v)                   { this._DRIVER_ID = v }
   
-  get DATA_STAGING_SUPPORTED()       { return false } 
   get SQL_COPY_OPERATIONS()          { return false }
   get PARALLEL_READ_OPERATIONS()     { return true };
   get PARALLEL_WRITE_OPERATIONS()    { return true }
@@ -142,6 +141,7 @@ class YadamuDBI extends EventEmitter {
   get INFINITY_MANAGEMENT()          { return this.parameters.INFINITY_MANAGEMENT         || DBIConstants.INFINITY_MANAGEMENT };
   get STAGING_FILE_RETENTION()       { return this.parameters.STAGING_FILE_RETENTION      || DBIConstants.STAGING_FILE_RETENTION }
   get BYTE_TO_CHAR_RATIO()           { return this.parameters.BYTE_TO_CHAR_RATIO          || DBIConstants.BYTE_TO_CHAR_RATIO }
+  get RESET_IDENTITY()               { return this.parameters.RESET_IDENTITY              || DBIConstants.RESET_IDENTITY }
 
   get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || this.DATA_TYPES?.storageOptions.SPATIAL_FORMAT};
   get CIRCLE_FORMAT()                { return this.parameters.CIRCLE_FORMAT               || this.DATA_TYPES?.storageOptions.CIRCLE_FORMAT};
@@ -189,7 +189,7 @@ class YadamuDBI extends EventEmitter {
   
   // Override based on local parameters object ( which under the test harnesss may differ from the one obtained from yadamu in the constructor).
   
-  get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || this.yadamu.PARALLEL)}
+  // get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || this.yadamu.PARALLEL)}
 
   get FILE()                          { return this.parameters.FILE        || this.yadamu.FILE }  
   get CIPHER()                        { return this.parameters.CIPHER      || this.yadamu.CIPHER }
@@ -266,7 +266,8 @@ class YadamuDBI extends EventEmitter {
     return this._ROLE  
   }
   
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.STAGING_UNSUPPORTED }
+  static get DEFAULT_STAGING_PLATFORM()      { return undefined }
+  get SUPPORTED_STAGING_PLATFORMS()          { return DBIConstants.STAGING_UNSUPPORTED }
 
   // Not available until configureConnection() has been called 
 
@@ -1457,10 +1458,11 @@ class YadamuDBI extends EventEmitter {
       // this.LOGGER.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
     }     
 
-    await this.closeConnection(closeOptions)
-    this.logDisconnect()
-    await this.closePool(closeOptions)
-        
+    if (!this.DESTROYED) {
+      await this.closeConnection(closeOptions)
+      this.logDisconnect()
+      await this.closePool(closeOptions)
+	}
   } 
 
   async destroy(err) {
@@ -1981,7 +1983,7 @@ class YadamuDBI extends EventEmitter {
       inputStream.STREAM_STATE.endTime = performance.now()
       inputStream.STREAM_STATE.readableLength = inputStream.readableLength || 0
     }).on('error',async (err) => {
-      this.handleInputStreamError(inputStream,err,queryInfo.SQL_STATEMENT)
+      this.handleInputStreamError(inputStream,err,queryInfo?.SQL_STATEMENT)
     })	
     return inputStream;
   }      
@@ -2123,35 +2125,19 @@ class YadamuDBI extends EventEmitter {
     return ''
   }
 
-  verifyStagingSource(source) {   
-    if (!this.SUPPORTED_STAGING_PLATFORMS.includes(source)) {
-      throw new YadamuError(`COPY operations not supported between "${source}" and "${this.DATABASE_VENDOR}".`)
-    }
+  isValidCopySource(sourceVendor) {   
+    return this.SUPPORTED_STAGING_PLATFORMS.includes(sourceVendor)
   }
   
-  reportCopyOperationMode(copyEnabled,controlFilePath,contentType) {
-    this.LOGGER.info([this.DATABASE_VENDOR,'COPY',`${contentType}`],`Processing ${controlFilePath}" using ${copyEnabled ? 'COPY' : 'PIPELINE' } mode.`)
-    return copyEnabled
-  } 
-    
-  validStagedDataSet(vendor,controlFilePath,controlFile) {
-
-    /*
-    **
-    ** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-    ** Return false if the data set cannot be consumed using a Copy operation
-    ** Do not throw errors if the data set cannot be used for a COPY operatio
-    ** Generate Info messages to explain why COPY cannot be used.
-    **
-    */
-
-    if (!this.SUPPORTED_STAGING_PLATFORMS.includes(vendor)) {
-       return false;
-    }
-
-    return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
+  async isValidCopyFormat(format) {
+	 // Override on potential staging platforms. Check data is in format that can be consumed by target's COPY operation, typically CSV
+	 return false
   }
-
+  
+  isValidStagingLocation(controlFileFolder) {
+	 return true
+  }
+  
   async generateCopyStatements(metadata) {
     await this.setMetadata(metadata)   
     const statementCache = await this.generateStatementCache(this.CURRENT_SCHEMA)

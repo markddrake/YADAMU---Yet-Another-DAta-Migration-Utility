@@ -1,12 +1,39 @@
 
 import YadamuCompare   from '../base/yadamuCompare.js'
 
-class MySQLCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NAMES()    { return _SQL_SCHEMA_TABLE_NAMES }
+class MySQLCompare extends YadamuCompare {    
 
-    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
-    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
-    static get SQL_SUCCESS()               { return _SQL_SUCCESS }
-    static get SQL_FAILED()                { return _SQL_FAILED }
+  
+  static #SQL_SCHEMA_TABLE_ROWS = `select TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
+
+  static #SQL_ACCURATE_ROW_COUNT = `select group_concat(concat('select ''',TABLE_NAME,''' "TABLE_NAME", count(*) TABLE_ROWS from "',TABLE_SCHEMA,'"."',TABLE_NAME,'"') SEPARATOR ' union all ' ) "SQL_STATEMENT" from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;  
+
+  static #SQL_COMPARE_SCHEMAS =  `CALL COMPARE_SCHEMAS(?,?,?);`;
+
+  static #SQL_SUCCESS =
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' as "RESULTS", TARGET_ROW_COUNT
+  from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
+   and MISSING_ROWS = 0
+   and EXTRA_ROWS = 0
+   and NOTES is NULL
+order by TABLE_NAME`;
+
+  static #SQL_FAILED = 
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'FAILED' as "RESULTS", SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, NOTES
+  from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
+    or MISSING_ROWS <> 0
+    or EXTRA_ROWS <> 0
+    or NOTES is NOT NULL
+ order by TABLE_NAME`;
+
+
+  static get SQL_SCHEMA_TABLE_ROWS()     { return this.#SQL_SCHEMA_TABLE_ROWS }
+  static get SQL_ACCURATE_ROW_COUNT()    { return this.#SQL_ACCURATE_ROW_COUNT }
+  static get SQL_COMPARE_SCHEMAS()       { return this.#SQL_COMPARE_SCHEMAS }
+  static get SQL_SUCCESS()               { return this.#SQL_SUCCESS }
+  static get SQL_FAILED()                { return this.#SQL_FAILED }
 	
     constructor(dbi,configuration) {
 	  super(dbi,configuration)
@@ -14,14 +41,15 @@ class MySQLCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NAMES(
 
     async getRowCounts(target) {
 
-      let results = await this.dbi.executeSQL(MySQLCompare.SQL_SCHEMA_TABLE_ROWS,[target]);
-      
-	  // const ACURATE_ROW_COUNT = results.map((row) => {return `select '${target}', '${row.TABLE_NAME}', count(*) from "${target}"."{row.TABLE}"`}).join('\nunion all\n');
-      // results = await this.dbi.executeSQL(MySQLCompare.ACURATE_ROW_COUNT);
+      let results = await this.dbi.executeSQL(MySQLCompare.SQL_ACCURATE_ROW_COUNT,[target]);
+	  const sqlStatement = results[0].SQL_STATEMENT
 	  
+	  results = sqlStatement ? await this.dbi.executeSQL(sqlStatement) : []
+      	  
       return results.map((row,idx) => {          
         return [target,row.TABLE_NAME,parseInt(row.TABLE_ROWS)]
       })
+	  
 	  
 
     }
@@ -55,24 +83,3 @@ class MySQLCompare extends YadamuCompare {    static get SQL_SCHEMA_TABLE_NAMES(
 
 export { MySQLCompare as default }
 
-const _SQL_SUCCESS =
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' as "RESULTS", TARGET_ROW_COUNT
-  from SCHEMA_COMPARE_RESULTS 
- where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
-   and MISSING_ROWS = 0
-   and EXTRA_ROWS = 0
-   and NOTES is NULL
-order by TABLE_NAME`;
-
-const _SQL_FAILED = 
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'FAILED' as "RESULTS", SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, NOTES
-  from SCHEMA_COMPARE_RESULTS 
- where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-    or MISSING_ROWS <> 0
-    or EXTRA_ROWS <> 0
-    or NOTES is NOT NULL
- order by TABLE_NAME`;
-
-const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
-
-const _SQL_COMPARE_SCHEMAS =  `CALL COMPARE_SCHEMAS(?,?,?);`;

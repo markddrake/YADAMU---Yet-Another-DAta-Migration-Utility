@@ -1,4 +1,5 @@
-"use strict" 
+
+import csv              from 'csv-parser';
 
 import AzureDBI          from '../../../node/dbi/azure/azureDBI.js';
 import AzureConstants    from '../../../node/dbi/azure/azureConstants.js';
@@ -35,4 +36,5 @@ class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
   }
   
 }
+
 export { AzureQA as default }

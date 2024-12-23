@@ -415,8 +415,7 @@ class YadamuOutputManager extends Transform {
 	this.doTransform(messageType,obj).then(() => { 
 	  callback() 
 	}).catch((e) => { 
-	  console.log(e,this.PIPELINE_STATE,DBIConstants.INPUT_STREAM_ID)
-      this.LOGGER.handleException([`PIPELINE`,`TRANSFORMER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
+	  this.LOGGER.handleException([`PIPELINE`,`TRANSFORMER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
   	  this.STREAM_STATE.error = e
       callback(e) 
     })

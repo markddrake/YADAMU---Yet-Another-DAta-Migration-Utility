@@ -43,6 +43,7 @@ class YadamuConstants {
 	 , "CIPHER"                    : 'aes-256-cbc'
      , "ENCRYPTION"                : true
 	 , "SALT"                      : "YABASCYADAMUUMADAYCSABAY"
+	 , "PARALLEL"                  : 0,
     })
     return this._STATIC_PARAMETERS;
   }
@@ -92,6 +93,8 @@ class YadamuConstants {
   static get ENCRYPTION()                      { return this.YADAMU_PARAMETERS.ENCRYPTION }
   static get SALT()                            { return this.YADAMU_PARAMETERS.SALT }
   
+  static get PARALLEL()                        { return this.YADAMU_PARAMETERS.PARALLEL }
+
   static get YADAMU_DRIVERS()                  { return this.YADAMU_CONFIGURATION.drivers }
   
   static get SAVE_POINT_NAME()                 { return 'YADAMU_INSERT' }
@@ -146,7 +149,7 @@ class YadamuConstants {
   }
 
   static get FILE_BASED_DRIVERS() {
-   this._FILE_BASED_DRIVERS = this._FILE_BASED_DRIVERS || Object.freeze(['file','awsS3File'])
+   this._FILE_BASED_DRIVERS = this._FILE_BASED_DRIVERS || Object.freeze(['file','awsS3File','azureFile'])
    return this._FILE_BASED_DRIVERS
   } 
   

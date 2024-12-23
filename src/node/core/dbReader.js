@@ -135,7 +135,11 @@ class DBReader extends Readable {
 	  const outputStreams = await writerDBI.getOutputStreams(queryInfo.MAPPED_TABLE_NAME,pipelineState)
 	  yadamuPipeline.push(...inputStreams,...outputStreams)
       activeStreams.push(...yadamuPipeline.map((s) => { 
-	    return finished(s) 
+	    return finished(s).catch((e) => { 
+		  // Under certain circumstance it appears that errors in the streams are not correclty handled in allSettled and escape as unhandled rejections. 
+		  // Flag the error as ignorable (it will be handled by the try/catch on the pipeline operation) and swallow it.
+		  e.ignoreUnhandledRejection = true
+		}) 
 	  }))
     } catch (e) {
       this.yadamuLogger.handleException(['PIPELINE','STREAM INITIALIZATION',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],e)
@@ -329,7 +333,7 @@ class DBReader extends Readable {
          break;
        case 'ddl' :
          let ddl = await this.getDDLOperations();
-         if (ddl === undefined) {
+		 if (ddl === undefined) {
            // Database does not provide mechansim to retrieve DDL statements used to create a schema (eg Oracle's DBMS_METADATA package)
            // Reverse Engineer DDL from metadata.
            this.metadata = await this.getSourceMetadata();

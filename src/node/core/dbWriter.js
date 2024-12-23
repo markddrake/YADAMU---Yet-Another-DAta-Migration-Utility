@@ -45,12 +45,15 @@ class DBWriter extends Writable {
   async executeDDL(ddlStatements) {
     // this.yadamuLogger.trace([this.constructor.name,`executeDDL()`,this.dbi.DATABASE_VENDOR],`Executing DLL statements)`) 
     const startTime = performance.now()
+	let results
     try {
-      const results = await this.dbi.executeDDL(ddlStatements) 
-      // this.emit(YadamuConstants.DDL_COMPLETE,results,startTime);  
-    } catch (e) {
-      // this.emit(YadamuConstants.DDL_COMPLETE,e,startTime);    
+	  results = await this.dbi.executeDDL(ddlStatements) 
+	} catch (e) {
+      this.LOGGER.handleException([YadamuConstants.WRITER_ROLE,dbi.DATABASE_VENDOR,dbi.DATABASE_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],e)
     }   
+    if (results instanceof Error) {
+	  throw results
+	} 
   }
   
   async generateStatementCache(metadata) {
@@ -204,7 +207,7 @@ class DBWriter extends Writable {
                 throw results;
               }
               this.ddlCompleted = true
-            }
+            }1
           }
           break;
         case 'metadata':
@@ -246,7 +249,7 @@ class DBWriter extends Writable {
     } catch (err) {
       this.yadamuLogger.handleException([`WRITER`,`WRITE`,messageType,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],err)
       this.underlyingError = err;
-      // Attempt a rollback, however if the rollback fails throw the err that let to the rollback operation
+      // Attempt a rollback, however if the rollback fails throw the err that led to the rollback operation
       try {
         await this.transactionManager.rollbackTransaction(e)
       } catch (rollbackError) {}      
