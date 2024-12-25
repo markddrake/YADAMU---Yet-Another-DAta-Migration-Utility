@@ -10,19 +10,15 @@ For homogeneous Oracle migrations all schema objects supported by DBMS_METADATA 
 For databases other than Oracle, or hetrogeneous migrations DDL operations are currently restriced to table layouts. Migration of indexes and other schema objects is not currently supported.
 
 Supported Databases :
-* Oracle 23c
-* Oracle 21c
-* Oracle 19c
-* Oracle 18c
-* Oracle 12cR2
-* Oracle 11gR2
-* Microsoft SQL Server 2014 - Microsoft SQL Server 2022
-* Postgres 11 through Postgres 16
-* MySQL 8.0.12 and later
-* MariaDB 5.5 and later
-* MongoDB 4.0 and later
+
+* Oracle 11gR2 through Oracle 23ai
+* Microsoft SQL Server 2012 - Microsoft SQL Server 2022
+* Postgres 11 through Postgres 17
+* MySQL 8.0.12 through MySQL 9.0.1
+* MariaDB 5.5 through MariaDB 11.5.2
+* MongoDB 4.0 through Mongo DB 8.0
 * Snowflake Data Warehouse
-* Vertica 9 through Vertica 23
+* Vertica 9 through Vertica 24
 * DB2 11 LUW
 * Yugabyte
 * CockroachDB
@@ -33,6 +29,7 @@ Supported Databases :
 Yadamu can also export data sets to Amazon AWS S3 Storage and Microsoft Azure BLOB storage. Data can be exported as CSV, JSON Arrays, or JSON.
 
 YADAMU has three modes of operation. 
+
 * It can export data from the source database to a file, and then import the contents of the file into the target database. (EXPORT/IMPORT)
 * It can also pump data directly from the source database to the target database. (PUMP)
 * It can stage data from a source database as set of CSV files and then instruct the target database to load the data directly from the CSV files (COPY)
