@@ -1,11 +1,12 @@
-version: "2.4"
+
 services:
 
   MONGO40-01: 
     container_name: MONGO40-01
+    hostname: MONGO40-01
     image:  mongo:4
     mem_limit: '12gb'
-    shm_size: '4gb'
+    shm_size: '2gb'
     security_opt:
       - seccomp:unconfined
     networks:

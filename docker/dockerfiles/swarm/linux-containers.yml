@@ -1,11 +1,11 @@
-version: "2.4"
+
 services:
 
   VRTCA23-01: 
     container_name: VRTCA23-01
     image:  vertica/vertica-ce:latest 
     mem_limit: '10gb'
-    shm_size: '4gb'
+    shm_size: '2gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -26,7 +26,7 @@ services:
     container_name: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
     mem_limit: '10gb'
-    shm_size: '4gb'
+    shm_size: '2gb'
     networks:
       - YADAMU-NET
     ports: 

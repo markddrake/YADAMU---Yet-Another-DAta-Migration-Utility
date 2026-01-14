@@ -38,7 +38,7 @@
     "pg-copy-streams": "^6.0.6",
     "pg-query-stream": "^4.5.3",
     "readable-stream": "^4.4.2",
-    "snowflake-sdk": "^1.14.0",
+    "snowflake-sdk": "^2.3.3",
     "uuid": "^11.0.3",
     "wkx": "^0.5.0"
   },

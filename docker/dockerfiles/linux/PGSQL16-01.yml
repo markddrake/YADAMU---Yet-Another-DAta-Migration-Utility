@@ -1,12 +1,12 @@
-version: "2.4"
 services:
 
   PGSQL16-01: 
     container_name: PGSQL16-01
+    hostname: PGSQL16-01
     image:  yadamu/postgres:latest
     # command: ["postgres", "-c", "log_statement=all"]
     mem_limit: '10gb'
-    shm_size: '4gb'
+    shm_size: '2gb'
     security_opt:
       - seccomp:unconfined
     networks:

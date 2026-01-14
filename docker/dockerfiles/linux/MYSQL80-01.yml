@@ -1,12 +1,12 @@
-version: "2.4"
 services:
 
   MYSQL80-01: 
     container_name: MYSQL80-01
+    hostname: MYSQL80-01
     image:  mysql:8.0.37
     command: --secure-file-priv=/mnt/shared  
     mem_limit: '10gb'
-    shm_size: '4gb'
+    shm_size: '2gb'
     security_opt:
       - seccomp:unconfined
     cap_add:

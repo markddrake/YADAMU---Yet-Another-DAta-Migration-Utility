@@ -5,6 +5,43 @@ export YADAMU_TEST_NAME=${YADAMU_TEST_NAME:-all}
 source qa/bin/createSharedFolders.sh mnt
 case $YADAMU_TEST_NAME  in
 
+  initialization)
+    source qa/bin/createOutputFolders.sh mnt
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh initialize
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh stageDataSets
+  ;;	
+  
+  standard)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaShortRegression
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaTestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10TestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh stageCSVDataSets	
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014ShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
+  ;;
+	
   shortRegression)
     source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression

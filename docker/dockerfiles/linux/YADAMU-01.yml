@@ -1,8 +1,9 @@
-version: "2.4"
+
 services:
 
   YADAMU-01:
     container_name: YADAMU-01
+    hostname: YADAMU-01
     image:  yadamu/regression:latest 
     entrypoint: sleep 365d
     mem_limit: '16g'

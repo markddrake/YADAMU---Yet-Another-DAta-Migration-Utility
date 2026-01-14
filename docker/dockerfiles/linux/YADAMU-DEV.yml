@@ -1,8 +1,9 @@
-version: "2.4"
+
 services:
 
   YADAMU-DEV:
     container_name: YADAMU-DEV
+    hostname: YADAMU-DEV
     image:  yadamu/secure:latest 
     entrypoint: sleep 365d
     mem_limit: '16g'

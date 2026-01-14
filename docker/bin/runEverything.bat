@@ -11,7 +11,7 @@ goto :eof
   docker run --security-opt=seccomp:unconfined --name %CONTAINER_NAME% --memory="16g" -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt --network YADAMU-NET -e YADAMU_TEST_NAME=everything  --add-host="MSSQL12-01:%MSSQL12%" --add-host="MSSQL14-01:%MSSQL14%" -d yadamu/secure:latest
   docker logs %CONTAINER_NAME%
   exit /b
-:end
+:end00
 
 :windowsContainerSwarm
   @set MAX_MEMORY="4g"

@@ -1,15 +1,16 @@
-version: "2.4"
+
 services:
 
   ORA1903-01: 
     container_name: ORA1903-01
+    hostname: ORA1903-01
     # image:  oracle/database:19.3.0-ee
     image:  yadamu/oracle:19.3.0
-    mem_limit: '10gb'
-    shm_size: '4gb'
+    mem_limit: '16gb'
+    shm_size: '8gb'
     security_opt:
       - seccomp:unconfined
-    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
     ports: 

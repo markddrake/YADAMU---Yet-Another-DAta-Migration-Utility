@@ -1,6 +1,6 @@
 #!/bin/bash
 export YADAMU_SCRIPT_PATH=$(dirname "$0")
-source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA2303-01
+# source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA2303-01
 # source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA2103-01
 source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1903-01
 source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1803-01
@@ -8,7 +8,8 @@ source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1220-01
 # source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1210-01
 source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1120-01
 # source $YADAMU_SCRIPT_PATH/linux/configureMySQL.sh    MYSQL80-01
-source $YADAMU_SCRIPT_PATH/linux/configureMySQL.sh    MYSQL81-01
+# source $YADAMU_SCRIPT_PATH/linux/configureMySQL.sh    MYSQL81-01
+source $YADAMU_SCRIPT_PATH/linux/configureMySQL.sh    MYSQL90-01
 # source $YADAMU_SCRIPT_PATH/linux/configureMariaDB.sh  MARIA10-01
 source $YADAMU_SCRIPT_PATH/linux/configureMariaDB.sh  MARIA11-01
 # source $YADAMU_SCRIPT_PATH/linux/configureMsSQL.sh    MSSQL17-01

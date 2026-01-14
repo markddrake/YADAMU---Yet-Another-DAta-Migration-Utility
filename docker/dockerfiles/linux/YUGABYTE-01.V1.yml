@@ -1,4 +1,3 @@
-version: '2'
 
 volumes:
   yb-master-data-1:

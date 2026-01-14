@@ -1,11 +1,12 @@
-version: "2.4"
+
 services:
 
  VRTCA09-01:
    container_name: VRTCA09-01
+   hostname: VRTCA09-01
    image:  dataplatform/docker-vertica
    mem_limit: '12gb'
-   shm_size: '4gb'
+   shm_size: '2gb'
    security_opt:
      - seccomp:unconfined
    networks:

@@ -1,11 +1,10 @@
-version: "2.4"
 services:
 
   PGSQL14-01: 
     container_name: PGSQL14-01
     image:  yadamu/postgres:14 
     mem_limit: '16gb'
-    shm_size: '4gb'
+    shm_size: '2gb'
     networks:
       - YADAMU-NET
     ports: 

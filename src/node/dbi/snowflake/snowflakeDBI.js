@@ -8,7 +8,7 @@ import {
 /* Database Vendors API */                                    
 		
 import snowflake                      from 'snowflake-sdk';
-import snowflakeParameters            from 'snowflake-sdk/lib/parameters.js';
+// import snowflakeParameters            from 'snowflake-sdk/lib/parameters.js';
 /* Yadamu Core */                                    
 
 import YadamuConstants                from '../../lib/yadamuConstants.js'
@@ -105,17 +105,29 @@ class SnowflakeDBI extends YadamuDBI {
 		
     this.parameters.DATABASE = this.parameters.DATABASE || this.parameters.DATABASE
 	
-    connectionProperties.account                = this.parameters.ACCOUNT                    || connectionProperties.account 
-    connectionProperties.username               = this.parameters.USERNAME                   || connectionProperties.username 
-    connectionProperties.password               = this.parameters.PASSWORD                   || connectionProperties.password  
-    connectionProperties.warehouse              = this.parameters.WAREHOUSE                  || connectionProperties.warehouse                       || this.DBI_PARAMETERS.DEFAULT_WAREHOUSE
-    connectionProperties.database               = this.parameters.DATABASE                   || connectionProperties.database                        || this.DBI_PARAMETERS.DEFAULT_DATABASE
-	connectionProperties.arrayBindingThreshold  = this.parameters.SNOWFLAKE_BUFFER_SIZE      || connectionProperties.arrayBindingThreshold || 100000      
-    connectionProperties.insecureConnect        = this.parameters.SNOWFLAKE_INSECURE_CONNECT || connectionProperties.insecureConnect || false      
+    connectionProperties.account                = this.parameters.ACCOUNT                    || process.env.SNOWFLAKE_ACCOUNT                || connectionProperties.account 
+    connectionProperties.username               = this.parameters.USERNAME                   || process.env.SNOWFLAKE_USER                   || connectionProperties.username 
+    connectionProperties.warehouse              = this.parameters.WAREHOUSE                  || process.env.SNOWFLAKE_WAREHOUSE              || connectionProperties.warehouse       || this.DBI_PARAMETERS.DEFAULT_WAREHOUSE
+    connectionProperties.database               = this.parameters.DATABASE                   || process.env.SNOWFLAKE_DATABASE               || connectionProperties.database        || this.DBI_PARAMETERS.DEFAULT_DATABASE
+	connectionProperties.arrayBindingThreshold  = this.parameters.SNOWFLAKE_BUFFER_SIZE      || connectionProperties.arrayBindingThreshold   || 100000      
+    connectionProperties.disableOCSPChecks      = this.parameters.SNOWFLAKE_INSECURE_CONNECT || connectionProperties.disableOCSPChecks       || false      
 
 	this.parameters.DATABASE = connectionProperties.database
-	
-	return connectionProperties
+
+    const password                              = this.parameters.PASSWORD                   || process.env.SNOWFLAKE_WAREHOUSE              || connectionProperties.password  
+	const token                                 = this.parameters.TOKEN                      || process.env.SNOWFLAKE_TOKEN                  || connectionProperties.token
+
+
+    if (token) {
+        // Use Personal Access Token authentication
+        connectionProperties.authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
+        connectionProperties.password = token;
+    } else {
+        // Fall back to password authentication (default)
+        connectionProperties.password = password
+    }
+    	
+    return connectionProperties
 
   }
     
