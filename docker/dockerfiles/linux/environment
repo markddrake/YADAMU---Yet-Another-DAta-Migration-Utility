@@ -1,25 +1,13 @@
 FROM node:22.12
 WORKDIR /usr/src/YADAMU
-
-# Add Oracle instant client
 ADD https://download.oracle.com/otn_software/linux/instantclient/2350000/oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm .
-
 COPY src/package*.json ./
-
-# Install deps and build tools
-RUN apt-get update \
- && apt-get install -y --no-install-recommends libaio1 alien python3 make g++ \
- && rm -rf /var/lib/apt/lists/* \
- # Convert & install Oracle client
+RUN apt update \
+ && apt-get -y install libaio1 alien \
  && alien -i --scripts ./oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm \
- # npm hygiene
- && npm set progress=false \
- && npm set fund=false \
- && npm set audit=false \
- && npm set fetch-retries=3 \
- && npm set fetch-timeout=30000 \
- && npm config set loglevel=warn \
- # Main install
- && npm install --no-fund --no-audit --prefer-offline --foreground-scripts=false \
- && npm ls --omit=dev \
- && node --version
+ && npm install --global electron \
+ && npm install \
+ && npm ls \
+ && npm outdated || true \
+ && node --version 
+ 

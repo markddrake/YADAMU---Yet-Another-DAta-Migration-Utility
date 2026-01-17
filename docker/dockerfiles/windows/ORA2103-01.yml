@@ -1,3 +1,4 @@
+version: "2.4"
 services:
 
   ORA2103-01: 
@@ -5,7 +6,7 @@ services:
     image:  yadamu/oracle:21.3.0
     isolation: hyperv
     mem_limit: 8192M
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
     ports: 

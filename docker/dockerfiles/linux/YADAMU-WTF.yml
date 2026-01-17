@@ -1,9 +1,8 @@
-
+version: "2.4"
 services:
 
   YADAMU-WTF:
     container_name: YADAMU-WTF
-    hostname: YADAMU-WTF
     image:  yadamu/wtf:latest 
     entrypoint: sleep 365d
     mem_limit: '16g'

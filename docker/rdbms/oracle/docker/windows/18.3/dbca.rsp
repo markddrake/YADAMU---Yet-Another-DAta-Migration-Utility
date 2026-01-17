@@ -552,7 +552,7 @@ variables=DB_UNIQUE_NAME=CDB18300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB18300,DB_NA
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-initParams=compatible=18.0.0,db_name=CDB18300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=160,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=16GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME},SGA_TARGET=4G,PGA_AGGREGATE_TARGET=2G
+initParams=compatible=18.0.0,db_name=CDB18300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=16GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME},SGA_TARGET=4G,PGA_AGGREGATE_TARGET=2G
 
 #-----------------------------------------------------------------------------
 # Name          : sampleSchema

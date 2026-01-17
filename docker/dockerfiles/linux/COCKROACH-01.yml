@@ -1,8 +1,8 @@
+version: '2.4'
 services:
 
   ROACH01-01:
     container_name: ROACH01-01
-    hostname: ROACH01-01
     image:  cockroachdb/cockroach
     command: start --advertise-addr=ROACH01-01:26357  --listen-addr=ROACH01-01:26357  --http-addr=ROACH01-01:8080  --sql-addr=ROACH01-01:26257 --insecure --store=node1 --join=ROACH01-01,ROACH01-02,ROACH01-03
     mem_limit: '8gb'
@@ -21,7 +21,6 @@ services:
 
   ROACH01-02:
     container_name: ROACH01-02
-    hostname: ROACH01-02
     image:  cockroachdb/cockroach
     command: start --advertise-addr=ROACH01-02:26357  --listen-addr=ROACH01-02:26357  --http-addr=ROACH01-02:8081  --sql-addr=ROACH01-02:26258  --insecure --join=ROACH01-01,ROACH01-02,ROACH01-03 
     mem_limit: '8gb'
@@ -40,7 +39,6 @@ services:
 
   ROACH01-03:
     container_name: ROACH01-03
-    hostname: ROACH01-03
     image:  cockroachdb/cockroach
     command: start --advertise-addr=ROACH01-03:26357  --listen-addr=ROACH01-03:26357  --http-addr=ROACH01-03:8082  --sql-addr=ROACH01-03:26259  --insecure --join=ROACH01-01,ROACH01-02,ROACH01-03 
     mem_limit: '8gb'

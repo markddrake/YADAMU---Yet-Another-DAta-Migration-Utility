@@ -1,12 +1,11 @@
-
+version: "2.4"
 services:
 
   PGSQL12-01: 
     container_name: PGSQL12-01
-    hostname: PGSQL12-01
     image:  yadamu/postgres:12 
     mem_limit: '12gb'
-    shm_size: '2gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:

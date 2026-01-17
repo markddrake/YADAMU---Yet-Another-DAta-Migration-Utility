@@ -1,16 +1,15 @@
-
+version: "2.4"
 services:
 
   ORA2303-01: 
     container_name: ORA2303-01
-    hostname: ORA2303-01
     # image:  oracle/database:21.3.0-ee
     image: gvenzl/oracle-free:23
     mem_limit: '16gb'
     security_opt:
       - seccomp:unconfined
-    shm_size: '8gb'
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    shm_size: '4gb'
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
     ports: 

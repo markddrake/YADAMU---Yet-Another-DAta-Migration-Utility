@@ -18,7 +18,7 @@ class SnowflakeStatementLibrary {
        return `select t.table_schema   "TABLE_SCHEMA"
                      ,t.table_name   "TABLE_NAME"
                      ,concat('[',listagg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position),']') "COLUMN_NAME_ARRAY"
-                     ,concat('[',listagg(concat('"',case when c.comment = concat('EXPECTATION: CHECK_XML("',c.column_name,'") IS NULL') then 'XML' else data_type end,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
+                     ,concat('[',listagg(concat('"',case when c.comment = concat('CHECK(CHECK_XML("',c.column_name,'") IS NULL)') then 'XML' else data_type end,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
                      ,concat('[',listagg(case
                                    when (numeric_precision is not null) and (numeric_scale is not null) 
                                      then concat('[',numeric_precision,',',numeric_scale,']')

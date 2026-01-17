@@ -5,10 +5,8 @@ try {
     var row = resultSet.fetchOneObject();
     println('YADAMU_INSTANCE_ID():',row['YADAMU_INSTANCE_ID']);
   } catch(e) {
-    let code = e.code
-    if (!code && e.message && e.message.includes('YADAMU_INSTANCE_ID does not exist')) code = 1305
-    if (code === 1305) {
-  	  try {
+    if (e.code === 1305) {
+      try {
         var resultSet = session.runSql('select UUID() INSTANCE_ID');
         var row = resultSet.fetchOneObject();
 	    UUID = row['INSTANCE_ID']

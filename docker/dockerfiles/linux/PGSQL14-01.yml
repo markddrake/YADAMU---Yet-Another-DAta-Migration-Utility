@@ -1,4 +1,4 @@
-
+version: "2.4"
 services:
 
   PGSQL14-01: 
@@ -7,7 +7,7 @@ services:
     mem_limit: '12gb'
     security_opt:
       - seccomp:unconfined
-    shm_size: '2gb'
+    shm_size: '4gb'
     networks:
       - YADAMU-NET
     ports: 

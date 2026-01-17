@@ -1,16 +1,15 @@
-
+version: "2.4"
 services:
 
   ORA1210-01: 
     container_name: ORA1210-01
-    hsotname: ORA1210-01
     # image:  oracle/database:12.1.0.2-ee 
     image:  yadamu/oracle:12.1
     mem_limit: '10gb'
-    shm_size: '8gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
     ports: 

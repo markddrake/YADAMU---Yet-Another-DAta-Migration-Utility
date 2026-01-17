@@ -498,7 +498,7 @@ variables=DB_UNIQUE_NAME=ORA11200,ORACLE_BASE=c:\oracle,DB_NAME=ORA11200,ORACLE_
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-initParams=compatible=11.2.0.4.0,java_jit_enabled=false,db_name=ORA11200,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,processes=160,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=16384,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME},SGA_TARGET=4096,PGA_AGGREGATE_TARGET=2048
+initParams=compatible=11.2.0.4.0,java_jit_enabled=false,db_name=ORA11200,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=16384,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME},SGA_TARGET=4096,PGA_AGGREGATE_TARGET=2048
 
 #-----------------------------------------------------------------------------
 # Name          : MEMORYPERCENTAGE 

@@ -1,4 +1,3 @@
-set DOCKER_CLI_HINTS=false
 for /f "tokens=1,2" %%i in ('docker info ^| findstr OSType') do set DOCKER_ENGINE=%%j
 if "%DOCKER_ENGINE%" == "linux" ( call :linuxContainer ) else ( call :windowsContainer)
 goto :eof

@@ -1,12 +1,11 @@
-
+version: "2.4"
 services:
 
   MSSQL17-01: 
     container_name: MSSQL17-01
-    hostname: MSSQL17-01
     image:  mcr.microsoft.com/mssql/server:2017-latest
     mem_limit: '10gb'
-    shm_size: '2gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:

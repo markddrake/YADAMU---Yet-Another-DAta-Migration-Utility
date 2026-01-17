@@ -1,11 +1,11 @@
+version: "2.4"
 services:
 
   PGSQL15-01: 
     container_name: PGSQL15-01
-    hostname: PGSQL15-01
     image:  yadamu/postgres:15
     mem_limit: '10gb'
-    shm_size: '2gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:

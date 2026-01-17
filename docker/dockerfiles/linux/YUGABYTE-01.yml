@@ -1,8 +1,8 @@
+version: "2.4"
 
 services:
   YUGABYTE-01:
       container_name: YUGABYTE-01
-      hostname: YUGABYTE-01
       # image: yugabytedb/yugabyte:latest
       image: yugabytedb/yugabyte:2024.1.3.0-b105
       command: /home/yugabyte/bin/yugabyted start --background=false --base_dir=/home/yugabyte/yb_data

@@ -11,7 +11,7 @@ spool &STAGE_LOCATION/log/configure.log
 select file_id, file_name from DBA_DATA_FILES
 /
 COLUMN FILE_ID new_value FILE_ID
-select FILE_ID
+select FILE_ID 
   from DBA_DATA_FILES
  where TABLESPACE_NAME = 'USERS'
 /
@@ -75,8 +75,4 @@ alter system register
 -- connect / as sysdba
 -- startup
 --
--- Verify
---
-show PARAMETER processes
-/
 exit

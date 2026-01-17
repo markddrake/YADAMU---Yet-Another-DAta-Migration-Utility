@@ -1,19 +1,17 @@
-
+version: "2.4"
 services:
 
   # ORA2303-01: 1521
   
   ORA1120-01: 
     container_name: ORA1120-01
-    hostname: ORA1120-01
     # image:  oracle/database:11.2.0.4-ee
     image:  yadamu/oracle:11.2.0.4
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '8gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       YADAMU-NET:
         aliases:
@@ -36,15 +34,13 @@ services:
   
   ORA1220-01: 
     container_name: ORA1220-01
-    hostname: ORA1220-01
     # image:  oracle/database:12.2.0.1-ee 
     image:  yadamu/oracle:12.2.0
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '8gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       YADAMU-NET:
         aliases:
@@ -65,15 +61,13 @@ services:
 
   ORA1803-01: 
     container_name: ORA1803-01
-    hostname: ORA1803-01
     # image:  oracle/database:18.3.0-ee
     image:  yadamu/oracle:18.3.0
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '8gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       YADAMU-NET:
         aliases:
@@ -94,15 +88,13 @@ services:
 
   ORA1903-01: 
     container_name: ORA1903-01
-    hostname: ORA1903-01
     # image:  oracle/database:19.3.0-ee
     image:  yadamu/oracle:19.3.0
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '8gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       YADAMU-NET:
         aliases:
@@ -127,11 +119,9 @@ services:
   
   MARIA11-01: 
     container_name: MARIA11-01
-    hostname: MARIA11-01
-    image:  mariadb:11.5
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    image:  mariadb:latest
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -152,11 +142,9 @@ services:
 
   MONGO80-01: 
     container_name: MONGO80-01
-    hostname: MONGO80-01
     image:  mongo:latest 
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -176,11 +164,9 @@ services:
 
   MSSQL22-01: 
     container_name: MSSQL22-01
-    hostname: MSSQL22-01
     image:  mcr.microsoft.com/mssql/server:2022-latest
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -204,11 +190,9 @@ services:
 
   MSSQL19-01: 
     container_name: MSSQL19-01
-    hostname: MSSQL19-01
     image:  mcr.microsoft.com/mssql/server:2019-latest
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -228,12 +212,10 @@ services:
 
   MYSQL90-01: 
     container_name: MYSQL90-01
-    hostname: MYSQL90-01
-    image:  mysql:9.0.1
+    image:  mysql:latest
     command: --secure-file-priv=/mnt/shared 
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     cap_add:
@@ -255,11 +237,9 @@ services:
 
   PGSQL17-01: 
     container_name: PGSQL17-01
-    hostname: PGSQL17-01
     image:  yadamu/postgres:17
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -284,11 +264,9 @@ services:
 
   VRTCA24-01: 
     container_name: VRTCA24-01
-    hostname: VRTCA24-01
     image:  vertica/vertica-ce:latest 
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
@@ -313,11 +291,9 @@ services:
         
   VRTCA10-01: 
     container_name: VRTCA10-01
-    hostname: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
-    mem_limit: '16gb'          #
-    memswap_limit: -1     # allow unlimited swap
-    shm_size: '2gb'
+    mem_limit: '10gb'
+    shm_size: '4gb'
     networks:
       YADAMU-NET:
         aliases:
@@ -342,10 +318,8 @@ services:
 
   MINIO-01: 
     container_name: MINIO-01
-    hostname: MINIO-01
     image:  minio/minio 
     mem_limit: '1gb'
-    memswap_limit: -1     # allow unlimited swap
     command:  server /data --console-address  ":9001"
     networks:
       - YADAMU-NET
@@ -361,10 +335,8 @@ services:
     
   AZURE-01: 
     container_name: AZURE-01
-    hostname: AZURE-01
     image:   mcr.microsoft.com/azure-storage/azurite 
     mem_limit: '1gb'
-    memswap_limit: -1     # allow unlimited swap
     command: azurite-blob --blobHost 0.0.0.0 --loose --blobPort 10000 
     networks:
       - YADAMU-NET
@@ -376,10 +348,8 @@ services:
 
   YADAMU-SMB: 
     container_name: YADAMU-SMB
-    hostname: YADAMU-SMB
     image:   dperson/samba
     mem_limit: '1gb'
-    memswap_limit: -1     # allow unlimited swap
     command: -p -s "work;/mount;yes;no;yes" -n -p
     networks:
       - YADAMU-NET

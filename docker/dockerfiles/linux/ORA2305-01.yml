@@ -1,16 +1,15 @@
-
+version: "2.4"
 services:
 
   ORA2305-01: 
     container_name: ORA2305-01
-    hostname: ORA2305-01
     #image:  container-registry.oracle.com/database/free:latest
     image:  gvenzl/oracle-free:23.5-full
     mem_limit: '16gb'
     security_opt:
       - seccomp:unconfined
-    shm_size: '8gb'
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    shm_size: '4gb'
+    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
     ports: 

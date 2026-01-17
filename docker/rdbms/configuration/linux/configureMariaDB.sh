@@ -5,6 +5,6 @@ docker cp src/sql/mariadb/                          $CONTAINER_NAME:/var/lib/mys
 docker exec -it                                     $CONTAINER_NAME mv /var/lib/mysql/stage/mariadb /var/lib/mysql/stage/sql
 docker cp docker/rdbms/mariadb/setup                $CONTAINER_NAME:/var/lib/mysql/stage
 docker cp docker/rdbms/mariadb/testdata             $CONTAINER_NAME:/var/lib/mysql/stage
-docker cp src/install/mariadb/js/YADAMU_INSTALL.js  $CONTAINER_NAME:/var/lib/mysql/stage/setup
+docker cp src/install/mariadb/js                    $CONTAINER_NAME:/var/lib/mysql/stage
 docker exec -it -u root -w /                        $CONTAINER_NAME chown -R mysql:mysql /var/lib/mysql/stage
 docker exec -it                                     $CONTAINER_NAME bash /var/lib/mysql/stage/setup/configure.sh

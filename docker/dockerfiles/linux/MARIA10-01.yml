@@ -1,13 +1,12 @@
-
+version: "2.4"
 
 services:
 
   MARIA10-01: 
     container_name: MARIA10-01
-    hostname: MARIA10-01
     image:  mariadb:10.9.5
     mem_limit: '10gb'
-    shm_size: '2gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:

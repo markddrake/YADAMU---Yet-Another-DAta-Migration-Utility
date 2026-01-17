@@ -13,12 +13,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
-  generateDDLStatement(schema, tableName, columnDefinitions, mappedDataTypes, expectationsClause) {	  
-    return `create ${this.dbi.TRANSIENT_TABLES ? 'transient ' : ''}table if not exists "%%YADAMU_DATABASE%%"."${schema}"."${tableName}"(${columnDefinitions.join(',')})$ {expectationsClause.length ? expectationsClause.join('\n') : ''}${this.dbi.DATA_RETENTION_TIME !== undefined  ? ` DATA_RETENTION_TIME_IN_DAYS=${this.dbi.DATA_RETENTION_TIME}`  : ''}`;
-  }
-
-
-  generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes,expectationsClause) {	  
+  generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes) {	  
     return `create ${this.dbi.TRANSIENT_TABLES ? 'transient ' : ''}table if not exists "%%YADAMU_DATABASE%%"."${schema}"."${tableName}"(\n  ${columnDefinitions.join(',')}) ${this.dbi.DATA_RETENTION_TIME !== undefined ? `DATA_RETENTION_TIME_IN_DAYS=${this.dbi.DATA_RETENTION_TIME}` : ''} `
   }
 
@@ -79,7 +74,6 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 
     const insertOperators = Object.keys(new Array(dataTypes.length).fill(null)).map((idx) => {return(`COLUMN${parseInt(idx)+1}`)})
 	const columnClause = new Array(dataTypes.length).fill('')
-	const expectationsClause = []
     
 	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
 	const columnDataTypes = [...targetDataTypes]
@@ -114,14 +108,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 			   break
 		     default:
 		       insertOperators[idx] = `case when check_xml("${insertOperators[idx]}") is NULL then "${insertOperators[idx]}" else NULL end`
-			   // Snowflake Pre Version 9
-		       // columnClause[idx] = `check((CHECK_XML("${tableMetadata.columnNames[idx]}") is NULL)) COMMENT 'CHECK(CHECK_XML("${tableMetadata.columnNames[idx]}") IS NULL)'`
-			   // Snowflake Version 9+
-			   columnClause[idx] = `COMMENT 'EXPECTATION: CHECK_XML("${columnName}") IS NULL'`
-			   expectationsClause.push(
-                 `expectation ${tableMetadata.tableName}_${columnName}_is_xml ` +
-                 `as (check_xml("${columnName}") is null) ` +
-                 `comment = 'Column contains serialized XML'`)
+		       columnClause[idx] = `check((CHECK_XML("${tableMetadata.columnNames[idx]}") is NULL)) COMMENT 'CHECK(CHECK_XML("${tableMetadata.columnNames[idx]}") IS NULL)'`
 		    } 
 			break
 		  case this.dbi.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE:
@@ -145,7 +132,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 	this.dbi.applyDataTypeMappings(tableMetadata.tableName,tableMetadata.columnNames,targetDataTypes,this.dbi.IDENTIFIER_MAPPINGS,true)
     
 	const tableInfo = { 
-      ddl             : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes,expectationsClause)
+      ddl             : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
     , dml             : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators,parserRequired)
 	, copy            : this.generateCopyOperation(this.targetSchema,tableMetadata.tableName,tableMetadata.dataFile)
     , args            : args

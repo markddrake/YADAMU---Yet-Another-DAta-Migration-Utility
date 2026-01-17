@@ -17,8 +17,8 @@ function initializeLogging($TESTNAME) {
    
    $YADAMU_LOG_PATH = Join-Path -Path $YADAMU_LOG_PATH -ChildPath $YADAMU_TIMESTAMP
    New-Item -force -ItemType Directory $YADAMU_LOG_PATH | Out-Null
-   $YADAMU_IMPORT_LOG = Join-Path -Path $YADAMU_LOG_PATH -ChildPath "$TESTNAME.log"
-   $YADAMU_EXPORT_LOG = Join-Path -Path $YADAMU_LOG_PATH -ChildPath "$TESTNAME.log"
+   $YADAMU_IMPORT_LOG = Join-Path -Path $YADAMU_LOG_PATH -ChildPath "yadamu.log"
+   $YADAMU_EXPORT_LOG = Join-Path -Path $YADAMU_LOG_PATH -ChildPath "yadamu.log"
    return $YADAMU_LOG_PATH
 }
  
@@ -81,61 +81,7 @@ createSharedFolders $YADAMU_MOUNT_FOLDER
 $YADAMU_LOG_ROOT = Join-Path $YADAMU_MOUNT_FOLDER "log"
 
 switch ($ENV:YADAMU_TEST_NAME) {
-
-  "intialization" {
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
-     resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\postgres")
-     runRegressionTest "initialize"
-     runRegressionTest "stageDataSets"
-     runRegressionTest "import"
-     runRegressionTest "importDataTypes"
-     break
-  }
-    
-  "standard" {
-    runRegressionTest "shortRegression"
-    runRegressionTest "verticaShortRegression"
-	runRegressionTest "vertica10ShortRegression"
-    runRegressionTest "snowflakeShortRegression"
-    runRegressionTest "postgresDataTypes"
-    runRegressionTest "verticaDataTypes"
-    runRegressionTest "vertica10DataTypes"
-    runRegressionTest "snowflakeDataTypes"
-    runRegressionTest "export"
-    runRegressionTest "import"
-    runRegressionTest "fileRoundtrip"
-    runRegressionTest "uploadRoundtrip"
-    runRegressionTest "dbRoundtrip"
-    runRegressionTest "mongoTestSuite"
-    runRegressionTest "lostConnection"
-    runRegressionTest "loaderTestSuite"
-    runRegressionTest "awsTestSuite"
-    runRegressionTest "azureTestSuite"
-    runRegressionTest "verticaTestSuite"
-	runRegressionTest "vertica10TestSuite"
-    runRegressionTest "oracleCopy"
-	runRegressionTest "postgresCopy"
-	runRegressionTest "mysqlCopy"
-	runRegressionTest "mariadbCopy"
-	runRegressionTest "verticaCopy"
-	runRegressionTest "vertica10Copy"
-	runRegressionTest "oracleCopy"
-	runRegressionTest "postgresCopy"
-	runRegressionTest "mysqlCopy"
-	runRegressionTest "mariadbCopy"
-	runRegressionTest "verticaCopy"
-	runRegressionTest "vertica10Copy"
-    runRegressionTest "snowflakeTestSuite"
-	runRegressionTest "snowflakeCopy"
-    runRegressionTest "snowflakeCopy"
-	runRegressionTest "mssql2014ShortRegression"
-    runRegressionTest "mssql2014DataTypes"
-    runRegressionTest "mssql2014TestSuite"
-    break
-  }	
-  
+ 
  "shortRegression" {
     source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
     runRegressionTest "shortRegression"

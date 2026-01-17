@@ -1,12 +1,11 @@
-
+version: "2.4"
 services:
 
   PGSQL11-01: 
     container_name: PGSQL11-01
-    hostname: PGSQL11-01
     image:  postgres:11.2
     mem_limit: '12gb'
-    shm_size: '2gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:

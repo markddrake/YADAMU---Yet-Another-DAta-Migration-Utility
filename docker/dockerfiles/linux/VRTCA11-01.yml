@@ -1,11 +1,11 @@
+version: "2.4"
 services:
 
   VRTCA11-01: 
     container_name: VRTCA11-01
-    hostname: VRTCA11-01
     image:  vertica/vertica-ce:11.1.1-0 
     mem_limit: '12gb'
-    shm_size: '2gb'
+    shm_size: '4gb'
     security_opt:
       - seccomp:unconfined
     networks:
