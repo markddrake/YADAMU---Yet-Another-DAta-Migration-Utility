@@ -11,7 +11,7 @@
     "operation"         : "import"
   , "source"            : "file-staging"
   , "targets"           : [
-       "vertica#1","vertica10"
+       "vertica#1","vertica#2"
 	]
   , "verifyOperation"   : true
   , "parameters"        : {
@@ -33,19 +33,19 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "oracle18c"
+    "source"            : "oracle#2"
   , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "oracle12c"
+    "source"            : "oracle#3"
   , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "oracle11g"
+    "source"            : "oracle#4"
   , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -57,7 +57,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "mssql19"
+    "source"            : "mssql#2"
   , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -87,7 +87,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"            : "vertica10"
+    "source"            : "vertica#2"
   , "target"            : "vertica#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -95,7 +95,7 @@
   },{
     "source"            : "vertica#1"
   , "targets": [
-	  "oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1","vertica10"
+	  "oracle#1","oracle#2","oracle#3","oracle#4","mssql#1","mssql#2","postgres#1","mysql#1","mariadb#1","mongodb#1","vertica#2"
     ]
   , "parameters": {
       "IDENTIFIER_MAPPING_FILE"  : null

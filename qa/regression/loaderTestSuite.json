@@ -26,19 +26,19 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle18c"
+    "source"             : "oracle#2"
   , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle12c"
+    "source"             : "oracle#3"
   , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle11g"
+    "source"             : "oracle#4"
   , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -50,7 +50,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "mssql19"
+    "source"             : "mssql#2"
   , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -85,7 +85,7 @@
   },{
     "source"             : "loader-YADAMU_HOME"
   , "targets": [
-	  "oracle#1","oracle18c","oracle12c","oracle11g"
+	  "oracle#1","oracle#2","oracle#3","oracle#4"
 	  
     ]
   , "parameters": {
@@ -98,7 +98,7 @@
   },{
     "source"             : "loader-YADAMU_HOME"
   , "targets": [
-	   "mssql#1","mssql19"
+	   "mssql#1","mssql#2"
 	  
     ]
   , "parameters": {
@@ -155,7 +155,7 @@
       "HR","BI"
 	]
   },{
-    "source"             : "mssql19"
+    "source"             : "mssql#2"
   , "target"             : "loader-lRegress"
   , "parameters"         : {
       "DIRECTORY"        : "%operation%/gzip-json/%sourceConnection%"
@@ -165,7 +165,7 @@
       "Northwind","WWI_Warehouse"
 	]
   },{
-    "source"             : "mssql19"
+    "source"             : "mssql#2"
   , "target"             : "loader-lRegress"
   , "parameters"         : {
       "DIRECTORY"        : "%operation%/x-gzip-json/%sourceConnection%"
@@ -177,7 +177,7 @@
       "Northwind","WWI_Warehouse"
 	]
   },{
-    "source"             : "mssql19"
+    "source"             : "mssql#2"
   , "target"             : "loader-lRegress"
   , "parameters"         : {
       "DIRECTORY"        : "%operation%/x-json/%sourceConnection%"

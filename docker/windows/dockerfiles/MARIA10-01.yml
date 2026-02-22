@@ -1,0 +1,28 @@
+services:
+  
+  MARIA10-01: 
+    container_name: MARIA10-01
+    image:  yadamu/mariadb:10
+    isolation: hyperv
+    mem_limit: 4096M
+    environment:
+      DELAY : 0
+      MYSQL_ROOT_PASSWORD: oracle  
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "33071:3306"
+    volumes:
+      - YADAMU_01-SHARED:c:\shared
+      - MARIA10-01-VOLUME:C:\ProgramData\MariaDB\10
+    restart: always
+ 
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+     external: true
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MARIA10-01-VOLUME:
+     

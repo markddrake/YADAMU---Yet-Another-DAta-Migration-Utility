@@ -1,0 +1,1 @@
+bin\export rdbms=mysql username=root password=oracle database=sys hostname=yadamu-db2 file=test.json overwrite=true from_user=\"sakila\"

@@ -2,6 +2,12 @@
   "name": "yadamu",
   "type": "module",
   "version": "1.0.0",
+  "files": [
+     "node/"
+    ],
+    "exports": {
+        "./node/*": "./node/*"
+    },
   "description": "User Interface for YADAMU",
   "main": "./node/gui/index.mjs",
   "scripts": {

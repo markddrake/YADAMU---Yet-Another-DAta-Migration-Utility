@@ -1,0 +1,279 @@
+
+services:
+
+  YADAMU-SVR:
+    container_name: YADAMU-SVC
+    image:  yadamu/service
+    command: [ "c:/YADAMU/bin/service.bat",
+               "CONFIG=c:/yadamu/src/node/cfg/serviceConfiguration.json",
+               "ENCRYPTION=false"]
+    isolation: hyperv
+    mem_limit: 8192M
+    environment:
+      TNS_ADMIN: /usr/src/YADAMU
+      YADAMU_PASSPHRASE: yabasc
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "3000:3000"
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+    restart: always
+
+  # ORA2303-01: 1521
+
+  ORA1120-01:
+    container_name: ORA1120-01
+    image:  yadamu/oracle:11.2.0.4
+    isolation: hyperv
+    mem_limit: 8192M
+    networks:
+      - YADAMU-NET
+    ports:
+      - "15211:1521"
+    environment:
+      ORACLE_SID: ORA11200
+      ORACLE_PDB: ORA11200
+      ORACLE_PWD: oracle
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1120-01-ADMIN:c:\oracle\admin
+      - ORA1120-01-DATA:c:\oracle\oradata
+      - ORA1120-01-DIAG:c:\oracle\diag
+    restart: always
+
+  # ORA1210-01: 15212
+
+  ORA1220-01: 
+    container_name: ORA1220-01
+    image:  yadamu/oracle:12.2.0
+    isolation: hyperv
+    depends_on:
+      - ORA1803-01    
+    mem_limit: 8192M
+    networks:
+      - YADAMU-NET
+    ports:
+      - "15213:1521"
+    environment:
+      ORACLE_SID: CDB12200
+      ORACLE_PDB: PDB12200 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1220-01-ADMIN:c:\oracle\admin
+      - ORA1220-01-DATA:c:\oracle\oradata
+      - ORA1220-01-DIAG:c:\oracle\diag
+    restart: always
+
+  ORA1803-01:
+    container_name: ORA1803-01
+    image:  yadamu/oracle:18.3.0
+    isolation: hyperv
+    mem_limit: 8192M
+    networks:
+      - YADAMU-NET
+    ports:
+      - "15214:1521"
+    environment:
+      ORACLE_SID: CDB18300
+      ORACLE_PDB: PDB18300
+      ORACLE_PWD: oracle
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1803-01-ADMIN:c:\oracle\admin
+      - ORA1803-01-DATA:c:\oracle\oradata
+      - ORA1803-01-DIAG:c:\oracle\diag
+    restart: always
+
+  ORA1903-01:
+    container_name: ORA1903-01
+    image:  yadamu/oracle:19.3.0
+    isolation: hyperv
+    mem_limit: 8192M
+    networks:
+      - YADAMU-NET
+    ports:
+      - "15215:1521"
+    environment:
+      ORACLE_SID: CDB19300
+      ORACLE_PDB: PDB19300
+      ORACLE_PWD: oracle
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1903-01-ADMIN:c:\oracle\admin
+      - ORA1903-01-DATA:c:\oracle\oradata
+      - ORA1903-01-DIAG:c:\oracle\diag
+    restart: always
+
+  # ORA2103-01: 15216
+
+  MARIA11-01:
+    container_name: MARIA11-01
+    image:  yadamu/mariadb:11
+    isolation: hyperv
+    mem_limit: 4096M
+    networks:
+      - YADAMU-NET
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle
+      MARIADB_VERSION: 11
+    volumes:
+      - YADAMU_01-SHARED:c:\shared
+      - MARIA11-01-CONF:C:\ProgramData\MariaDB\11\Conf.d
+      - MARIA11-01-DATA:C:\ProgramData\MariaDB\11\Data
+    restart: always
+
+  # MARAI10-01: 33071
+
+  MONGO70-01: 
+    container_name: MONGO70-01
+    image:  yadamu/mongodb:7
+    isolation: hyperv
+    mem_limit: 4096M
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "27017:27017"
+    volumes:
+      - YADAMU_01-SHARED:c:\shared
+      - MONGO70-01-VOLUME:c:\ProgramData\MongoDB\Server\7.0
+    restart: always
+    
+  # MONGO40-01: 27018
+  # MONGO70-01: 27019
+  # MONGO60-01: 27020
+
+  # MSSQL17-01: "14332:1433"
+
+  MSSQL22-01:
+    container_name: MSSQL22-01
+    image:  yadamu/mssql:2022
+    isolation: hyperv
+    mem_limit: 6144M
+    networks:
+      - YADAMU-NET
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+      - MSSQL22-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA
+      - MSSQL22-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\LOG
+    restart: always
+
+  MSSQL19-01:
+      container_name: MSSQL19-01
+      image:  yadamu/mssql:2019-CU13
+      isolation: hyperv
+      mem_limit: 6144M
+      networks:
+        - YADAMU-NET
+      ports:
+        - "14333:1433"
+      environment:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: oracle#1
+      volumes:
+        - YADAMU_01-SHARED:c:\mount
+        - MSSQL19-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\DATA
+        - MSSQL19-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\LOG
+      restart: always
+
+  MSSQL14-01: 
+      container_name: MSSQL14-01
+      image:  yadamu/svr-2016/mssql:2014
+      isolation: hyperv
+      mem_limit: 6144M
+      networks:
+        - YADAMU-NET
+      ports: 
+        - "14331:1433"
+      environment:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: oracle#1
+      volumes:
+        - YADAMU_01-SHARED:c:\mount
+        - MSSQL14-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA
+        - MSSQL14-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\LOG
+      restart: always
+  MYSQL90-01:
+  
+    container_name: MYSQL90-01
+    image:  yadamu/mysql:8.1
+    isolation: hyperv
+    mem_limit: 4096M
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "3306:3306"
+    environment:
+      MYSQL_VERSION: 8.1
+    volumes:
+      - YADAMU_01-SHARED:c:\shared
+      - MYSQL90-01-VOLUME:C:\ProgramData\MySQL\8.1
+    restart: always
+
+  # MYSQL80-01: 33061
+
+  PGSQL16-01:
+    container_name: PGSQL16-01
+    image:  yadamu/postgres:16
+    isolation: hyperv
+    mem_limit: 4096M
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle
+      PGSQL_VERSION: 16
+    volumes:
+      - YADAMU_01-SHARED:c:\mount
+      - PGSQL16-01-VOLUME:C:\ProgramData\PostgreSQL\16\data\
+    restart: always
+
+  # PGSQL11-01: 54321
+  # PGSQL12-01: 54322
+  # PGSQL13-01: 54323
+  # PGSQL14-01: 54324
+  # PGSQL15-01: 54325
+
+networks:
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  ORA1903-01-ADMIN:
+  ORA1903-01-DATA:
+  ORA1903-01-DIAG:
+  ORA1803-01-ADMIN:
+  ORA1803-01-DATA:
+  ORA1803-01-DIAG:
+  ORA1220-01-ADMIN:
+  ORA1220-01-DATA:
+  ORA1220-01-DIAG:
+  ORA1120-01-ADMIN:
+  ORA1120-01-DATA:
+  ORA1120-01-DIAG:
+  MSSQL22-01-DATA:
+  MSSQL22-01-LOG:
+  MSSQL19-01-DATA:
+  MSSQL19-01-LOG:
+  MSSQL14-01-DATA:
+  MSSQL14-01-LOG:
+  PGSQL16-01-VOLUME:
+  MARIA11-01-CONF:
+  MARIA11-01-DATA:
+  MYSQL90-01-VOLUME:
+  MONGO70-01-VOLUME:

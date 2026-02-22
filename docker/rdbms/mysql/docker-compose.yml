@@ -1,0 +1,89 @@
+services:
+
+  MYSQL80-01: 
+    container_name: MYSQL80-01
+    hostname: MYSQL80-01
+    image:  mysql:8.0.37
+    command: --secure-file-priv=/mnt/shared  
+    mem_limit: '10gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MYSQL-DB
+    ports: 
+      - "33061:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+      LC_ALL: C.UTF-8      
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MYSQL80-01-VOLUME:/var/lib/mysql 
+    restart: always
+    
+  MYSQL90-01: 
+    container_name: MYSQL90-01
+    hostname: MYSQL90-01
+    image:  mysql:9.0.1
+    command: --secure-file-priv=/mnt/shared 
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MYSQL-DB
+    ports: 
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+      LC_ALL: C.UTF-8      
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MYSQL90-01-VOLUME:/var/lib/mysql 
+    restart: always  
+   
+  MYSQL95-01: 
+    container_name: MYSQL95-01
+    hostname: MYSQL95-01
+    image:  mysql:latest
+    command: --secure-file-priv=/mnt/shared 
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MYSQL-DB
+    ports: 
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+      LC_ALL: C.UTF-8      
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MYSQL95-01-VOLUME:/var/lib/mysql 
+    restart: always
+    
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MYSQL80-01-VOLUME:
+  MYSQL90-01-VOLUME:
+  MYSQL95-01-VOLUME:

@@ -1,0 +1,4 @@
+*
+!docker/regressionTests/tnsnames.ora
+!src/node/service
+

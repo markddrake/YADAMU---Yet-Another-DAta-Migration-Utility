@@ -3,14 +3,42 @@
         "oracle": {
             "user": "SYSTEM",
             "password": "oracle",
-            "connectString": "ORA1903"
+            "connectString": "ORACL01"
+        }
+    },
+    "oracle#2": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORACL02"
+        }
+    },
+    "oracle#3": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORACL03"
+        }
+    },
+    "oracle#4": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORACL04"
+        }
+    },
+    "oracle26ai": {
+        "oracle": {
+            "user": "SYSTEM",
+            "password": "oracle",
+            "connectString": "ORACL26"
         }
     },
     "oracle23ai": {
         "oracle": {
             "user": "SYSTEM",
             "password": "oracle",
-            "connectString": "ORA2305"
+            "connectString": "ORACL23"
         }
     },
     "oracle21c": {
@@ -51,7 +79,7 @@
     "mssql#1": {
         "mssql": {
             "user": "sa",
-            "server": "MSSQL22-01",
+            "server": "MSSQL-DB1",
             "database": "master",
             "password": "oracle#1",
             "requestTimeout": 360000000,
@@ -61,10 +89,10 @@
             }
         }
     },
-    "mssql12": {
+    "mssql#2": {
         "mssql": {
             "user": "sa",
-            "server": "MSSQL12-01",
+            "server": "MSSQL-DB2",
             "database": "master",
             "password": "oracle#1",
             "requestTimeout": 360000000,
@@ -74,36 +102,10 @@
             }
         }
     },
-    "mssql14": {
+    "mssql25": {
         "mssql": {
             "user": "sa",
-            "server": "MSSQL14-01",
-            "database": "master",
-            "password": "Oracle#1",
-            "requestTimeout": 360000000,
-            "options": {
-                "encrypt": false,
-                "abortTransactionOnError": false
-            }
-        }
-    },
-    "mssql17": {
-        "mssql": {
-            "user": "sa",
-            "server": "MSSQL17-01",
-            "database": "master",
-            "password": "oracle#1",
-            "requestTimeout": 360000000,
-            "options": {
-                "encrypt": false,
-                "abortTransactionOnError": false
-            }
-        }
-    },
-    "mssql19": {
-        "mssql": {
-            "user": "sa",
-            "server": "MSSQL19-01",
+            "server": "MSSQL25-01",
             "database": "master",
             "password": "oracle#1",
             "requestTimeout": 360000000,
@@ -126,10 +128,62 @@
             }
         }
     },
+    "mssql19": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL19-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql17": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL17-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql14": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL14-01",
+            "database": "master",
+            "password": "Oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
+    "mssql12": {
+        "mssql": {
+            "user": "sa",
+            "server": "MSSQL12-01",
+            "database": "master",
+            "password": "oracle#1",
+            "requestTimeout": 360000000,
+            "options": {
+                "encrypt": false,
+                "abortTransactionOnError": false
+            }
+        }
+    },
     "postgres#1": {
         "postgres": {
             "user": "postgres",
-            "host": "PGSQL17-01",
+            "host": "POSTGRES-DB1",
             "database": "yadamu",
             "password": "oracle",
             "port": 5432
@@ -174,7 +228,7 @@
     "mysql#1": {
         "mysql": {
             "user": "root",
-            "host": "MYSQL90-01",
+            "host": "MYSQL-DB1",
             "database": "sys",
             "password": "oracle",
             "port": 3306,
@@ -199,7 +253,7 @@
             "dateStrings": true
         }
     },
-    "mysql91": {
+    "mysql90": {
         "mysql": {
             "user": "root",
             "host": "MYSQL90-01",
@@ -216,7 +270,7 @@
     "mariadb#1": {
         "mariadb": {
             "user": "root",
-            "host": "MARIA11-01",
+            "host": "MARIA-DB1",
             "database": "mysql",
             "password": "oracle",
             "port": 3306,
@@ -257,7 +311,7 @@
     },
     "mongodb#1": {
         "mongodb": {
-            "host": "MONGO80-01",
+            "host": "MONGO-DB1",
             "port": 27017,
             "options": {
                 "socketTimeoutMS": 900000
@@ -303,7 +357,20 @@
     "vertica#1": {
         "vertica": {
             "user": "dbadmin",
-            "host": "VRTCA24-01",
+            "host": "VERTICA-DB1",
+            "database": "VMart",
+            "password": "oracle",
+            "port": 5433
+        },
+        "parameters": {
+            "REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+            "LOCAL_STAGING_AREA": "/usr/src/YADAMU/stagingArea/db/vertica"
+        }
+    },
+    "vertica#2": {
+        "vertica": {
+            "user": "dbadmin",
+            "host": "VERTICA-DB2",
             "database": "VMart",
             "password": "oracle",
             "port": 5433
@@ -381,7 +448,25 @@
     "db2#1": {
         "db2": {
             "user": "DB2INST1",
-            "host": "IBMDB2-01",
+            "host": "IBMDB2-DB",
+            "database": "YADAMU",
+            "password": "oracle",
+            "port": 50000
+        }
+    },
+    "db2#11": {
+        "db2": {
+            "user": "DB2INST1",
+            "host": "IBMDB2-11",
+            "database": "YADAMU",
+            "password": "oracle",
+            "port": 50000
+        }
+    },
+    "db2#12": {
+        "db2": {
+            "user": "DB2INST1",
+            "host": "IBMDB2-12",
             "database": "YADAMU",
             "password": "oracle",
             "port": 50000

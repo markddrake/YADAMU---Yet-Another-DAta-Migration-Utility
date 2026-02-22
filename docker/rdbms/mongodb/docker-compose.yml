@@ -1,0 +1,102 @@
+
+services:
+
+  MONGO40-01: 
+    container_name: MONGO40-01
+    hostname: MONGO40-01
+    image:  mongo:4
+    mem_limit: '12gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "27018:27017"
+    volumes:
+      - MONGO40-01-VOLUME:/data/db 
+    restart: always
+
+ MONGO50-01: 
+    container_name: MONGO50-01
+    hostname: MONGO50-01
+    image:  mongo:5 
+    mem_limit: '10gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "27019:27017"
+    volumes:
+      - MONGO50-01-VOLUME:/data/db 
+    restart: always
+    
+ MONGO60-01: 
+    container_name: MONGO60-01
+    hostname: MONGO60-01
+    image:  mongo:6 
+    mem_limit: '10gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "27020:27017"
+    volumes:
+      - MONGO60-01-VOLUME:/data/db 
+    restart: always
+
+ MONGO70-01: 
+    container_name: MONGO60-01
+    hostname: MONGO60-01
+    image:  mongo:7
+    mem_limit: '10gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "27020:27017"
+    volumes:
+      - MONGO70-01-VOLUME:/data/db 
+    restart: always
+
+
+  MONGO80-01: 
+    container_name: MONGO80-01
+    hostname: MONGO80-01
+    image:  mongo:latest 
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MONGO-DB
+    ports: 
+      - "27017:27017"
+    volumes:
+      - MONGO80-01-VOLUME:/data/db 
+    restart: always
+    
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MONGO40-01-VOLUME:
+  MONGO50-01-VOLUME:
+  MONGO60-01-VOLUME:
+  MONGO70-01-VOLUME:
+  MONGO80-01-VOLUME:
+    
+
+    

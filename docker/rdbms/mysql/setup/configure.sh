@@ -14,6 +14,11 @@ mkdir -p log
 export DB_USER=root
 export DB_PWD=oracle
 export DB_DBNAME=sys
-mysql   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f < setup/configure.sql > log/configure.log
-mysqlsh -u$DB_USER -p$DB_PWD -D$DB_DBNAME --js --interactive --file=setup/YADAMU_INSTALL.js
-mysql   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f < sql/YADAMU_COMPARE.sql > log/YADAMU_COMPARE.log
+mysql   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f < setup/configure.sql                > log/configure.log 2>&1
+mysql   -u$DB_USER -p$DB_PWD -Dsakila     -v -f < testdata/sakila/sakila-schema.sql >> log/configure.log 2>&1
+mysql   -u$DB_USER -p$DB_PWD -Dsakila     -v -f < testdata/sakila/sakila-data.sql   >> log/configure.log 2>&1
+mysql   -u$DB_USER -p$DB_PWD -Djtest      -v -f <  testdata/jtest.audit.sql         >> log/configure.log 2>&1
+mysqlsh -u$DB_USER -p$DB_PWD -D$DB_DBNAME --js --interactive --file=setup/YADAMU_INSTALL.js > log/install.log 2>&1
+cat log/install.log
+mysql   -u$DB_USER -p$DB_PWD -D$DB_DBNAME -v -f < sql/YADAMU_COMPARE.sql > log/YADAMU_COMPARE.log 2>&1
+ 

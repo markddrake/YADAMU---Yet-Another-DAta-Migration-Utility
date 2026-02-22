@@ -86,9 +86,10 @@ class AWSS3StorageService {
 	    Bucket      : this.dbi.BUCKET
 	  , Key         : key
 	  , ContentType : contentType
-	  , queueSize   : this.dbi.yadamu.PARALLEL  
 	  , Params      : 'new PassThrough()'
 	  }
+    , queueSize     : this.dbi.yadamu.PARALLEL  
+    , partSize      : this.CHUNK_SIZE
     }
         
 	const operation = `S3LibStorage.Upload(${JSON.stringify(input.params)})`
@@ -101,7 +102,7 @@ class AWSS3StorageService {
       const upload = new Upload(input)	
       upload.done().then(() => {
 	    // this.LOGGER.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`DONE`],input.params.Key);
-	    input.params.Body.destroy()
+	    input.params.Body.end()
 	    resolve(input.params.Key)
 	  }).catch((err) => {
         const cause = err instanceof DatabaseError ? err : this.dbi.getDatabaseException(err,stack,operation)
@@ -204,7 +205,6 @@ class AWSS3StorageService {
 	}
   }
 
-  
   async getContentAsString(key,input) {
 	const object = await this.getObject(key,input)
     const sw = new StringWriter();
@@ -247,60 +247,111 @@ class AWSS3StorageService {
 	return object.Body
 
   }
+    
+  async deleteFolder(key, input) {
   
-  async deleteFolder(key,input) {
-	 
-	input = input || {}
-	input.Bucket = this.dbi.BUCKET
-	input.Prefix = key.split(path.sep).join(path.posix.sep)
-	let stack
-	let operation
-	let folder
-    do { 
+    input = input || {}
+    input.Bucket = this.dbi.BUCKET
+  
+    let stack
+    let operation
+  
+    // Normalize to S3 key format and make it a "folder" prefix
+    stack = new Error().stack
+    input.Prefix = key.split(path.sep).join(path.posix.sep)
+  
+    operation = `S3Client.ListObjectsV2Command(${JSON.stringify(input)})`
+    if (input.Prefix === '' || input.Prefix === '/' || input.Prefix === '.') {
+      throw this.dbi.getDatabaseException(new Error(`Refusing to delete dangerous prefix: "${input.Prefix}"`), stack, operation)
+    }
+    if (!input.Prefix.endsWith('/')) {
+      input.Prefix = input.Prefix + '/'
+    }
+  
+    // Ensure we control pagination
+    delete input.StartAfter
+    delete input.ContinuationToken
+  
+    let folder
+  
+    do {
+  
       try {
-   	    operation = `S3Client.ListObjectsV2Command(${JSON.stringify(input)})`
-        const command = new ListObjectsV2Command(input)
-		stack = new Error().stack
-	    folder = await this.s3Client.send(command)	 
+        stack = new Error().stack
+        operation = `S3Client.ListObjectsV2Command(${JSON.stringify(input)})`
+        folder = await this.s3Client.send(new ListObjectsV2Command(input))
       } catch (e) {
-        throw this.dbi.getDatabaseException(e,stack,operation)
-	  }
-	  if (folder.KeyCount === 0) break;
-	  const deleteinput = {
-		Bucket : this.dbi.BUCKET
-	  , Delete : { Objects : folder.Contents.map((c) => { return {Key : c.Key }})}
-	  }
-	  try {
-  	    stack = new Error().stack
-   	    const operation = `S3Client.ListObjectsV2Command(${JSON.stringify(deleteinput)})`
-        const command = new DeleteObjectsCommand(deleteinput)
-        await this.s3Client.send(command)	 
+        throw this.dbi.getDatabaseException(e, stack, operation)
+      }
+  
+      if (!folder || folder.KeyCount === 0) {
+        break
+      }
+  
+      const objects = (folder.Contents || []).map((c) => { return { Key: c.Key } })
+      if (objects.length === 0) {
+        break
+      }
+  
+      const deleteinput = {
+        Bucket: this.dbi.BUCKET,
+        Delete: {
+          Objects: objects,
+          Quiet: true
+        }
+      }
+  
+      try {
+        stack = new Error().stack
+        operation = `S3Client.DeleteObjectsCommand(${JSON.stringify({ Bucket: deleteinput.Bucket, Count: deleteinput.Delete.Objects.length })})`
+        await this.s3Client.send(new DeleteObjectsCommand(deleteinput))
       } catch (e) {
-        throw this.dbi.getDatabaseException(e,stack,operation)
-	  }
-	} while (folder.IsTruncated);
+        throw this.dbi.getDatabaseException(e, stack, operation)
+      }
+  
+      // Advance pagination
+      if (folder.IsTruncated) {
+        input.ContinuationToken = folder.NextContinuationToken
+      } else {
+        delete input.ContinuationToken
+      }
+  
+    } while (folder.IsTruncated)
+  
   }
-
-  async deleteFile(key,input) {
-	 
-	/* 
-	input = input || {}
-	input.Bucket = this.dbi.BUCKET
-	input.Prefix = key.split(path.sep).join(path.posix.sep)
-    const deleteinput = {
-	  Bucket : this.dbi.BUCKET
-	, Delete : { Objects : folder.Contents.map((c) => { return {Key : c.Key }})}
-	}
-	let stack
+  
+  async deleteFile(key, input) {
+  
+    input = input || {}
+    input.Bucket = this.dbi.BUCKET
+  
+    // Normalize Windows-style paths to S3 keys
+    input.Key = key.split(path.sep).join(path.posix.sep)
+  
+    // Don't allow callers to smuggle version deletes (optional but sane)
+    delete input.VersionId
+  
+    let stack
+    let operation
+  
+    // Guard rails: refuse obviously dangerous / empty keys
+    stack = new Error().stack
+    operation = `S3Client.DeleteObjectCommand(${JSON.stringify({ Bucket: input.Bucket, Key: input.Key })})`
+    if (!input.Key || input.Key === "/" || input.Key.endsWith("/")) {
+      throw this.dbi.getDatabaseException(new Error(`Refusing to delete invalid object key: "${input.Key}"`), stack, operation)
+    }
+  
     try {
       stack = new Error().stack
-	  await this.s3Client.deleteObjects(deleteinput).promise();
+      operation = `S3Client.DeleteObjectCommand(${JSON.stringify({ Bucket: input.Bucket, Key: input.Key })})`
+      await this.s3Client.send(new DeleteObjectCommand(input))
     } catch (e) {
-      throw this.dbi.getDatabaseException(e,stack,`S3Client.deleteObjects(s3://${this.dbi.BUCKET}/${deleteinput.Delete.Objects.length})`)
-	}
-	*/
+      throw this.dbi.getDatabaseException(e, stack, operation)
+    }
+  
   }
 
 }
+
 
 export { AWSS3StorageService as default }

@@ -42,7 +42,7 @@
             ]
         },
         {
-            "source": "oracle18c",
+            "source": "oracle#2",
             "target": "file-lRegress",
             "parameters": {
                 "DIRECTORY": "%operation%/json/%connection%/%mode%"
@@ -52,7 +52,7 @@
             ]
         },
         {
-            "source": "oracle18c",
+            "source": "oracle#2",
             "target": "file-lRegress",
             "parameters": {
                 "MODE": "DDL_ONLY",
@@ -63,7 +63,7 @@
             ]
         },
         {
-            "source": "oracle18c",
+            "source": "oracle#2",
             "target": "file-lRegress",
             "parameters": {
                 "MODE": "DDL_AND_DATA",
@@ -74,7 +74,7 @@
             ]
         },
         {
-            "source": "oracle12c",
+            "source": "oracle#3",
             "target": "file-lRegress",
             "parameters": {
                 "DIRECTORY": "%operation%/json/%connection%/%mode%"
@@ -84,7 +84,7 @@
             ]
         },
         {
-            "source": "oracle12c",
+            "source": "oracle#3",
             "target": "file-lRegress",
             "parameters": {
                 "MODE": "DDL_ONLY",
@@ -95,7 +95,7 @@
             ]
         },
         {
-            "source": "oracle12c",
+            "source": "oracle#3",
             "target": "file-lRegress",
             "parameters": {
                 "MODE": "DDL_AND_DATA",
@@ -106,7 +106,7 @@
             ]
         },
         {
-            "source": "oracle11g",
+            "source": "oracle#4",
             "parameters": {
                 "DIRECTORY": "%operation%/json/%connection%/%mode%"
             },
@@ -116,7 +116,7 @@
             ]
         },
         {
-            "source": "oracle11g",
+            "source": "oracle#4",
             "target": "file-lRegress",
             "parameters": {
                 "MODE": "DDL_ONLY",
@@ -127,7 +127,7 @@
             ]
         },
         {
-            "source": "oracle11g",
+            "source": "oracle#4",
             "target": "file-lRegress",
             "parameters": {
                 "MODE": "DDL_AND_DATA",
@@ -152,14 +152,14 @@
             ]
         },
         {
-            "source": "mssql19",
+            "source": "mssql#2",
             "target": "file-lRegress",
             "tasks": [
                 "mssql"
             ]
         },
         {
-            "source": "mssql19",
+            "source": "mssql#2",
             "target": "file-lRegress",
             "tasks": [
                 "AdventureWorksAll"

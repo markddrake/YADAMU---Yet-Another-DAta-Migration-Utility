@@ -17,19 +17,19 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle18c",
+		    "source": "oracle#2",
             "target": "oracle#1",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle12c",
+		    "source": "oracle#3",
             "target": "oracle#1",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle11g",
+		    "source": "oracle#4",
             "target": "oracle#1",
             "tasks": [
                 "oracle","mssql","mysql"
@@ -41,7 +41,7 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "mssql19",
+		    "source": "mssql#2",
             "target": "oracle#1",
             "tasks": [
                 "oracle","mssql","mysql"

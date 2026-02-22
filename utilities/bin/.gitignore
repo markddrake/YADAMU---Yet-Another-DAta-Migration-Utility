@@ -1,0 +1,113 @@
+# =============================================================================
+# YADAMU .gitignore
+# =============================================================================
+# This file serves two purposes:
+#   1. Used by deploy.ps1 to determine which files to copy to the repo
+#   2. Ready to use directly if/when the dev folder becomes the git repo
+# =============================================================================
+
+# -- Node ----------------------------------------------------------------------
+node_modules/
+package-lock.json
+
+
+# -- DEV artifacts  ----------------------------------------------------------------------
+exceptions/
+exception/
+warnings/
+rejections/
+log/
+JSON/
+scratch/
+wip/
+work/
+YDB*
+ydb*
+
+# Deprecated, Desupported and Not yet Shipped
+mariadb_v2/
+mysql_v1/
+docker/swarm/
+
+# -- SRC artifacts  ----------------------------------------------------------------------
+# qa/ - include only specific subdirectories
+/src/*
+!/src/package.json
+!/src/html
+!/src/install
+/src/install/redshift
+!/src/node
+!/src/qa
+!/src/sql
+
+
+!/qa/bin/
+!/qa/cmdLine/
+!/qa/connections/
+!/qa/install/
+!/qa/mappings/
+!/qa/regression/
+!/qa/service/
+!/qa/sql/
+# Within connections, only deploy connections.json
+/qa/connections/*
+!/qa/connections/connections.json
+
+
+# -- QA artifacts  ----------------------------------------------------------------------
+# qa/ - include only specific subdirectories
+/qa/*
+!/qa/bin/
+!/qa/cmdLine/
+!/qa/connections/
+!/qa/install/
+!/qa/mappings/
+!/qa/regression/
+!/qa/regression/ydb*
+!/qa/service/
+!/qa/sql/
+# Within connections, only deploy connections.json
+/qa/connections/*
+!/qa/connections/connections.json
+
+# -- IDE / Editor --------------------------------------------------------------
+# Add your editor's config folder here, e.g.:
+sessions/
+.vs/
+# .vscode/
+# .idea/
+# *.sublime-project
+# *.sublime-workspace
+*.swp
+*.swo
+*~
+
+# -- OS files ------------------------------------------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# -- Logs ----------------------------------------------------------------------
+*.log
+
+# -- Credentials ---------------------------------------------------------------
+# The sanitized qa/connections/connections.json IS deployed (line 349 of old script)
+# If there are other connections files with real creds, add patterns here:
+# **/connections.local.json
+
+# -- Test data -----------------------------------------------------------------
+# TODO: Mark to specify exact locations / patterns for large test data
+# Uncomment and adjust as needed:
+# /testdata/
+# /qa/work/
+# **/*.dump
+# **/*.dmp
+
+# -- Build artifacts -----------------------------------------------------------
+/dist/
+/build/
+
+# Ignore testdata contents (not the directory itself, so negations work)
+/docker/rdbms/**/testdata/*
+# Whitelist specific files
+!/docker/rdbms/postgres/testdata/dataTypeTesting.sql

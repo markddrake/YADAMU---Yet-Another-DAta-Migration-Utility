@@ -25,19 +25,19 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle18c"
+    "source"             : "oracle#2"
   , "target"             : "minio#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle12c"
+    "source"             : "oracle#3"
   , "target"             : "minio#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "oracle11g"
+    "source"             : "oracle#4"
   , "target"             : "minio#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -49,7 +49,7 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"             : "mssql19"
+    "source"             : "mssql#2"
   , "target"             : "minio#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -84,7 +84,7 @@
   },{
     "source"             : "minio#1"
   , "targets": [
-	  "oracle#1","oracle18c","oracle12c","oracle11g"
+	  "oracle#1","oracle#2","oracle#3","oracle#4"
 	  
     ]
   , "parameters": {
@@ -97,7 +97,7 @@
   },{
     "source"             : "minio#1"
   , "targets": [
-	   "mssql#1","mssql19"
+	   "mssql#1","mssql#2"
 	  
     ]
   , "parameters": {
@@ -131,7 +131,7 @@
       "HR","BI"
 	]
   },{
-    "source"             : "mssql19"
+    "source"             : "mssql#2"
   , "target"             : "minio#1"
   , "parameters"         : {
       "DIRECTORY"        : "longRegress/%operation%/gzip-json/%sourceConnection%"

@@ -1,4 +1,4 @@
-#1/bin/bash
+#!/bin/bash
 START_TIME=`date +%s`
 source qa/cmdLine/bin/initialize.sh $BASH_SOURCE[0] $BASH_SOURCE[0] mysql export $YADAMU_TESTNAME
 rm -rf $YADAMU_EXPORT_PATH

@@ -63,7 +63,7 @@ class OracleError extends DatabaseError {
   
   underlyingCause(prefix,errorNum) {
 	const code = prefix + '-' + errorNum.toString().padStart(5,'0')
-	return this.cause.stack.includes(code)
+	return this.cause.message.includes(code)
   }
 
   invalidPool() {

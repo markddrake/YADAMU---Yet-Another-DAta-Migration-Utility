@@ -1,4 +1,4 @@
-#1/bin/bash
+#!/bin/bash
 START_TIME=`date +%s`
 source qa/cmdLine/bin/initialize.sh  $1 $BASH_SOURCE[0] mssql export $YADAMU_TESTNAME
 rm -rf $YADAMU_EXPORT_PATH

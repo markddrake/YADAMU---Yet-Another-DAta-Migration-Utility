@@ -29,7 +29,7 @@
             ]
         },
         {
-            "source": "oracle18c",
+            "source": "oracle#2",
             "target": "snow#1",
             "tasks": [
                 "oracle",
@@ -38,7 +38,7 @@
             ]
         },
         {
-            "source": "oracle12c",
+            "source": "oracle#3",
             "target": "snow#1",
             "tasks": [
                 "oracle",
@@ -47,7 +47,7 @@
             ]
         },
         {
-            "source": "oracle11g",
+            "source": "oracle#4",
             "target": "snow#1",
             "tasks": [
                 "oracle",
@@ -65,7 +65,7 @@
             ]
         },
         {
-            "source": "mssql19",
+            "source": "mssql#2",
             "target": "snow#1",
             "tasks": [
                 "oracle",

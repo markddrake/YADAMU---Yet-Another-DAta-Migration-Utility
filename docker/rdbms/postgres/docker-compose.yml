@@ -1,0 +1,208 @@
+
+services:
+
+  POSTGRES-01: 
+    container_name: POSTGRES-01
+    hostname: POSTGRES-01
+    image:  yadamu/postgres:latest
+    build:
+      dockerfile: build/Dockerfile
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+    ports: 
+      - "54300:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - POSTGRES-01-DATA:/var/lib/postgresql/data
+    restart: always
+
+  PGSQL11-01: 
+    container_name: PGSQL11-01
+    hostname: PGSQL11-01
+    image:  postgres:11.2
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "54311:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL11-01-DATA:/var/lib/postgresql/data
+    restart: always
+
+  PGSQL12-01: 
+    container_name: PGSQL12-01
+    hostname: PGSQL12-01
+    image:  yadamu/postgres:12 
+    build:
+      dockerfile: build/Dockerfile.12
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "54312:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL12-01-DATA:/var/lib/postgresql/data
+    restart: always
+
+  PGSQL13-01: 
+    container_name: PGSQL13-01
+    hostname: PGSQL13-01
+    image:  yadamu/postgres:13 
+    build:
+      dockerfile: build/Dockerfile.13
+    mem_limit: '16gb'
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '2gb'
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "54313:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL13-01-DATA:/var/lib/postgresql/data
+    restart: always
+ 
+  PGSQL14-01: 
+    container_name: PGSQL14-01
+    image:  yadamu/postgres:14
+    build:
+      dockerfile: build/Dockerfile.14
+    mem_limit: '16gb'
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '2gb'
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "54314:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL14-01-DATA:/var/lib/postgresql/data
+    restart: always
+ 
+  PGSQL15-01: 
+    container_name: PGSQL15-01
+    hostname: PGSQL15-01
+    image:  yadamu/postgres:15
+    build:
+      dockerfile: build/Dockerfile.15
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "54315:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL15-01-DATA:/var/lib/postgresql/data
+    restart: always
+
+  PGSQL16-01: 
+    container_name: PGSQL16-01
+    hostname: PGSQL16-01
+    image:  yadamu/postgres:16
+    build:
+      dockerfile: build/Dockerfile.16
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+    ports: 
+      - "54316:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL16-01-DATA:/var/lib/postgresql/data
+    restart: always
+
+  PGSQL17-01: 
+    container_name: PGSQL17-01
+    hostname: PGSQL17-01
+    image:  yadamu/postgres:17
+    build:
+      dockerfile: build/Dockerfile.17
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+    ports: 
+      - "54317:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL17-01-DATA:/var/lib/postgresql/data
+    restart: always
+
+  PGSQL18-01: 
+    container_name: PGSQL18-01
+    hostname: PGSQL18-01
+    image:  yadamu/postgres:18
+    build:
+      dockerfile: build/Dockerfile.18
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - POSTGRES-DB
+    ports: 
+      - "54318:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL18-01-DATA:/var/lib/postgresql
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  POSTGRES-01-DATA:
+  PGSQL11-01-DATA:
+  PGSQL12-01-DATA:
+  PGSQL13-01-DATA:    
+  PGSQL14-01-DATA:  
+  PGSQL15-01-DATA:
+  PGSQL16-01-DATA:
+  PGSQL17-01-DATA:
+  PGSQL18-01-DATA:
+

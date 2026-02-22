@@ -34,19 +34,19 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "oracle18c"
+    "source"          : "oracle#2"
   , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
-    "source"          : "oracle12c"
+    "source"          : "oracle#3"
   , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
 	]
   },{
-    "source"          : "oracle11g"
+    "source"          : "oracle#4"
   , "target"          : "oracle19c"
   , "tasks": [ 
       "postgresDataTypes"
@@ -58,7 +58,7 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "mssql19"
+    "source"          : "mssql#2"
   , "target"          : "oracle19c"
   , "tasks": [
       "postgresDataTypes"
@@ -100,7 +100,7 @@
   },{
     "source"          : "oracle19c"
   , "targets"         : [
-       "oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+       "oracle#2","oracle#3","oracle#4","mssql#1","mssql#2","postgres#1","mysql#1","mariadb#1","mongodb#1"
 	]
   , "tasks": [ 
       "postgresDataTypes"

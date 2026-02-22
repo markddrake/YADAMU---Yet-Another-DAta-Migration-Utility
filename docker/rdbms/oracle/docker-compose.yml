@@ -1,0 +1,279 @@
+
+services:
+
+  ORA1120-01: 
+    container_name: ORA1120-01
+    hostname: ORA1120-01
+    # image:  oracle/database:11.2.0.4-ee
+    image:  yadamu/oracle:11.2.0.4
+    build:
+      context: build/11.2.0.4
+      dockerfile: Dockerfile
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\11.2.0.4
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-04
+    ports: 
+      - "15211:1521"
+    environment:
+      ORACLE_SID: ORA11200 
+      ORACLE_PDB: ORA11200 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1120-01-DATA:/opt/oracle/admin
+      - ORA1120-01-DATA:/opt/oracle/oradata
+      - ORA1120-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA1210-01: 
+    container_name: ORA1210-01
+    hostname: ORA1210-01
+    # image:  oracle/database:12.1.0.2-ee 
+    image:  yadamu/oracle:12.1
+    build:
+      context: build/12.1
+      dockerfile: Dockerfile
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\12.1
+    mem_limit: '10gb'
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15212:1521"
+    environment:
+      ORACLE_SID: CDB12100
+      ORACLE_PDB: PDB12100
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1210-01-DIAG:/opt/oracle/admin
+      - ORA1210-01-DATA:/opt/oracle/oradata
+      - ORA1210-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA1220-01: 
+    container_name: ORA1220-01
+    hostname: ORA1220-01
+    # image:  oracle/database:12.2.0.1-ee 
+    image:  yadamu/oracle:12.2.0
+    build:
+      context: build/12.2
+      dockerfile: Dockerfile
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\12.2
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-03
+    ports: 
+      - "15213:1521"
+    environment:
+      ORACLE_SID: CDB12200 
+      ORACLE_PDB: PDB12200 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1220-01-DATA:/opt/oracle/admin
+      - ORA1220-01-DATA:/opt/oracle/oradata
+      - ORA1220-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA1803-01: 
+    container_name: ORA1803-01
+    hostname: ORA1803-01
+    # image:  oracle/database:18.3.0-ee
+    image:  yadamu/oracle:18.3.0
+    build:
+      context: build/18.3
+      dockerfile: Dockerfile
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\18.3
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-02
+    ports: 
+      - "15214:1521"
+    environment:
+      ORACLE_SID: CDB18300 
+      ORACLE_PDB: PDB18300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1803-01-DATA:/opt/oracle/admin
+      - ORA1803-01-DATA:/opt/oracle/oradata
+      - ORA1803-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA1903-01: 
+    container_name: ORA1903-01
+    hostname: ORA1903-01
+    # image:  oracle/database:19.3.0-ee
+    image:  yadamu/oracle:19.3.0
+    build:
+      context: build/19.3
+      dockerfile: Dockerfile
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\19.3
+    mem_limit: '16gb'
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-01
+    ports: 
+      - "15215:1521"
+    environment:
+      ORACLE_SID: CDB19300 
+      ORACLE_PDB: PDB19300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1903-01-DATA:/opt/oracle/admin
+      - ORA1903-01-DATA:/opt/oracle/oradata
+      - ORA1903-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA2103-01: 
+    container_name: ORA2103-01
+    hostname: ORA2103-01
+    # image:  oracle/database:21.3.0-ee
+    image:  yadamu/oracle:21.3.0
+    build:
+      context: build/21.3
+      dockerfile: Dockerfile
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\21.3
+    mem_limit: '16gb'
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15216:1521"
+    environment:
+      ORACLE_SID: CDB21300 
+      ORACLE_PDB: PDB21300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA2103-01-DATA:/opt/oracle/admin
+      - ORA2103-01-DATA:/opt/oracle/oradata
+      - ORA2103-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORACL23-01: 
+    container_name: ORACL23-01
+    hostname: ORACL23-01
+    #image:  container-registry.oracle.com/database/free:latest
+    image:  gvenzl/oracle-free:23.9-full
+    mem_limit: '16gb'
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '8gb'
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15218:1521"
+    environment:
+      ORACLE_SID: FREE
+      ORACLE_PDB: FREEPDB1 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+      ORACLE_PASSWORD: oracle
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORACL23-01-DATA:/opt/oracle/admin
+      - ORACL23-01-DATA:/opt/oracle/oradata
+      - ORACL23-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORACL26-01: 
+    container_name: ORACL26-01
+    hostname: ORACL26-01
+    #image:  container-registry.oracle.com/database/free:latest
+    image:  gvenzl/oracle-free:23.26.0-full
+    mem_limit: '16gb'
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '8gb'
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "15219:1521"
+    environment:
+      ORACLE_SID: FREE
+      ORACLE_PDB: FREEPDB1 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+      ORACLE_PASSWORD: oracle
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORACL26-01-DATA:/opt/oracle/admin
+      - ORACL26-01-DATA:/opt/oracle/oradata
+      - ORACL26-01-DIAG:/opt/oracle/diag
+    restart: always
+      
+      
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  ORA1120-01-DATA:
+  ORA1120-01-DIAG:
+  ORA1210-01-DATA:
+  ORA1210-01-DIAG:
+  ORA1220-01-DATA:
+  ORA1220-01-DIAG:
+  ORA1803-01-DATA:
+  ORA1803-01-DIAG:
+  ORA1903-01-DATA:
+  ORA1903-01-DIAG:
+  ORA2103-01-DATA:
+  ORA2103-01-DIAG:
+  ORACL23-01-DATA:
+  ORACL23-01-DIAG:
+  ORACL26-01-DATA:
+  ORACL26-01-DIAG:

@@ -1,4 +1,0 @@
-FROM yadamu/base:latest
-WORKDIR /usr/src/YADAMU
-COPY docker/regression/tnsnames.ora .
-COPY src/node/service src/node/service

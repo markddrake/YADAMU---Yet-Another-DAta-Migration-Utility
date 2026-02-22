@@ -13,7 +13,7 @@ if ((@HOST_PLATFORM = 'Windows') and  (CONVERT(INT,SERVERPROPERTY('ProductMajorV
   set @WWI_InMemory_Data_1 = STUFF(@DEFAULT_DATA_PATH,LEN(@DEFAULT_DATA_PATH)-4,4,'IN_MEMORY') + 'WideWorldImporters_InMemory_Data_1';
 --
 RESTORE DATABASE WorldWideImporters
-FROM disk= '$(STAGE)/testdata/WideWorldImporters-Full.bak'
+FROM disk= '$(STAGE)/testdata/WideWorldImporters/WideWorldImporters-Full.bak'
 WITH 
 MOVE 'WWI_Primary'         TO @WWI_Primary,
 MOVE 'WWI_UserData'        TO @WWI_UserData,

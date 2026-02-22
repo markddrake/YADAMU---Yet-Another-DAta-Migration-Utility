@@ -1,4 +1,4 @@
-#1/bin/bash
+#!/bin/bash
 START_TIME=`date +%s`
 export YADAMU_VENDOR=$(basename "$1")
 export YADAMU_SCRIPT_ROOT=$(dirname "$1") 

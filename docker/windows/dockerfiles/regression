@@ -1,0 +1,38 @@
+# escape=`
+FROM yadamu/base:latest
+WORKDIR C:/YADAMU
+COPY docker/regressionTests/bin bin
+COPY docker/regressionTests/tnsnames.ora .
+COPY qa/bin qa/bin
+COPY qa/mappings qa/mappings
+COPY qa/regression qa/regression
+COPY qa/service qa/service
+COPY qa/sql qa/sql
+COPY src src
+COPY utilities utilities
+COPY qa/connections/connections.json qa/regression
+ENV TNS_ADMIN=c:\YADAMU
+ENV YADAMU_PASSPHRASE=yabasc
+#RUN New-Item -force -ItemType directory -Path mnt\log; `
+#    New-Item -force -ItemType directory -Path mnt\longRegress; `
+#    New-Item -force -ItemType directory -Path mnt\shortRegress; `	
+#    New-Item -force -ItemType directory -Path mnt\stagingArea; `
+#    New-Item -force -ItemType directory -Path mnt\cmdLine; `
+#    New-Item -force -ItemType directory -Path mnt\output; `
+#    New-Item -force -ItemType directory -Path mnt\scratch; `	
+#    New-Item -force -ItemType directory -Path mnt\test; `
+#    New-Item -force -ItemType directory -Path mnt\work; `
+#	 New-Item -ItemType SymbolicLink -Path log          -Value C:\YADAMU\mnt\log; `
+# 	 New-Item -ItemType SymbolicLink -Path longRegress  -Value C:\YADAMU\mnt\longRegress; `
+#    New-Item -ItemType SymbolicLink -Path shortRegress -Value C:\YADAMU\mnt\shortRegress; `
+#	 New-Item -ItemType SymbolicLink -Path stagingArea  -Value C:\YADAMU\mnt\stagingArea; `
+#	 New-Item -ItemType SymbolicLink -Path cmdLine      -Value C:\YADAMU\mnt\cmdLine; `
+#	 New-Item -ItemType SymbolicLink -Path output       -Value C:\YADAMU\mnt\output; `
+#	 New-Item -ItemType SymbolicLink -Path scratch      -Value C:\YADAMU\mnt\scratch; `
+#	 New-Item -ItemType SymbolicLink -Path test         -Value C:\YADAMU\mnt\test; `
+#	 New-Item -ItemType SymbolicLink -Path work         -Value C:\YADAMU\mnt\work
+	
+ENTRYPOINT ["powershell","c:\\YADAMU\\bin\\chooseTest.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]
+
+

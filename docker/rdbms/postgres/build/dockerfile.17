@@ -1,0 +1,17 @@
+FROM postgres:17
+ENV LANGUAGE="en_US.UTF-8"
+ENV LC_ALL="en_US.UTF-8"
+ENV PIP_BREAK_SYSTEM_PACKAGES 1
+RUN apt update \
+ && apt install -y locales \
+ && apt install -y postgis postgresql-17-postgis-3 \ 
+ && apt install -y postgresql-plpython3-17 \
+ && apt install -y python-is-python3 python3-full \
+ && apt install -y python3-pip pipx \
+ && apt install -y python3-lxml \
+ && pip install lxml 
+RUN sed -i -e "s/# $LANGUAGE.*/$LANGUAGE UTF-8/" /etc/locale.gen \
+ && cat /etc/locale.gen | grep $LANGUAGE \
+ && dpkg-reconfigure --frontend=noninteractive locales\
+ && update-locale LANG=$LANGUAGE 
+ 

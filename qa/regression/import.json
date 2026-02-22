@@ -10,25 +10,25 @@
   }
 , "tests" : [{
     "source"      : "file-staging"
-  , "targets"     : ["mssql#1","mssql19","postgres#1","mysql#1","mariadb#1"]
+  , "targets"     : ["mssql#1","mssql#2","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "oracle"
     ]
   },{
     "source"      : "file-staging"
-  , "targets"     : ["oracle#1","oracle18c","oracle12c","oracle11g","mssql#1","mssql19","postgres#1"]
+  , "targets"     : ["oracle#1","oracle#2","oracle#3","oracle#4","mssql#1","mssql#2","postgres#1"]
   , "tasks": [
       "mysql"
     ]
   },{
     "source"      : "file-staging"
-  , "targets"     : ["oracle#1","oracle18c","oracle12c","postgres#1","mysql#1","mariadb#1"]
+  , "targets"     : ["oracle#1","oracle#2","oracle#3","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "mssql"
     ]
   },{
     "source"      : "file-staging"
-  , "targets"     : ["oracle11g"]
+  , "targets"     : ["oracle#4"]
   , "parameters"  : {
       "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/oracle11gAdventureWorks.json"
 	}

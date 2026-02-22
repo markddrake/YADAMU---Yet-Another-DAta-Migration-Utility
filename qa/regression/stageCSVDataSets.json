@@ -9,31 +9,25 @@
         "OUTPUT_FORMAT"           : "CSV"
 	},
 	"tests": [{
-            "source": "oracle#1",
+		    "source": "oracle#1",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle19c",
+		    "source": "oracle#2",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle18c",
+		    "source": "oracle#3",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "oracle12c",
-            "target": "loader-staging",
-            "tasks": [
-                "oracle","mssql","mysql"
-            ]
-    },{
-		    "source": "oracle11g",
+		    "source": "oracle#4",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
@@ -45,7 +39,7 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "mssql19",
+		    "source": "mssql#2",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
@@ -81,7 +75,7 @@
                 "oracle","mssql","mysql"
             ]
     },{
-		    "source": "vertica10",
+		    "source": "vertica#2",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
@@ -97,7 +91,7 @@
    			  "SPATIAL_FORMAT"          : "WKT"
 	        }
     },{
-		    "source": "oracle19c",
+		    "source": "oracle#2",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
@@ -107,7 +101,7 @@
    			  "SPATIAL_FORMAT"          : "WKT"
 	        }
     },{
-		    "source": "oracle18c",
+		    "source": "oracle#3",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"
@@ -117,17 +111,7 @@
    			  "SPATIAL_FORMAT"          : "WKT"
 	        }
     },{
-		    "source": "oracle12c",
-            "target": "loader-staging",
-            "tasks": [
-                "oracle","mssql","mysql"
-            ],
-	        "parameters": {
-		      "DIRECTORY"               : "loader/csv/WKT/%sourceConnection%",
-   			  "SPATIAL_FORMAT"          : "WKT"
-	        }
-    },{
-		    "source": "oracle11g",
+		    "source": "oracle#4",
             "target": "loader-staging",
             "tasks": [
                 "oracle","mssql","mysql"

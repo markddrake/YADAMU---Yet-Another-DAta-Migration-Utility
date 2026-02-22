@@ -1,0 +1,396 @@
+
+services:
+
+  # ORA2303-01: 1521
+  
+  ORA1120-01: 
+    container_name: ORA1120-01
+    hostname: ORA1120-01
+    # image:  oracle/database:11.2.0.4-ee
+    image:  yadamu/oracle:11.2.0.4
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-DB4
+    ports: 
+      - "15211:1521"
+    environment:
+      ORACLE_SID: ORA11200 
+      ORACLE_PDB: ORA11200 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1120-01-DATA:/opt/oracle/admin
+      - ORA1120-01-DATA:/opt/oracle/oradata
+      - ORA1120-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  # ORA1210-01: 15212
+  
+  ORA1220-01: 
+    container_name: ORA1220-01
+    hostname: ORA1220-01
+    # image:  oracle/database:12.2.0.1-ee 
+    image:  yadamu/oracle:12.2.0
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-DB3
+    ports: 
+      - "15213:1521"
+    environment:
+      ORACLE_SID: CDB12200 
+      ORACLE_PDB: PDB12200 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1220-01-DATA:/opt/oracle/admin
+      - ORA1220-01-DATA:/opt/oracle/oradata
+      - ORA1220-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA1803-01: 
+    container_name: ORA1803-01
+    hostname: ORA1803-01
+    # image:  oracle/database:18.3.0-ee
+    image:  yadamu/oracle:18.3.0
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-DB2
+    ports: 
+      - "15214:1521"
+    environment:
+      ORACLE_SID: CDB18300 
+      ORACLE_PDB: PDB18300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1803-01-DATA:/opt/oracle/admin
+      - ORA1803-01-DATA:/opt/oracle/oradata
+      - ORA1803-01-DIAG:/opt/oracle/diag
+    restart: always
+
+  ORA1903-01: 
+    container_name: ORA1903-01
+    hostname: ORA1903-01
+    # image:  oracle/database:19.3.0-ee
+    image:  yadamu/oracle:19.3.0
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
+    networks:
+      YADAMU-NET:
+        aliases:
+          - ORACLE-DB1
+    ports: 
+      - "15215:1521"
+    environment:
+      ORACLE_SID: CDB19300 
+      ORACLE_PDB: PDB19300 
+      ORACLE_PWD: oracle 
+      ORACLE_CHARACTERSET: AL32UTF8
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA1903-01-DATA:/opt/oracle/admin
+      - ORA1903-01-DATA:/opt/oracle/oradata
+      - ORA1903-01-DIAG:/opt/oracle/diag
+    restart: always
+  
+
+  PGSQL18-01: 
+    container_name: PGSQL18-01
+    hostname: PGSQL18-01
+    image:  yadamu/postgres:18
+    mem_limit: '16gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - POSTGRES-DB1
+    ports: 
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: oracle 
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - PGSQL18-01-DATA:/var/lib/postgresql
+    restart: always
+    
+  MARIA12-01: 
+    container_name: MARIA12-01
+    hostname: MARIA12-01
+    image:  mariadb:12
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MARIA-DB1
+    ports: 
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MARIA12-01-CONF:/etc/mysql/conf.d
+      - MARIA12-01-DATA:/var/lib/mysql 
+    restart: always
+
+  MONGO80-01: 
+    container_name: MONGO80-01
+    hostname: MONGO80-01
+    image:  mongo:latest 
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MONGO-DB1
+    ports: 
+      - "27017:27017"
+    volumes:
+      - MONGO80-01-VOLUME:/data/db 
+    restart: always
+
+  MSSQL25-01: 
+    container_name: MSSQL25-01
+    hostname: MSSQL25-01
+    image:  mcr.microsoft.com/mssql/server:2025-latest
+    cpuset: '0-11'        # Avoid E Core problem
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    cpus: '8'     
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MSSQL-DB1
+    ports: 
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL25-01-VOLUME:/var/opt/mssql
+    restart: always
+  
+  MSSQL22-01: 
+    container_name: MSSQL22-01
+    hostname: MSSQL22-01
+    image:  mcr.microsoft.com/mssql/server:2022-latest
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MSSQL-DB2
+    ports: 
+      - "14333:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL22-01-VOLUME:/var/opt/mssql
+    restart: always
+
+  MYSQL95-01: 
+    container_name: MYSQL95-01
+    hostname: MYSQL95-01
+    image:  mysql:latest
+    command: --secure-file-priv=/mnt/shared 
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MYSQL-DB1
+    ports: 
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MYSQL95-01-VOLUME:/var/lib/mysql 
+    restart: always
+    
+  VRTCA24-01: 
+    container_name: VRTCA24-01
+    hostname: VRTCA24-01
+    image:  vertica/vertica-ce:latest 
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - VERTICA-DB1
+    ports: 
+      - "5433:5433"
+      - "5444:5444"
+    environment:
+      APP_DB_USER: "vertica"
+      APP_DB_PASSWORD: "oracle"
+      TZ: "Etc/UTC"
+    #deploy:
+    #  mode: global
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - VRTCA24-01-VOLUME:/data
+    restart: always    
+
+  VRTCA10-01: 
+    container_name: VRTCA10-01
+    hostname: VRTCA10-01
+    image: vertica/vertica-ce:10.1.1-0
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    networks:
+      YADAMU-NET:
+        aliases:
+          - VERTICA-DB2
+    ports: 
+      - "54332:5433"
+      - "54442:5444"
+    environment:
+      APP_DB_USER: "vertica"
+      APP_DB_PASSWORD: "oracle"
+      TZ: "Etc/UTC"
+    #deploy:
+    #  mode: global
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - VRTCA10-01-VOLUME:/data
+    restart: always
+
+  MINIO-01: 
+    container_name: MINIO-01
+    hostname: MINIO-01
+    # image:  minio/minio 
+    image:  minio/minio:RELEASE.2024-11-07T00-52-20Z
+    mem_limit: '1gb'
+    memswap_limit: -1     # allow unlimited swap
+    command:  server /data --console-address  ":9001"
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: AKIAIOSFODNN7EXAMPLE
+      MINIO_ROOT_PASSWORD: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    volumes:
+      - MINIO-01-VOLUME:/data
+    restart: always
+    
+  AZURE-01: 
+    container_name: AZURE-01
+    hostname: AZURE-01
+    image:   mcr.microsoft.com/azure-storage/azurite 
+    mem_limit: '1gb'
+    memswap_limit: -1     # allow unlimited swap
+    command: azurite-blob --blobHost 0.0.0.0 --loose --blobPort 10000 --skipApiVersionCheck 
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "10000:10000"
+    volumes:
+      - AZURE-01-VOLUME:/data
+    restart: always
+
+  YADAMU-SMB: 
+    container_name: YADAMU-SMB
+    hostname: YADAMU-SMB
+    image:   dperson/samba
+    mem_limit: '1gb'
+    memswap_limit: -1     # allow unlimited swap
+    command: -p -s "work;/mount;yes;no;yes" -n -p
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "139:139"
+      - "445:445"
+      - "137:137/udp"
+      - "138:138/udp"
+    volumes:
+      - YADAMU_01-SHARED:/mount
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  ORA1903-01-DATA:
+  ORA1903-01-DIAG:
+  ORA1803-01-DATA:
+  ORA1803-01-DIAG:
+  ORA1220-01-DATA:
+  ORA1220-01-DIAG:
+  ORA1120-01-DATA:
+  ORA1120-01-DIAG:
+  MSSQL22-01-VOLUME:
+  MSSQL25-01-VOLUME:
+  PGSQL18-01-DATA:
+  MYSQL95-01-VOLUME:
+  MARIA12-01-CONF:
+  MARIA12-01-DATA:
+  MONGO80-01-VOLUME:
+  VRTCA10-01-VOLUME:
+  VRTCA24-01-VOLUME:
+  MINIO-01-VOLUME:
+  AZURE-01-VOLUME:
+    
+
+    

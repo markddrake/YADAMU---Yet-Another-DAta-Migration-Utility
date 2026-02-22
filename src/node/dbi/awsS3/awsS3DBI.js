@@ -7,6 +7,10 @@ import {
 
 /* Database Vendors API */                                    
 
+import                                https from 'https'
+import { 
+  NodeHttpHandler 
+}                                     from '@aws-sdk/node-http-handler'
 import { 
   S3Client
 }                                     from "@aws-sdk/client-s3";
@@ -143,12 +147,24 @@ class AWSS3DBI extends CloudDBI {
   }
   
   async createConnectionPool() {
-	// this.LOGGER.trace([this.constructor.name],`new S3Client()`)
-	
-	this.cloudConnection = await new S3Client(this.CONNECTION_PROPERTIES.connection)
-	this.cloudService = new AWSS3StorageService(this,{})
+  
+    const agent = new https.Agent({
+      keepAlive: true,
+      maxSockets: 32,       // tune if needed
+      keepAliveMsecs: 30000
+    })
+  
+    this.cloudConnection = new S3Client({
+      ...this.CONNECTION_PROPERTIES.connection,
+      requestHandler: new NodeHttpHandler({
+        httpsAgent: agent,
+        connectionTimeout: 30000,
+        socketTimeout: 300000
+      })
+    })
+  
+    this.cloudService = new AWSS3StorageService(this,{})
   }
-
 
   /*
   **

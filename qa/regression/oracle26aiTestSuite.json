@@ -1,0 +1,175 @@
+{
+    "operation": "dbRoundTrip",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "parameters": {
+    },
+    "tests": [
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "oracle26ai",
+            "recreateSchema": false,
+            "parameters": {
+                "TRUNCATE_ON_LOAD": true,
+                "DIRECTORY": "export/json/%vendor%",
+                "TABLES": [
+                    "ONLINE_MEDIA"
+                ]
+            },
+            "tasks": [
+                "PM"
+            ]
+        },
+        {
+            "operation": "export",
+            "source": "oracle26ai",
+            "target": "file-staging",
+            "recreateSchema": true,
+            "createDirectory": true,
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "%operation%/json/%connection%/%mode%"
+            },
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "operation": "import",
+            "source": "file-staging",
+            "target": "oracle26ai",
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "export/json/%location%"
+            },
+            "tasks": [
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle26ai",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle#2",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle#3",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle#4",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#2",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "target": "oracle26ai",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "oracle26ai",
+            "parameters": {
+                "MONGO_STRIP_ID": false
+            },
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "oracle26ai",
+            "targets": [
+                "oracle#1",
+                "oracle#2",
+                "oracle#3",
+                "oracle#4",
+                "mssql#1",
+                "mssql#2",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        }
+    ]
+}

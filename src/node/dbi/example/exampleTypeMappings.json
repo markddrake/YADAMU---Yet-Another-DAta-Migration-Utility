@@ -1,0 +1,16 @@
+{
+  "mappings": {
+	"CHAR_TYPE"                                            : "CHAR"  
+  , "NUMERIC_TYPE"                                         : "NUMBER"                                                          
+  , "DOUBLE_TYPE"                                          : "BINARY_DOUBLE"                                                   
+  , "BINARY_TYPE"                                          : "VARCHAR2"                                                        
+  , "TIMESTAMP_TYPE"                                       : "TIMESTAMP"                                                       
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "NUMBER"                                                          
+  }  
+, "limits": {
+    "SCALAR_LENGTH"                                        : 4000
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "WKB"
+  }
+}                                                        

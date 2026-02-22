@@ -1,0 +1,41 @@
+
+services:
+  environment:
+    image: yadamu/environment:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/environment
+      no_cache: true
+      args:
+        BUILDKIT_PROGRESS: plain
+
+  base:
+    image: yadamu/base:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/yadamu
+
+  regression:
+    image: yadamu/regression:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/regression
+
+  commandline:
+    image: yadamu/commandline:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/commandLine
+      # DOCKER_BUILDKIT is enabled by default in Compose V2
+
+  secure:
+    image: yadamu/secure:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/secure
+
+  service:
+    image: yadamu/service:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/service

@@ -3,19 +3,37 @@ echo "Using Docker"
 # MariaDB Connection Information
 unset MARIADB_USER
 unset MARIADB_PWD
-export MARIADB_HOST=MARIA11-01
+export MARIADB_HOST=MARIA-DB1
 unset MARIADB_PORT
 unset MARIADB_DBNAME
-# Generic SQL Server Connection Information
-unset MSSQL_USER
-unset MSSQL_PWD
-export MSSQL_HOST=MSSQL22-01
-unset MSSQL_PORT
-unset MSSQL_DBNAME
+# MySQL Connection Information
+unset MYSQL_USER
+unset MYSQL_PWD
+export MYSQL_HOST=MYSQL-DB1
+unset MYSQL_PORT
+unset MYSQL_DBNAME
+# Postgres Connection Information
+unset POSTGRES_USER
+unset POSTGRES_PWD
+export POSTGRES_HOST=POSTGRES-DB1
+unset POSTGRES_PORT
+unset POSTGRES_DBNAME
+# Generic SQL Server Connection Information #1 
+unset MSSQL_01_USER
+unset MSSQL_01_PWD
+export MSSQL_01_HOST=MSSQL-DB1
+unset MSSQL_01_PORT
+unset MSSQL_01_DBNAME
+# Generic SQL Server Connection Information #2
+unset MSSQL_02_USER
+unset MSSQL_02_PWD
+export MSSQL_02_HOST=MSSQL-DB1
+unset MSSQL_02_PORT
+unset MSSQL_02_DBNAME
 # SQL Server 2017 Connection Information
 unset MSSQL17_USER
 unset MSSQL17_PWD
-export MSSQL17_HOST=MSSQL17-01
+export MSSQL17_HOST=MSSQL-DB2
 unset MSSQL17_PORT
 unset MSSQL17_DBNAME
 # SQL Server 2019 Connection Information
@@ -30,12 +48,22 @@ unset MSSQL22_PWD
 export MSSQL22_HOST=MSSQL22-01
 unset MSSQL22_PORT
 unset MSSQL22_DBNAME
-# MySQL Connection Information
-unset MYSQL_USER
-unset MYSQL_PWD
-export MYSQL_HOST=MYSQL90-01
-unset MYSQL_PORT
-unset MYSQL_DBNAME
+# Oracle #1 Connection Information
+export ORACLE_01=ORACL01
+unset ORACLE_01_USER
+unset ORACLE_01_PWD
+# Oracle #1 Connection Information
+export ORACLE_02=ORACL02
+unset ORACLE_02_USER
+unset ORACLE_02_PWD
+# Oracle #1 Connection Information
+export ORACLE_03=ORACL03
+unset ORACLE_03_USER
+unset ORACLE_03_PWD
+# Oracle #1 Connection Information
+export ORACLE_04=ORACL04
+unset ORACLE_04_USER
+unset ORACLE_04_PWD
 # Oracle 19c Connection Information
 export ORACLE19C=ORA1903
 unset ORACLE19C_USER
@@ -52,14 +80,8 @@ unset ORACLE12C_PWD
 export ORACLE11G=ORA1120
 unset ORACLE11G_USER
 unset ORACLE11G_PWD
-# Postgres Connection Information
-unset POSTGRES_USER
-unset POSTGRES_PWD
-export POSTGRES_HOST=PGSQL17-01
-unset POSTGRES_PORT
-unset POSTGRES_DBNAME
 # Relative location of export files to be used for testing
-export YADAMU_ORACLE_PATH=oracle19c
-export YADAMU_MSSQL_PATH=mssql22
+export YADAMU_ORACLE_PATH=oracle#1
+export YADAMU_MSSQL_PATH=mssql#1
 export YADAMU_MYSQL_PATH=mysql
 export YADAMU_TEST_FOLDER=cmdLine

@@ -1,0 +1,4 @@
+FROM yadamu/base:latest
+WORKDIR C:\YADAMU
+COPY docker/regressionTests/tnsnames.ora .
+COPY src/node/service src/node/service

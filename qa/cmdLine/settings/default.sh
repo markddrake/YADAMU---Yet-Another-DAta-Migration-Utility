@@ -53,8 +53,8 @@ unset POSTGRES_HOST
 unset POSTGRES_PORT
 unset POSTGRES_DBNAME
 # Relative location of export files to be used for testing
-export YADAMU_ORACLE_PATH=oracle19c
-export YADAMU_MSSQL_PATH=mssql19
+export YADAMU_ORACLE_PATH=oracle#1
+export YADAMU_MSSQL_PATH=mssql#1
 export YADAMU_MYSQL_PATH=mysql
 export YADAMU_TEST_FOLDER=cmdLine
 @echo on

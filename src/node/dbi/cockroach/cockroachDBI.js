@@ -482,46 +482,52 @@ class CockroachDBI extends YadamuDBI {
 	
   }
   
-  async insertBatch(sqlStatement,batch) {
-	 
-	let retryCount = 0
+  async retryableOperation(operation, operationName) {
+    let retryCount = 0;
     while (true) {
-      // Exit with result or exception.  
       try {
-        const result = await this.executeSQL(sqlStatement,batch)
-		// Cockroach does not like long running transations, so each batch insert is it's own transaction
-		// Cockroach can throw retry transaction on a commit. Ensure retry is possible by committing here. 
-		// Disable savepoints in the bulk insert operation, they are redundant.
-		// This will cause dummy transactions to occur but allows standard transaction housekeeping to track number of records written
-		await this.commitTransaction();
-		await this.beginTransaction();
+        const result = await operation();
         return result;
       } catch (cause) {
-		try {
-          await this.rollbackTransaction(cause) 
-	    } catch(transactionError) {
-	 	  cause.cause = [cause.cause, transactionError];
-  		  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','TRANSACTION ABORTED','ROLLBACK TRANSACTION'],cause)
-	      throw cause
-		}
-  	    try {
- 		  await this.beginTransaction() 
-	    } catch(transactionError) {
-		  cause.cause = [cause.cause, transactionError];
-  		  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'INSERT BATCH','BEGIN TRANSACTION',operation],cause)
-		  throw cause
-		}
-		if (cause.transactionAborted() && (retryCount < this.RETRY_LIMIT)) {
- 	      retryCount++
-		  this.LOGGER.handleWarning([this.DATABASE_VENDOR,'INSERT BATCH','TRANSACTION ABORTED',retryCount],cause)
-		  this.LOGGER.info([this.DATABASE_VENDOR,'INSERT BATCH'],`Retrying operation.`)
-		  continue
-		}
-		throw cause
-      }      
-    } 
+        if (cause.transactionAborted && cause.transactionAborted() && retryCount < this.RETRY_LIMIT) {
+          retryCount++;
+          // this.LOGGER.handleWarning([this.DATABASE_VENDOR, operationName, 'RETRY TRANSACTION', retryCount], cause);
+		  this.LOGGER.info([this.DATABASE_VENDOR, operationName, 'RETRY TRANSACTION', retryCount], cause?.message || cause?.toString() || Srting(cause));
+          this.LOGGER.info([this.DATABASE_VENDOR, operationName], `Retrying operation.`);
+        
+          try {
+            // Will probably generate Notice "there is no transaction is process"
+		    await this.rollbackTransaction(cause);
+          } catch (transactionError) {
+            cause.cause = [cause.cause, transactionError];
+            this.LOGGER.handleException([this.DATABASE_VENDOR, this.ROLE, operationName, 'RETRY TRANSACTION', 'ROLLBACK TRANSACTION'], cause);
+            throw cause;
+          }
+        
+          try {
+            await this.beginTransaction();
+          } catch (transactionError) {
+            cause.cause = [cause.cause, transactionError];
+            this.LOGGER.handleException([this.DATABASE_VENDOR, this.ROLE, operationName, 'RETRY TRANSACTION', 'BEGIN TRANSACTION'], cause);
+            throw cause;
+          }
+       
+          continue;
+        }
+        throw cause;
+      }
+    }
   }
   
+  async insertBatch(sqlStatement, batch) {
+    return await this.retryableOperation(async () => {
+      const result = await this.executeSQL(sqlStatement, batch);
+      await this.commitTransaction();
+      await this.beginTransaction();
+      return result;
+    }, 'INSERT BATCH');
+  }
+
   async initialize() {
     await super.initialize(true)
 	this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
@@ -536,10 +542,11 @@ class CockroachDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-     // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
+    // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION)
-	 super.beginTransaction()
+	this.currentBatch = undefined
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION)
+	super.beginTransaction()
 
   }
 
@@ -553,6 +560,7 @@ class CockroachDBI extends YadamuDBI {
 	  
     // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
+	this.currentBatch = undefined
 	super.commitTransaction()
     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_COMMIT_TRANSACTION)
 	
@@ -585,18 +593,29 @@ class CockroachDBI extends YadamuDBI {
 	}
   }
 
-  async createSavePoint() {
+  // Cockroach does not implement save points in the same way as other database. It expects the client to be able to retry a batch, consequently in cockroach we must be able to reapply a batch. 
+
+  async createSavePoint(batch) {
 
     // this.LOGGER.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
-															
+ 
+    /*
+	**
+	** Savepoints are problematic in Cockroach. They do not guarantee recovery to a point in time. Consequently they are not implemented by the Cocroach driver and Multi-Batch Commits are diabled
+	**
+
     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CREATE_SAVE_POINT)
+	
+	**
+	*/
+
     super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
 
     // this.LOGGER.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
-																 
+							
     this.checkConnectionState(cause)
 	 
 	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
@@ -604,7 +623,16 @@ class CockroachDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
+      /*
+	  **
+	  ** Savepoints are problematic in Cockroach. They do not guarantee recovery to a point in time. Consequently they are not implemented by the Cocroach driver and Multi-Batch Commits are diabled
+	  **
+      
+	  await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESTORE_SAVE_POINT)
+      
+	  **
+	  */
+	  
       super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue)
@@ -615,8 +643,17 @@ class CockroachDBI extends YadamuDBI {
 
     // this.LOGGER.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
+    /*
+	**
+	** Savepoints are problematic in Cockroach. They do not guarantee recovery to a point in time. Consequently they are not implemented by the Cocroach driver and Multi-Batch Commits are diabled
+	**
+   
     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RELEASE_SAVE_POINT)    
-    super.releaseSavePoint()
+	
+    **
+	*/
+    
+	super.releaseSavePoint()
 
   } 
   

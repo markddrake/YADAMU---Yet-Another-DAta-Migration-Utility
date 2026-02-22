@@ -31,21 +31,21 @@
         },
         {
             "source": "oracle#1",
-            "target": "oracle18c",
+            "target": "oracle#2",
             "tasks": [
                 "postgresDataTypes"
             ]
         },
         {
             "source": "oracle#1",
-            "target": "oracle12c",
+            "target": "oracle#3",
             "tasks": [
                 "postgresDataTypes"
             ]
         },
         {
             "source": "oracle#1",
-            "target": "oracle11g",
+            "target": "oracle#4",
             "tasks": [
                 "postgresDataTypes"
             ]
@@ -58,7 +58,7 @@
             ]
         },
         {
-            "source": "mssql19",
+            "source": "mssql#2",
             "target": "oracle#1",
             "tasks": [
                 "postgresDataTypes"
@@ -98,11 +98,11 @@
         {
             "source": "oracle#1",
             "targets": [
-                "oracle18c",
-                "oracle12c",
-                "oracle11g",
+                "oracle#2",
+                "oracle#3",
+                "oracle#4",
                 "mssql#1",
-                "mssql19",
+                "mssql#2",
                 "postgres#1",
                 "mysql#1",
                 "mariadb#1",

@@ -15,24 +15,24 @@
             ]
         },
         {
-            "source": "oracle18c",
-            "target": "oracle18c",
+            "source": "oracle#2",
+            "target": "oracle#2",
             "tasks": [
                 "HR",
                 "BI"
             ]
         },
         {
-            "source": "oracle12c",
-            "target": "oracle12c",
+            "source": "oracle#3",
+            "target": "oracle#3",
             "tasks": [
                 "HR",
                 "BI"
             ]
         },
         {
-            "source": "oracle11g",
-            "target": "oracle11g",
+            "source": "oracle#4",
+            "target": "oracle#4",
             "tasks": [
                 "HR",
                 "BI"
@@ -47,8 +47,8 @@
             ]
         },
         {
-            "source": "mssql19",
-            "target": "mssql19",
+            "source": "mssql#2",
+            "target": "mssql#2",
             "tasks": [
                 "HR",
                 "BI"

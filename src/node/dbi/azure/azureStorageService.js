@@ -1,3 +1,4 @@
+import path from "path"
 
 import { 
   compose,
@@ -210,39 +211,78 @@ class AzureStorageService {
 	}
   }
   
-  async deleteFolder(key,params) {
-
-    let stack	 
-	let operation 
+  async deleteFolder(key, params) {
+  
+    params = params || {}
+  
+    // Normalize Windows paths to blob prefix format
+    let prefix = key.split(path.sep).join(path.posix.sep)
+  
+    let stack
+    let operation
+  
+    // Guard rails
+    stack = new Error().stack
+    operation = `Azure.containerClient.listBlobsFlat(${JSON.stringify({ prefix })})`
+    if (prefix === '' || prefix === '/' || prefix === '.') {
+      throw this.dbi.getDatabaseException(
+        new Error(`Refusing to delete dangerous prefix: "${prefix}"`),
+        stack,
+        operation
+      )
+    }
+  
+    // Force "folder" semantics so foo doesn't match foobar
+    if (!prefix.endsWith('/')) {
+      prefix = prefix + '/'
+    }
+  
     try {
       stack = new Error().stack
-	  operation = `Azure.containerClient.listBlobsFlat("${key}")`
-	  for await (const blob of this.containerClient.listBlobsFlat({prefix: key})) {
-        operation = `Azure.containerClient.deleteBlob("${blob.name}")`
-	    this.containerClient.deleteBlob(blob.name, {deleteSnapshots : "include"})
-	  }  
+      operation = `Azure.containerClient.listBlobsFlat(${JSON.stringify({ prefix })})`
+  
+      for await (const blob of this.containerClient.listBlobsFlat({ prefix })) {
+        operation = `Azure.containerClient.deleteBlob("${blob.name}", { deleteSnapshots: "include" })`
+        await this.containerClient.deleteBlob(blob.name, { deleteSnapshots: "include" })
+      }
+  
     } catch (e) {
-	  throw this.dbi.getDatabaseException(e,stack,operation)
+      throw this.dbi.getDatabaseException(e, stack, operation)
     }
+  
   }
-
-  async deleteFile(key,params) {
-
-    /*
-    let stack	 
-	let operation 
+  
+  async deleteFile(key, params) {
+  
+    params = params || {}
+  
+    // Normalize Windows paths to blob name
+    const blobName = key.split(path.sep).join(path.posix.sep)
+  
+    let stack
+    let operation
+  
+    // Guard rails
+    stack = new Error().stack
+    operation = `Azure.containerClient.deleteBlob("${blobName}", { deleteSnapshots: "include" })`
+    if (!blobName || blobName === '/' || blobName.endsWith('/')) {
+      throw this.dbi.getDatabaseException(
+        new Error(`Refusing to delete invalid blob name: "${blobName}"`),
+        stack,
+        operation
+      )
+    }
+  
     try {
       stack = new Error().stack
-	  operation = `Azure.containerClient.listBlobsFlat("${key}")`
-	  for await (const blob of this.containerClient.listBlobsFlat({prefix: key})) {
-        operation = `Azure.containerClient.deleteBlob("${blob.name}")`
-	    this.containerClient.deleteBlob(blob.name, {deleteSnapshots : "include"})
-	  }  
+      operation = `Azure.containerClient.deleteBlob("${blobName}", { deleteSnapshots: "include" })`
+      await this.containerClient.deleteBlob(blobName, { deleteSnapshots: "include" })
     } catch (e) {
-	  throw this.dbi.getDatabaseException(e,stack,operation)
+      throw this.dbi.getDatabaseException(e, stack, operation)
     }
-	*/
+  
   }
+
 }
 
 export {AzureStorageService as default }

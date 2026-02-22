@@ -39,7 +39,7 @@
             ]
         },
         {
-            "source": "oracle18c",
+            "source": "oracle#2",
             "targets": [
                 "croach#1"
             ],
@@ -48,7 +48,7 @@
             ]
         },
         {
-            "source": "oracle12c",
+            "source": "oracle#3",
             "targets": [
                 "croach#1"
             ],
@@ -57,7 +57,7 @@
             ]
         },
         {
-            "source": "oracle11g",
+            "source": "oracle#4",
             "targets": [
                 "croach#1"
             ],
@@ -75,7 +75,7 @@
             ]
         },
         {
-            "source": "mssql19",
+            "source": "mssql#2",
             "targets": [
                 "croach#1"
             ],
@@ -126,11 +126,11 @@
             "source": "croach#1",
             "targets": [
                 "oracle#1",
-                "oracle18c",
-                "oracle12c",
-                "oracle11g",
+                "oracle#2",
+                "oracle#3",
+                "oracle#4",
                 "mssql#1",
-                "mssql19",
+                "mssql#2",
                 "postgres#1",
                 "mysql#1",
                 "mariadb#1",

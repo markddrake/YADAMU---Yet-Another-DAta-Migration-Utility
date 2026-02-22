@@ -1,0 +1,44 @@
+{
+	"operation": "dbRoundtrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"createDirectory": true,
+	"verifyOperation": true,
+	"parameters": {
+		"MODE"     : "DDL_AND_DATA"
+	},
+	"tests": [{
+			"operation": "export",
+			"createDirectory": true,
+	        "verifyOperation": false,
+			"source": "oracle26ai",
+			"target": "file-staging",
+			"parameters": {
+				"DIRECTORY": "export/%mode%/%sourceConnection%"
+			},
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		},{
+			"operation": "import",
+			"source": "file-staging",
+			"target": "oracle26ai",
+			"parameters": {
+				"DIRECTORY": "export/%mode%/%targetConnection%"
+			},
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		},{
+			"source": "oracle26ai",
+			"target": "oracle26ai",
+			"tasks": [
+				"HR",
+				"BI"
+			]
+		}
+	]
+}

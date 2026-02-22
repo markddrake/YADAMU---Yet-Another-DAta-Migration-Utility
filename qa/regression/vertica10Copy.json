@@ -11,6 +11,17 @@
 		"DIRECTORY": "loader/csv/%sourceConnection%"
 	},
 	"tests": [
+	     {
+            "operation": "copy",
+            "source": "vertica10",
+            "target": "loader-staging",
+            "parameters": {
+               "OUTPUT_FORMAT"           : "CSV"
+	         },
+	         "tasks": [
+                "oracle","mssql","mysql"
+            ]
+        },	
 		{
 			"source": "vertica10",
 			"targets": [
@@ -34,7 +45,7 @@
 			]
 		},
 		{
-			"source": "oracle18c",
+			"source": "oracle#2",
 			"targets": [
 				"vertica10"
 			],
@@ -45,7 +56,7 @@
 			]
 		},
 		{
-			"source": "oracle12c",
+			"source": "oracle#3",
 			"targets": [
 				"vertica10"
 			],
@@ -56,7 +67,7 @@
 			]
 		},
 		{
-			"source": "oracle11g",
+			"source": "oracle#4",
 			"targets": [
 				"vertica10"
 			],
@@ -78,7 +89,7 @@
 			]
 		},
 		{
-			"source": "mssql19",
+			"source": "mssql#2",
 			"targets": [
 				"vertica10"
 			],

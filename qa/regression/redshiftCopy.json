@@ -29,7 +29,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "mssql19",
+			"source": "mssql#2",
 			"target": "redshift#1",
 			"tasks": [
 				"oracle","mssql","mysql"

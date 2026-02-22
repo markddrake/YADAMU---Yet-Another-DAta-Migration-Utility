@@ -1,2 +1,5 @@
 source  ~db2inst1/sqllib/db2profile
-db2 -td/ -vmf /database/stage/sql/YADAMU_IMPORT.sql
+export STAGE=/database/stage
+cd $STAGE
+mkdir -p log
+db2 -td/ -vmf sql/YADAMU_IMPORT.sql > log/YADAMU_IMPORT.log 2>&1

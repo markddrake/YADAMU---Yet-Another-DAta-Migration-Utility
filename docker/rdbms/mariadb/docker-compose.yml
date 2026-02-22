@@ -1,0 +1,87 @@
+
+services:
+
+  MARIA10-01: 
+    container_name: MARIA10-01
+    hostname: MARIA10-01
+    image:  mariadb:10
+    mem_limit: '10gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MARIA-DB
+    ports: 
+      - "33071:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MARIA10-01-CONF:/etc/mysql/conf.d
+      - MARIA10-01-DATA:/var/lib/mysql 
+    restart: always
+
+  MARIA11-01: 
+    container_name: MARIA11-01
+    hostname: MARIA11-01
+    image:  mariadb:11
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MARIA-DB
+    ports: 
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MARIA11-01-CONF:/etc/mysql/conf.d
+      - MARIA11-01-DATA:/var/lib/mysql 
+    restart: always
+
+  MARIA12-01: 
+    container_name: MARIA12-01
+    hostname: MARIA12-01
+    image:  mariadb:12
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MARIA-DB
+    ports: 
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oracle  
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MARIA12-01-CONF:/etc/mysql/conf.d
+      - MARIA12-01-DATA:/var/lib/mysql 
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MARIA10-01-CONF:
+  MARIA10-01-DATA:
+  MARIA11-01-CONF:
+  MARIA11-01-DATA:
+  MARIA12-01-CONF:
+  MARIA12-01-DATA:
+    
+
+    

@@ -1,0 +1,11 @@
+*
+!docker/regressionTests/tnsnames.ora
+!docker/regressionTests/bin/*.sh
+!qa/bin/*sh
+!qa/connections/connections.json
+!qa/mappings
+!qa/regression
+!qa/sql
+!qa/service
+!src/qa
+!utilities/bin/*.sh

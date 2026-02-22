@@ -1,0 +1,34 @@
+
+services:
+
+  REDSHIFT-01: 
+    container_name: REDSHIFT-01
+    image:  foundryai/postgres8 
+    mem_limit: '12gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "5438:5432"
+    environment:
+      POSTGRES_USER: docker
+      POSTGRES_PASSWORD: docker
+      POSTGRES_DATABASE: docker
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - REDSHIFT-01-DATA:/usr/local/psql/data
+    restart: always
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  REDSHIFT-01-DATA:
+    
+
+    

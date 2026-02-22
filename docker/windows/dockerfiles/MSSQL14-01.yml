@@ -1,0 +1,29 @@
+services:
+  
+  MSSQL14-01: 
+      container_name: MSSQL14-01
+      image:  yadamu/svr-2016/mssql:2014
+      isolation: hyperv
+      mem_limit: 6144M
+      networks:
+        - YADAMU-NET
+      ports: 
+        - "14331:1433"
+      environment:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: oracle#1
+      volumes:
+        - YADAMU_01-SHARED:c:\mount
+        - MSSQL14-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA
+        - MSSQL14-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\LOG
+      restart: always
+ 
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+     external: true
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MSSQL14-01-DATA:
+  MSSQL14-01-LOG:

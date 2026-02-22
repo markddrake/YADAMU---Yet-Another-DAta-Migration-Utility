@@ -11,10 +11,10 @@
     "source": "file-YADAMU_HOME"
   , "targets": [
       "oracle#1"
-    , "oracle18c"
-    , "oracle12c"
+    , "oracle#2"
+    , "oracle#3"
     , "mssql#1"
-    , "mssql19"
+    , "mssql#2"
     , "postgres#1"
     , "mysql#1"
     ]

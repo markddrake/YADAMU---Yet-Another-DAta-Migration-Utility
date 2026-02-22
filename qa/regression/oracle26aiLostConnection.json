@@ -1,0 +1,27 @@
+{
+  "operation"         : "lostConnection"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "parameters": {
+    "MODE": "DATA_ONLY"
+  }
+, "tests"                  : [
+    {"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 20000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 5000, "worker": 1}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 15000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "ABORT" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "FLUSH" }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 1000, "worker": 0}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "SKIP"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "READER", "delay": 25000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 5000, "worker": 0}}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 25000 }}
+   ,{"source":   "oracle26ai",  "target": "oracle26ai",   "parameters" : { "PARALLEL" : 4, "ON_ERROR" : "RETRY"  }, "tasks": ["WWI_Warehouse"], "kill": { "process": "WRITER", "delay": 6000, "worker": 0}}
+ ]
+}

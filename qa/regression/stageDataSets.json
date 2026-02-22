@@ -17,7 +17,7 @@
             ]
         },
         {
-            "source": "oracle18c",
+            "source": "oracle#2",
             "target": "file-staging",
             "tasks": [
                 "PM"
@@ -40,7 +40,7 @@
         {
             "operation": "import",
             "source": "file-staging",
-            "targets": ["mssql#1","mssql19"],
+            "targets": ["mssql#1","mssql#2"],
             "parameters": {
                 "DIRECTORY": "export/json/%vendor%"
             },
@@ -51,7 +51,7 @@
         {
             "operation": "import",
             "source": "file-staging",
-            "targets": ["mssql#1","mssql19"],
+            "targets": ["mssql#1","mssql#2"],
             "recreateSchema": false,
             "parameters": {
                 "DIRECTORY": "export/json/%vendor%"

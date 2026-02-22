@@ -37,7 +37,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle18c",
+			"source": "oracle#2",
 			"targets": [
 			   "vertica12"
 		    ],
@@ -45,7 +45,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle12c",
+			"source": "oracle#3",
 			"targets": [
 			   "vertica12"
 		    ],
@@ -53,7 +53,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "oracle11g",
+			"source": "oracle#4",
 			"targets": [
 			   "vertica12"
 		    ],
@@ -69,7 +69,7 @@
 				"oracle","mssql","mysql"
 			]
 		},{
-			"source": "mssql19",
+			"source": "mssql#2",
 			"targets": [
 			   "vertica12"
 		    ],
@@ -103,7 +103,7 @@
 		},{
 			"source": "vertica12",
 			"targets": [
-			   "vertica10"
+			   "vertica#2"
 		    ],
 	        "parameters": {
  	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"
@@ -136,7 +136,7 @@
 		},{
 			"source": "vertica12",
 			"targets": [
-			   "vertica10"
+			   "vertica#2"
 		    ],
 	        "parameters": {
  	          "LOCAL_STAGING_AREA": "/usr/src/YADAMU/mnt/stagingArea/loader/csv/%sourceConnection%"

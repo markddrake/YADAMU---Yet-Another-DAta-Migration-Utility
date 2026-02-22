@@ -1,0 +1,62 @@
+FROM oraclelinux:7-slim as base
+#
+# Configure OS for Oracle Database
+#
+RUN yum -y install  oracle-rdbms-server-11gR2-preinstall.x86_64 unzip openssl \
+ && yum clean all \
+ && mkdir /opt/oracle \
+ && mkdir /opt/oracle/admin \
+ && mkdir /opt/oracle/diag \
+ && mkdir /opt/oracle/oradata \
+ && chown -R oracle:oinstall /opt/oracle \
+ && echo oracle:oracle | chpasswd  
+#
+# Set Environment Variables
+#
+USER oracle
+WORKDIR /opt/oracle
+ENV ORACLE_BASE=/opt/oracle \
+    ORACLE_HOME=/opt/oracle/rdbms/11.2/db_home1 \
+    ORACLE_SID=ORA11200 
+ENV PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch/:/usr/sbin:$PATH \
+    LD_LIBRARY_PATH=$ORACLE_HOME/lib:/usr/lib \
+    CLASSPATH=$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
+#
+# Copy and Unpack Oracle RDBMS into ORACLE_HOME
+#
+COPY --from=tarballs --chown=oracle:oinstall p13390677_112040_Linux-x86-64_1of2.zip p13390677_112040_Linux-x86-64_2of2.zip ./
+#
+RUN mkdir -p $ORACLE_HOME \
+ && unzip p13390677_112040_Linux-x86-64_1of2.zip -d $ORACLE_BASE \
+ && unzip p13390677_112040_Linux-x86-64_2of2.zip -d $ORACLE_BASE \
+ && rm p13390677_112040_Linux-x86-64_1of2.zip p13390677_112040_Linux-x86-64_2of2.zip
+#
+# Install Oracle Software
+#
+WORKDIR $ORACLE_BASE
+COPY --chown=oracle:oinstall setup.rsp $ORACLE_BASE/database
+RUN ./database/runInstaller -silent -force -waitforcompletion -responsefile $ORACLE_BASE/database/setup.rsp -ignoresysprereqs -ignoreprereq -ignorePrereq; exit 0  
+RUN rm -rf database \
+ && rm -rf $ORACLE_HOME/apex \
+ && rm -rf $ORACLE_HOME/ords \
+ && rm -rf $ORACLE_HOME/sqldeveloper \
+ && rm -rf $ORACLE_HOME/ucp \
+ && rm -rf $ORACLE_HOME/lib/*.zip \
+ && rm -rf $ORACLE_HOME/inventory/backup/* \
+ && rm -rf $ORACLE_HOME/network/tools/help \
+ && rm -rf $ORACLE_HOME/assistants/dbua \
+ && rm -rf $ORACLE_HOME/dmu \
+ && rm -rf $ORACLE_HOME/install/pilot \
+ && rm -rf $ORACLE_HOME/suptools \
+ && rm -rf /tmp/* 
+#
+USER root
+RUN /opt/oracle/oraInventory/orainstRoot.sh \
+ && /opt/oracle/rdbms/11.2/db_home1/root.sh
+#
+USER oracle
+WORKDIR /
+COPY --chown=oracle:oinstall dbca.rsp  $ORACLE_HOME
+COPY --chown=oracle:oinstall start.sh .
+#
+ENTRYPOINT ["/bin/bash", "/start.sh"]

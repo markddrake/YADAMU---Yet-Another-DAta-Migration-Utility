@@ -29,5 +29,34 @@ language javascript
 as $$
   return FLOAT_VALUE ? FLOAT_VALUE.toExponential(20) : FLOAT_VALUE
 $$;
-
+--
+CREATE OR REPLACE FUNCTION YADAMU_SYSTEM.IS_XML_COLUMN(
+  p_schema VARCHAR,
+  p_table VARCHAR, 
+  p_column VARCHAR
+)
+RETURNS BOOLEAN
+LANGUAGE JAVASCRIPT
+AS
+$$
+  var full_table = '"' + P_SCHEMA + '"."' + P_TABLE + '"';
+  
+  var stmt = snowflake.createStatement({
+    sqlText: `SELECT COUNT(*) as cnt
+              FROM TABLE(INFORMATION_SCHEMA.DATA_METRIC_FUNCTION_EXPECTATIONS(
+                REF_ENTITY_NAME => ?,
+                REF_ENTITY_DOMAIN => 'table'
+              ))
+              WHERE expectation_expression ILIKE ?`,
+    binds: [full_table, '%CHECK_XML("' + P_COLUMN + '")%']
+  });
+  
+  try {
+    var result = stmt.execute();
+    result.next();
+    return result.getColumnValue(1) > 0;
+  } catch (e) {
+    return false;
+  }
+$$;
 

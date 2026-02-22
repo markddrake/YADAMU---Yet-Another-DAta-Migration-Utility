@@ -23,7 +23,7 @@
   },{
     "source": "oracle#1"
   , "targets": [
-	  "mssql#1","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  "mssql#1","mssql#2","postgres#1","mysql#1","mariadb#1","mongodb#1"
     ]
   , "tasks": [ 
       "HR","BI"

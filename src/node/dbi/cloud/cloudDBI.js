@@ -221,8 +221,8 @@ class CloudDBI extends LoaderDBI {
 
   async truncateTable(schema,tableName) {
 
-    const datafilePath = this.makeAbsolute(this.getDataFileName(tableName));
-    await this.cloudService.removeFile(dataFilePath)
+    const dataFilePath = this.makeAbsolute(this.getDataFileName(tableName));
+    await this.cloudService.deleteFile(dataFilePath)
 	
   }
 

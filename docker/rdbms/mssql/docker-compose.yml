@@ -1,0 +1,111 @@
+
+services:
+
+  MSSQL17-01: 
+    container_name: MSSQL17-01
+    hostname: MSSQL17-01
+    image:  mcr.microsoft.com/mssql/server:2017-latest
+    mem_limit: '10gb'
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports: 
+      - "14331:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL17-01-VOLUME:/var/opt/mssql 
+    restart: always
+
+  MSSQL19-01: 
+    container_name: MSSQL19-01
+    hostname: MSSQL19-01
+    image:  mcr.microsoft.com/mssql/server:2019-latest
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MSSQL-02
+    ports: 
+      - "14332:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL19-01-VOLUME:/var/opt/mssql
+    restart: always
+
+  MSSQL22-01: 
+    container_name: MSSQL22-01
+    hostname: MSSQL22-01
+    image:  mcr.microsoft.com/mssql/server:2022-latest
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MSSQL-01
+    ports: 
+      - "14333:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL22-01-VOLUME:/var/opt/mssql
+    restart: always
+
+  MSSQL25-01: 
+    container_name: MSSQL25-01
+    hostname: MSSQL25-01
+    image:  mcr.microsoft.com/mssql/server:2025-latest
+    cpuset: '0-11' # Avoid E Core problem
+    mem_limit: '16gb'          #
+    memswap_limit: -1     # allow unlimited swap
+    cpus: '8'     
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      YADAMU-NET:
+        aliases:
+          - MSSQL-01
+    ports: 
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_MEMORY_LIMIT_MB: 16384
+      SA_PASSWORD: oracle#1
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - MSSQL25-01-VOLUME:/var/opt/mssql
+    restart: always
+
+volumes:
+  YADAMU_01-SHARED:
+    name: YADAMU_01-SHARED
+  MSSQL17-01-VOLUME:
+  MSSQL19-01-VOLUME:
+  MSSQL22-01-VOLUME:
+  MSSQL25-01-VOLUME:
+
+networks: 
+  YADAMU-NET:
+     name: YADAMU-NET
+
+    

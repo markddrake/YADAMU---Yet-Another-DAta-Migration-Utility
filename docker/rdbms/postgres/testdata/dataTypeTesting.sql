@@ -1,4 +1,4 @@
-drop schema t_postgres cascade;
+drop schema if exists t_postgres cascade;
 --
 create schema t_postgres;
 --
@@ -674,10 +674,10 @@ create table t_postgres.network_types (
 --
 insert into t_postgres.network_types
 values (
-  '2001:4f8:3:ba:​2e00:81ff:fe22:d1f1/128',
+  '2001:4f8:3:ba:2e00:81ff:fe22:d1f1/128'::cidr,
   '2001:4f8:3:ba::/64',
-  '0800-2b01-0203',
-  '08002b01:02030405'
+  '08-00-2b-01-02-03',
+  '08:00:2b:01:02:03:04:05'
 );
 --
 insert into t_postgres.network_types
@@ -949,7 +949,7 @@ create table t_postgres.undocumented_types (
 );
 --
 \q
-create table t_postgres.numeric_arrays
+create table t_postgres.numeric_arrays (
   smallint_col                  smallint[],
   integer_col                   integer[],
   bigint_col                    bigint[],
@@ -1045,7 +1045,7 @@ create table t_postgres.ts_search_arrays (
 -- 8.17. Range Types
 --
 create table t_postgres.range_arrays (
-    ,int4range_col              int4range[] 
+     int4range_col              int4range[] 
     ,int8range_col              int8range[] 
     ,numrange_col               numrange[] 
     ,tsrange_col                tsrange[] 
@@ -1122,6 +1122,6 @@ insert into t_postgres.spatial_array_types values (ARRAY[POINT(1,2),POINT(1,2)],
                                                    ARRAY[path '((-1,0),(1,0))',path '((-1,0),(1,0))'],ARRAY[BOX(POINT(1,2),POINT(5,7)),BOX(POINT(1,2),POINT(5,7))],ARRAY[polygon '((0,0),(1,3),(2,0))',polygon '((0,0),(1,3),(2,0))']);
 --
 
-select (array_to_tsvector('{fat,cat,rat}'::text[])));
+select (array_to_tsvector('{fat,cat,rat}'::text[]));
 
 

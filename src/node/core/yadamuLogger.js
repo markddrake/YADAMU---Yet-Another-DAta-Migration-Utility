@@ -137,7 +137,11 @@ class YadamuLogger {
   
   static streamLogger(os,state,exceptionFolder,exceptionFilePrefix) {
     try {
-      return new this.LOGGER_CLASS(os,state,exceptionFolder,exceptionFilePrefix)
+      // If it's an Express HTTP response object, set Transfer-Encoding
+      if (typeof os.setHeader === 'function' && typeof os.write === 'function') {
+        os.setHeader('Transfer-Encoding', 'chunked');
+      }      
+	  return new this.LOGGER_CLASS(os,state,exceptionFolder,exceptionFilePrefix)
     } catch (e) {
 	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER][STREAM]: Unable to create log file from supplied stream". Logging to console`); 
       return this.console.Logger(state,exceptionFolder,exceptionFilePrefix)
