@@ -15,7 +15,7 @@ Supported Databases :
 * Microsoft SQL Server 2012 - Microsoft SQL Server 2025
 * Postgres 11 through Postgres 18
 * MySQL 8.0.12 through MySQL 9.5.1
-* MariaDB 5.5 through MariaDB 12.
+* MariaDB 5.5 through MariaDB 12
 * MongoDB 4.0 through Mongo DB 8.0
 * Snowflake Data Warehouse
 * Vertica 9 through Vertica 24
@@ -24,7 +24,7 @@ Supported Databases :
 * CockroachDB
 
 * Amazon Redshift (Experimental)
-* Teradata 17 (Expermintal)
+* Teradata 17 (Experimental)
 
 Yadamu can also export data sets to Amazon AWS S3 Storage and Microsoft Azure BLOB storage. Data can be exported as CSV, JSON Arrays, or JSON.
 
