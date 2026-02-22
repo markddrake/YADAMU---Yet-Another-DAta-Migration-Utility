@@ -11,15 +11,15 @@ For databases other than Oracle, or hetrogeneous migrations DDL operations are c
 
 Supported Databases :
 
-* Oracle 11gR2 through Oracle 23ai
-* Microsoft SQL Server 2012 - Microsoft SQL Server 2022
-* Postgres 11 through Postgres 17
-* MySQL 8.0.12 through MySQL 9.0.1
-* MariaDB 5.5 through MariaDB 11.5.2
+* Oracle 11gR2 through Oracle 26ai
+* Microsoft SQL Server 2012 - Microsoft SQL Server 2025
+* Postgres 11 through Postgres 18
+* MySQL 8.0.12 through MySQL 9.5.1
+* MariaDB 5.5 through MariaDB 12.
 * MongoDB 4.0 through Mongo DB 8.0
 * Snowflake Data Warehouse
 * Vertica 9 through Vertica 24
-* DB2 11 LUW
+* DB2 11 and 12 LUW
 * Yugabyte
 * CockroachDB
 
