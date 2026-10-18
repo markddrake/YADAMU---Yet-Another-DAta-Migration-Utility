@@ -39,6 +39,7 @@
 , "Sales_AWA"            : { "vendor": "mssql",    "file" : "Sales.json",             "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
 , "AdventureWorksDW_AWA" : { "vendor": "mssql",    "file" : "AdventureWorksDW.json",  "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
 , "postgresDataTypes"    : { "vendor": "postgres", "file" : "postgresTypes.json",     "source" : {"schema" : "t_postgres" }}
+, "postgresDDL"          : { "vendor": "postgres", "file" : "postgresDDL.json",       "source" : {"schema" : "t_pgddl" }}
 , "datasetLocation" : {
     "oracle"    : "oracle"
   , "mssql"     : "mssql"

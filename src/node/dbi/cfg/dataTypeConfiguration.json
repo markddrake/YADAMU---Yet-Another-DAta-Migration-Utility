@@ -50,5 +50,9 @@
 	"Cockroach": {
 	  "class" : "../cockroach/cockroachDataTypes.js"
 	, "file": "../cockroach/cockroachTypeMappings.json"
+	},
+	"SQLite": {
+	  "class" : "../sqlite/sqliteDataTypes.js"
+	, "file": "../sqlite/sqliteTypeMappings.json"
 	}
 }

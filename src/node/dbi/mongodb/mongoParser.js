@@ -19,7 +19,10 @@ class MongoParser extends YadamuParser {
 
 	// Reorder the data types by the TARGET column names.
 	
-	if (queryInfo.hasOwnProperty('TARGET_DATA_TYPES')) {
+	// The reader always supplies TARGET_DATA_TYPES and TARGET_COLUMN_NAMES, as empty arrays when the target table does not exist yet.
+	// Only a non-empty list describes the target; otherwise the target will be created from the source, so use the source column order.
+	
+	if (queryInfo.TARGET_COLUMN_NAMES?.length > 0) {
       if ((queryInfo.TARGET_DATA_TYPES.length === 1) && (queryInfo.TARGET_DATA_TYPES[0] === 'json')) {
 	    // Target is an empty Mongo Collection or potentially a relational tabld with a single JSON column 
 		// Disable source transformation

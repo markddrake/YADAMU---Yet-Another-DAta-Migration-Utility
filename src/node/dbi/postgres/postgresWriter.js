@@ -11,9 +11,17 @@ class PostgresWriter extends YadamuWriter {
     super(dbi,tableName,pipelineState,status,yadamuLogger)
   }
 
+  // Values bound per row. Generated columns are inserted as DEFAULT, so their values are not bound.
+  get BOUND_COLUMN_COUNT() { return this.tableInfo.boundColumnCount || this.tableInfo.columnCount }
+
   reportBatchError(operation,cause,batch) {
     // Use Slice to add first and last row, rather than first and last value.
-	super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
+	super.reportBatchError(operation,cause,batch.slice(0,this.BOUND_COLUMN_COUNT),batch.slice(batch.length-this.BOUND_COLUMN_COUNT,batch.length))
+  }
+
+  generateValuesClause(rowCount) {
+    let argNumber = 1;
+    return Array(rowCount).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.includes('$%') ? operator.replace('$%',`$${argNumber++}`) : operator}).join(',')})`}).join(',');
   }
       
   async _writeBatch(batch,rowCount) {
@@ -24,8 +32,7 @@ class PostgresWriter extends YadamuWriter {
                
       try {
         await this.dbi.createSavePoint();
-        let argNumber = 1;
-        const args = Array(rowCount).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`}).join(',');
+        const args = this.generateValuesClause(rowCount)
         const sqlStatement = this.tableInfo.dml + args
 		const results = await this.dbi.insertBatch(sqlStatement,batch);
         this.endTime = performance.now();
@@ -42,12 +49,11 @@ class PostgresWriter extends YadamuWriter {
       }
     } 
      
-    let argNumber = 1;
-    const args = Array(1).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`}).join(',');
+    const args = this.generateValuesClause(1)
     const sqlStatement = this.tableInfo.dml + args
 	for (let row = 0; row < rowCount; row++) {
-	  const offset = row * this.tableInfo.columnCount
-      const nextRow  = batch.slice(offset,offset + this.tableInfo.columnCount)
+	  const offset = row * this.BOUND_COLUMN_COUNT
+      const nextRow  = batch.slice(offset,offset + this.BOUND_COLUMN_COUNT)
 	  try {
         await this.dbi.createSavePoint();
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);

@@ -97,12 +97,15 @@ class YadamuCompare {
 
     Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',YadamuCompare.COMPARE_RULES,this.configuration.source.vendor,this.configuration.source.version,this.configuration.target.vendor,this.configuration.target.version))
 	compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (this.configuration.parameters.INFINITY_MANAGEMENT === 'NULLIFY')
+
+	// A stored generated column is recomputed by the target database, so its values reflect the target's evaluation of the expression rather than the copy. A test can set IGNORE_GENERATED_COLUMNS to false to compare them.
+	compareRules.IGNORE_GENERATED_COLUMNS = this.configuration.parameters.hasOwnProperty('IGNORE_GENERATED_COLUMNS') ? this.configuration.parameters.IGNORE_GENERATED_COLUMNS !== false : YadamuCompare.COMPARE_RULES.IGNORE_GENERATED_COLUMNS.default
     
 
     // For CSV based copy operations check if the database can differentiate NULL and EMPTY string when loading from CSV
 	compareRules.EMPTY_STRING_IS_NULL = ( this.configuration.copyFromCSV && YadamuCompare.COMPARE_RULES.CSV_EMPTY_STRING_IS_NULL.hasOwnProperty(this.configuration.target.vendor) ) ? YadamuCompare.COMPARE_RULES.CSV_EMPTY_STRING_IS_NULL[this.configuration.target.vendor] : compareRules.EMPTY_STRING_IS_NULL 
 	
-	compareRules.DDL_COMPATBILITY = ((this.configuration.source.vendor === this.configuration.target.vendor) && (this.configuration.source.version <= this.configuration.target.version))
+	compareRules.DDL_COMPATBILITY = ((this.configuration.source.vendor === this.configuration.target.vendor) && (YadamuLibrary.compareVersions(this.configuration.source.version,this.configuration.target.version) <= 0))
     
     if (YadamuCompare.COMPARE_RULES.TIMESTAMP_PRECISION[this.configuration.source.vendor] > YadamuCompare.COMPARE_RULES.TIMESTAMP_PRECISION[this.configuration.target.vendor]) {
       compareRules.TIMESTAMP_PRECISION = YadamuCompare.COMPARE_RULES.TIMESTAMP_PRECISION[this.configuration.target.vendor]

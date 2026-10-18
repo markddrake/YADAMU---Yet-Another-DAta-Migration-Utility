@@ -8,9 +8,7 @@ import {pipeline}    from 'stream/promises'
 import YadamuLibrary from '../lib/yadamuLibrary.js';
 import StringWriter  from '../util//stringWriter.js'
 import NullWriter    from '../util//nullWriter.js';
-import {OracleError} from '../dbi/oracle/oracleException.js';
 import ErrorDBI      from '../dbi/file/errorDBI.js';
-import {FileError}   from '../dbi/file/fileException.js';
 
 import DBWriter      from './dbWriter.js';
 import {InternalError, DatabaseError, IterativeInsertError, BatchInsertError, YadamuShutdown}  from './yadamuException.js';
@@ -253,20 +251,12 @@ class YadamuLogger {
   logDatabaseError(e) {
     this.os.write(`${e.message}\n`);
     this.os.write(`${e.stack}\n`)
-    this.os.write(e instanceof FileError ?  `PATH: "${e.path}"\n` : `SQL: ${e.sql}\n`);
-    if (e instanceof OracleError) {
-      this.logOracleError(e)
-    }
+    e.getDiagnostics().forEach((line) => { this.os.write(`${line}\n`) })
     if (e.cause instanceof Error) {
       this.os.write(`cause: ${YadamuLibrary.serializeException(e.cause)}\n`)
     }
   }
-  
-  logOracleError(e) {
-    this.os.write(`Args/Binds: ${JSON.stringify(e.args)}\n`);
-    this.os.write(`OutputFormat/Rows: ${JSON.stringify(e.outputFormat)}\n`);
-  } 
-  
+
   logException(args,e) {
 
     if (e.yadamuAlreadyReported) {

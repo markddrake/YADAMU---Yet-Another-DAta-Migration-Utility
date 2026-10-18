@@ -23,9 +23,8 @@ class YugabyteError extends PostgresError {
   }
   
   serverUnavailable() {
-    super.serverUnavailable() || 
-    ((this.cause.severity && (this.cause.severity === 'FATAL')) && (this.cause.code && (this.cause.code === '57P03')) && this.cause.message.startsWith('the database system is in recovery mode')) ||
-    ((this.cause.errno && (this.cause.errno ===  -111)) && (this.cause.code && (this.cause.code === 'ECONNREFUSED')))	
+    // PostgresError covers SQLSTATE 57P03 (shutting down, starting up, in recovery mode) and ECONNREFUSED.
+    return super.serverUnavailable()
   }
 }
 

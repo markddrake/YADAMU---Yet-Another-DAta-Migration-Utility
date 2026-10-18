@@ -459,6 +459,9 @@ class FileDBI extends YadamuDBI {
 	  const exportFileContents = `${exportFileHeader}}`
       const finalizeExport = new ExportWriter(exportFileContents)
       await pipeline(finalizeExport,this.outputStream)
+	  // The export is complete and the pipeline has ended outputStream. Node 24 rejects a second pipe into an ended stream (ERR_STREAM_UNABLE_TO_PIPE); Node 22 ignored it.
+	  this.EXPORT_FILE_HEADER = exportFileHeader
+	  return
 	}
     else {
 	  exportFileHeader = `${exportFileHeader},"data":{` 

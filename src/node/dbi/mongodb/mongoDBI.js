@@ -190,7 +190,6 @@ class MongoDBI extends YadamuDBI {
 
     // Wrapper for client.db()
 	let stack
-    options.useUnifiedTopology = true
     const operation = `new MongoClient.connect(${this.CONNECTION_PROPERTIES.connection}))\n`
     try {   
       this.SQL_TRACE.trace(operation)
@@ -717,8 +716,11 @@ class MongoDBI extends YadamuDBI {
 
           const keyNameAggregation = [
             {"$project":{"arrayofkeyvalue":{"$objectToArray":"$$ROOT"}}},
-            {"$unwind":"$arrayofkeyvalue"},
-            {"$group":{"_id":collection.collectionName,"columnNames":{"$addToSet":"$arrayofkeyvalue.k"}}}
+            // $addToSet does not preserve order (MongoDB 9 returns the keys in an arbitrary order), so order the keys by where they first appear in the documents.
+            {"$unwind":{"path":"$arrayofkeyvalue","includeArrayIndex":"position"}},
+            {"$group":{"_id":"$arrayofkeyvalue.k","position":{"$min":"$position"}}},
+            {"$sort":{"position":1,"_id":1}},
+            {"$group":{"_id":collection.collectionName,"columnNames":{"$push":"$_id"}}}
 		  ]
 
           if (this.MONGO_SAMPLE_LIMIT !== 0) {

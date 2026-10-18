@@ -31,7 +31,10 @@ class PostgresDataTypes extends YadamuDataTypes {
       , this.PGSQL_TEXTSEACH_VECTOR_TYPE                                   
       , this.PGSQL_TEXTSEACH_QUERY_TYPE                                  
 	  , this.JSON_TYPE                                                     
-      , this.PGSQL_BINARY_JSON_TYPE                                        
+      , this.PGSQL_BINARY_JSON_TYPE
+      , this.PGSQL_VECTOR_TYPE
+      , this.PGSQL_HALF_VECTOR_TYPE
+      , this.PGSQL_SPARSE_VECTOR_TYPE
       ])
 	  return this._POSTGRES_JSON_TYPES
 	})()

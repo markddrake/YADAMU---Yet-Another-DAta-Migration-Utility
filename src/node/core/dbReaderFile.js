@@ -63,6 +63,8 @@ class DBReaderFile extends DBReader {
 	  writerDBI.reportPipelineStatus(pipelineState)	  
 	} catch (err) {		
 	  pipelineState.endTime = performance.now();
+	  // The pipeline rejected, so this attempt failed even if no stream flagged it.
+	  pipelineState.failed = true
 	  // 'Finish' event suppressed by end:false - Need to explicitly set endTime 
 	  outputStreamState.endTime = pipelineState.endTime
 

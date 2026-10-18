@@ -162,7 +162,7 @@ class CloudDBI extends LoaderDBI {
   
   getFileOutputStream(tableName,pipelineState) {
     // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
-	const file = this.makeAbsolute(this.getDataFileName(tableName))
+	const file = this.makeAbsolute(this.getOutputFileName(tableName))
 	const extension = path.extname(file);
 	const contentType = mime.lookup(extension) || 'application/octet-stream'
 	const outputStream = this.cloudService.createWriteStream(file,contentType,this.activeWriters)
@@ -221,9 +221,20 @@ class CloudDBI extends LoaderDBI {
 
   async truncateTable(schema,tableName) {
 
-    const dataFilePath = this.makeAbsolute(this.getDataFileName(tableName));
-    await this.cloudService.deleteFile(dataFilePath)
-	
+    const dataFile = this.releaseOutputFile(tableName)
+    if (dataFile) {
+      await this.cloudService.deleteFile(this.makeAbsolute(dataFile))
+    }
+
+  }
+
+  reportPipelineStatus(pipelineState,err) {
+	if (err) {
+	  // An object store upload is all or nothing. When the pipeline fails the upload is aborted, so none of the rows passed to it were committed.
+	  pipelineState.lost += pipelineState.committed
+	  pipelineState.committed = 0
+	}
+	return super.reportPipelineStatus(pipelineState,err)
   }
 
   async createInputStream(file) {

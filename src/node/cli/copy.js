@@ -7,6 +7,7 @@ class Copy extends YadamuCLI {}
 export { Copy as default}
 
 async function main() {
+  YadamuCLI.guardExitCode()
   
   try {
 	const copy = new Copy();
@@ -16,8 +17,10 @@ async function main() {
 	  copy.reportError(e)
     }
     await copy.close();
+    YadamuCLI.setExitCode(copy.EXIT_CODE)
   } catch (e) {
     YadamuLibrary.reportError(e)
+    YadamuCLI.setExitCode(YadamuCLI.getExitCode(e))
   }
 
 }

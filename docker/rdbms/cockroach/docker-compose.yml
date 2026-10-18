@@ -1,6 +1,22 @@
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   ROACH01-01:
+    logging: *default-logging
     container_name: ROACH01-01
     hostname: ROACH01-01
     image:  cockroachdb/cockroach
@@ -20,6 +36,7 @@ services:
     restart: always
 
   ROACH01-02:
+    logging: *default-logging
     container_name: ROACH01-02
     hostname: ROACH01-02
     image:  cockroachdb/cockroach
@@ -39,6 +56,7 @@ services:
     restart: always
 
   ROACH01-03:
+    logging: *default-logging
     container_name: ROACH01-03
     hostname: ROACH01-03
     image:  cockroachdb/cockroach

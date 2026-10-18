@@ -1,5 +1,10 @@
 
+import {
+  performance
+}                        from 'perf_hooks';
+
 import Service           from './service.js'
+import YadamuOutcome     from '../cli/yadamuOutcome.js'
 
 class Routes {
 
@@ -89,22 +94,33 @@ class Routes {
     }
   }
 
+  static recordStartTime(request,response,next) {
+	request.yadamuStartTime = performance.now()
+	next()
+  }
+
   static log(message) {
     Routes.LOGGER.info(['YADAMU-SVR'],message)
   }
 
   static handleException(err, req, res, next) {
-    /*
-    if (res.writableEnded) {
-    if (!res.finished) {
-      Routes.LOGGER.switchOutputStream(res);
-      Routes.LOGGER.handleException(['YADAMU-SVR','EXCEPTIION'],err)
-    }
-    */
-    Routes.LOGGER.switchOutputStream(process.stdout);
-    Routes.LOGGER.handleException(['YADAMU-SVR','EXCEPTIION'],err)
-    // res.status(500).send('An error has occurred, please contact support if the error persists');
-    res.end();
+	// Errors reach here either before a response has started streaming (invalid request: 4xx, internal error: 500) or, for internal errors, after.
+	// Either way the client receives a RESULT reporting the failure. See service.js
+	try {
+	  if (YadamuOutcome.getHttpStatus(err) < 500) {
+        Routes.LOGGER.error(['YADAMU-SVR','REQUEST',YadamuOutcome.getHttpStatus(err)],`${req.originalUrl}: ${err.message}`)
+	  }
+	  else {
+        Routes.LOGGER.handleException(['YADAMU-SVR','EXCEPTION',req.originalUrl],err)
+	  }
+	  Routes.SERVICE.sendFailure(req,res,err)
+	} catch (e) {
+	  console.log(`${new Date().toISOString()} [ERROR][YADAMU-SVR][EXCEPTION]: Unable to report failure of "${req.originalUrl}" to the client:`,e)
+	  if (!res.writableEnded && !res.destroyed) {
+		// Abort rather than end the response so the client cannot mistake it for a successful one.
+		res.destroy()
+	  }
+	}
   }
 
 }

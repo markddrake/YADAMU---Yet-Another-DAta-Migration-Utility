@@ -1,4 +1,19 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
  # docker run -itd --name DB2TEST --privileged=true -p 50001:50000 -e LICENSE=accept -e DB2INST1_PASSWORD=oracle -e DBNAME=yadamu -v DB2TEST_DATA:/database ibmcom/db2

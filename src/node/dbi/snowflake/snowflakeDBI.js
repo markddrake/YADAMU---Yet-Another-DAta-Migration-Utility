@@ -35,6 +35,8 @@ import SnowflakeConstants             from './snowflakeConstants.js'
 class SnowflakeDBI extends YadamuDBI {
 
   static #DBI_PARAMETERS
+  
+  
 
   static get DBI_PARAMETERS()  { 
 	this.#DBI_PARAMETERS = this.#DBI_PARAMETERS || Object.freeze({
@@ -134,6 +136,11 @@ class SnowflakeDBI extends YadamuDBI {
 
   }
     
+  #LAST_STATEMENT_ID
+  
+  get LAST_STATEMENT_ID()  { return this.#LAST_STATEMENT_ID }
+  set LAST_STATEMENT_ID(v) { this.#LAST_STATEMENT_ID = v }
+
   constructor(yadamu,manager,connectionSettings,parameters) {	  
   
     super(yadamu,manager,connectionSettings,parameters)
@@ -314,7 +321,8 @@ class SnowflakeDBI extends YadamuDBI {
       }
 	  // console.log(JSON.stringify(statement))
       statement.binds = args
-	  this.connection.execute(statement)
+      const stmt = this.connection.execute(statement)
+      this.LAST_STATEMENT_ID = stmt.getStatementId()
     })
   }  
 
@@ -626,7 +634,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	err.tags = []
 
 	try {
-	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => '_last'))`)
+	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => this.LAST_STATEMENT_ID))`)
       err.cause = results.map((err) => {
 	    const loadError = new Error(err.error)
 		Object.assign(loadError,err)

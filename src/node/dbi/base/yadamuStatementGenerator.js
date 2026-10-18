@@ -88,7 +88,33 @@ class YadamuStatementGenerator {
   async init() {
     // Set it to the value of the resolved promise..
     this.SOURCE_DATA_TYPES = await this.SOURCE_DATA_TYPES;
-  }  
+    this.dropVectorDimensions()
+  }
+
+  dropVectorDimensions() {
+
+	/*
+	**
+	** A pgvector column carries its dimension as a size constraint, e.g. vector(1536) => [1536]. A target that stores the vector as JSON
+	** has no use for it, and on a target whose JSON type is character based it would be applied as a length, e.g. varchar(1536).
+	**
+	*/
+
+	const vectorTypes = this.SOURCE_DATA_TYPES.PGSQL_VECTOR_TYPES.map((dataType,idx) => {
+	  // A source vendor without pgvector reports its JSON type here, and has no vector columns.
+	  return dataType === this.SOURCE_DATA_TYPES.JSON_TYPE ? undefined : (this.dbi.DATA_TYPES.PGSQL_VECTOR_TYPES[idx] === this.dbi.DATA_TYPES.JSON_TYPE) ? dataType.toLowerCase() : undefined
+	}).filter((dataType) => { return dataType !== undefined })
+
+	if (vectorTypes.length > 0) {
+	  Object.values(this.metadata || {}).forEach((tableMetadata) => {
+	    tableMetadata.dataTypes?.forEach((dataType,idx) => {
+		  if (vectorTypes.includes(YadamuDataTypes.decomposeDataType(dataType).type.toLowerCase()) && Array.isArray(tableMetadata.sizeConstraints?.[idx])) {
+		    tableMetadata.sizeConstraints[idx] = []
+		  }
+	    })
+	  })
+	}
+  }
   
   async debugStatementGenerator(options,statementCache) {  
     

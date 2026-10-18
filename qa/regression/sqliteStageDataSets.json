@@ -1,0 +1,32 @@
+{
+    "operation": "import",
+    "connections": "connections.json",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "parameters": {
+        "DIRECTORY": "export/json/%location%"
+    },
+    "tests": [
+        {
+            "source": "file-staging",
+            "target": "sqlite#2",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "file-staging",
+            "target": "sqlite#2",
+            "parameters": {
+                "CIRCLE_FORMAT": "CIRCLE"
+            },
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        }
+    ]
+}

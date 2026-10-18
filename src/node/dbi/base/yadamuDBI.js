@@ -11,8 +11,19 @@ import {
   setTimeout 
 }                         from 'timers/promises'
 
-import Yadamu             from '../../core/yadamu.js'
-import YadamuConstants    from '../../lib/yadamuConstants.js'
+/*
+**
+** Unused, and it closed an import cycle: yadamuDBI -> core/yadamu -> dbi/file/fileDBI -> yadamuDBI.
+** In a cycle the module entered first is evaluated last, so importing a DBI before core evaluated
+** fileDBI first and "class FileDBI extends YadamuDBI" failed with "Cannot access 'YadamuDBI' before
+** initialization". The CLI and service escaped it only because they import core/yadamu.js first.
+** Do not reinstate: a DBI must load without core having been loaded ahead of it.
+**
+** import Yadamu             from '../../core/yadamu.js'
+**
+*/
+
+import YadamuConstants   from '../../lib/yadamuConstants.js'
 import YadamuLibrary      from '../../lib/yadamuLibrary.js'
 import NullWriter         from '../../util/nullWriter.js'
 import NullWritable       from '../../util/nullWritable.js'
@@ -141,7 +152,8 @@ class YadamuDBI extends EventEmitter {
   get INFINITY_MANAGEMENT()          { return this.parameters.INFINITY_MANAGEMENT         || DBIConstants.INFINITY_MANAGEMENT };
   get STAGING_FILE_RETENTION()       { return this.parameters.STAGING_FILE_RETENTION      || DBIConstants.STAGING_FILE_RETENTION }
   get BYTE_TO_CHAR_RATIO()           { return this.parameters.BYTE_TO_CHAR_RATIO          || DBIConstants.BYTE_TO_CHAR_RATIO }
-  get RESET_IDENTITY()               { return this.parameters.RESET_IDENTITY              || DBIConstants.RESET_IDENTITY }
+  get RESET_IDENTITY()               { return this.parameters.hasOwnProperty('RESET_IDENTITY') ? this.parameters.RESET_IDENTITY : DBIConstants.RESET_IDENTITY }
+  get CONSISTENT_EXPORT()            { return this.parameters.hasOwnProperty('CONSISTENT_EXPORT') ? this.parameters.CONSISTENT_EXPORT : DBIConstants.CONSISTENT_EXPORT }
 
   get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || this.DATA_TYPES?.storageOptions.SPATIAL_FORMAT};
   get CIRCLE_FORMAT()                { return this.parameters.CIRCLE_FORMAT               || this.DATA_TYPES?.storageOptions.CIRCLE_FORMAT};
@@ -253,8 +265,8 @@ class YadamuDBI extends EventEmitter {
   get ROLE()                          {                     
     this._ROLE = this._ROLE || (() => {
       switch (true) { 
-	    case (this.parameters.MODE === YadamuConstants.COMAPRE_ROLE):
-		  return YadamuConstants.COMARE_ROLE
+	    case (this.parameters.MODE === YadamuConstants.COMPARE_ROLE):
+		  return YadamuConstants.COMPARE_ROLE
         case this.IS_READER: 
           return YadamuConstants.READER_ROLE; 
         case this.IS_WRITER: 
@@ -547,13 +559,21 @@ class YadamuDBI extends EventEmitter {
       }
     })
    
-      // cacheLoaded will resolve when the statement Cache has been generated 
-    
+      // cacheLoaded will resolve when the statement Cache has been generated
+      // It rejects if CACHE_LOADED is emitted with an Error, i.e. the statement cache cannot be generated, so that nothing waits forever on a cache that will never be loaded.
+
     this.cacheLoaded = new Promise((resolve,reject) => {
-      this.once(YadamuConstants.CACHE_LOADED  ,() => {
-        resolve(true)
+      this.once(YadamuConstants.CACHE_LOADED  ,(err) => {
+        if (err instanceof Error) {
+          reject(err)
+        }
+        else {
+          resolve(true)
+        }
       })
     })
+    // The failure is reported by whoever emitted it. Do not raise an unhandled rejection if nothing is waiting on the cache.
+    this.cacheLoaded.catch(YadamuLibrary.NOOP)
     
     this.ddlComplete = new Promise((resolve,reject) => {
       this.once(YadamuConstants.DDL_COMPLETE,(startTime,state) => {
@@ -867,7 +887,7 @@ class YadamuDBI extends EventEmitter {
   }
          
   isValidDDL() {
-    return ((this.systemInformation.vendor === this.DATABASE_VENDOR) && (this.systemInformation.dbVersion <= this.DATABASE_VERSION))
+    return ((this.systemInformation.vendor === this.DATABASE_VENDOR) && (YadamuLibrary.compareVersions(this.systemInformation.dbVersion,this.DATABASE_VERSION) <= 0))
   }
   
   isDatabase() {
@@ -1963,6 +1983,10 @@ class YadamuDBI extends EventEmitter {
   async getInputStream(queryInfo,pipelineState) {
 	
 	const inputStream = await this._getInputStream(queryInfo)
+	return this.trackInputStream(inputStream,queryInfo,pipelineState)
+  }
+  
+  trackInputStream(inputStream,queryInfo,pipelineState) {
     
 	this.ACTIVE_INPUT_STREAM = false
 	this.PREVIOUS_PIPELINE_ABORTED = false;
@@ -2192,36 +2216,54 @@ class YadamuDBI extends EventEmitter {
 
   trackPartitionedTableState(partitionState) {
 
-    if (!this.PARTITIONED_TABLE_STATE) {
-      this.PARTITIONED_TABLE_STATE = { 
-        startTime : partitionState.startTime
-      , endTime   : partitionState.endTime
-      , read      : partitionState.read
-      , committed : partitionState.committed
-      , lost      : partitionState.lost
-      , skipped   : partitionState.skipped
-      , sqlTime   : partitionState.sqlTime
-      , remaining : partitionState.partitionCount - 1
-      }
-    }
-    else {
-      const tableState = this.PARTITIONED_TABLE_STATE
-      tableState.startTime = partitionState.startTime < tableState.startTime ? partitionState.startTime : tableState.startTime
-      tableState.endTime =   partitionState.endTime > tableState.endTime ? partitionState.endTime : tableState.endTime
-	  tableState.read+=      partitionState.read
-	  tableState.committed+= partitionState.committed
-	  tableState.lost +=     partitionState.lost
-	  tableState.skipped+=   partitionState.skipped
-	  tableState.sqlTime+=   partitionState.sqlTime
-      tableState.remaining--
+    // Partition states are keyed by partition number, so a retried partition replaces its failed attempt rather than adding to it.
+	// A failed attempt that DBReader will retry is flagged retryPending. The table total is reported once every partition has a final state.
 
-      if (tableState.remaining === 0) {
-		const summary = this.yadamu.recordMetrics(partitionState.partitionedTableName,tableState);  
-	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(summary.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(tableState.sqlTime))}s. Throughput: ${summary.throughput} rows/s.`
-	    this.LOGGER.info([`${partitionState.partitionedTableName}`,`${partitionState.insertMode}`],`Total Rows ${tableState.committed}. ${timings}`)  
-      }
+    this.PARTITIONED_TABLE_STATE = this.PARTITIONED_TABLE_STATE || {}
+    const partitions = this.PARTITIONED_TABLE_STATE
+	const previousAttempt = partitions[partitionState.partitionNumber]
+
+    partitions[partitionState.partitionNumber] = {
+      startTime    : previousAttempt?.startTime < partitionState.startTime ? previousAttempt.startTime : partitionState.startTime
+    , endTime      : partitionState.endTime
+    , read         : partitionState.read
+    , committed    : partitionState.committed
+    , lost         : partitionState.lost
+    , skipped      : partitionState.skipped
+    , sqlTime      : partitionState.sqlTime
+	, retryPending : partitionState.retryPending === true
+    }
+
+	const partitionStates = Object.values(partitions)
+	if ((partitionStates.length === partitionState.partitionCount) && !partitionStates.some((state) => { return state.retryPending })) {
+      const tableState = partitionStates.reduce((tableState,state) => {
+        tableState.startTime = state.startTime < tableState.startTime ? state.startTime : tableState.startTime
+        tableState.endTime =   state.endTime > tableState.endTime ? state.endTime : tableState.endTime
+	    tableState.read+=      state.read
+	    tableState.committed+= state.committed
+	    tableState.lost +=     state.lost
+	    tableState.skipped+=   state.skipped
+	    tableState.sqlTime+=   state.sqlTime
+		return tableState
+	  },{ startTime : Infinity, endTime : -Infinity, read : 0, committed : 0, lost : 0, skipped : 0, sqlTime : 0 })
+
+	  const summary = this.yadamu.recordMetrics(partitionState.partitionedTableName,tableState);
+	  const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(summary.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(tableState.sqlTime))}s. Throughput: ${summary.throughput} rows/s.`
+	  this.LOGGER.info([`${partitionState.partitionedTableName}`,`${partitionState.insertMode}`],`Total Rows ${tableState.committed}. ${timings}`)
 	}
 
+  }
+
+  finalizePipelineState(pipelineState) {
+
+	// Called by DBReader when it stops retrying a failed attempt that was reported with retryPending set.
+
+	if (pipelineState.retryPending) {
+	  pipelineState.retryPending = false
+      if (pipelineState.partitionedTableName) {
+	    this.trackPartitionedTableState(pipelineState)
+      }
+	}
   }
   
   getRootCause(pipelineState,err) {
@@ -2354,7 +2396,9 @@ class YadamuDBI extends EventEmitter {
 	, mode               : this.MODE
 	, file               : this.FILE
 	, ddlValid           : this.isValidDDL()
-	}	 
+	// The MODE of the operation that replayed the source DDL; a DDL_ONLY replay does not apply statements that copy state, such as sequence values.
+	, ddlReplayed        : this.DDL_REPLAYED === true ? this.MODE : false
+	}
   }
     
 }

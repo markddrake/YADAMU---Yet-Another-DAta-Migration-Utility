@@ -4,7 +4,7 @@ import { performance } from 'perf_hooks';
 import WKX from 'wkx';
 
 import mongodb from 'mongodb'
-const { ObjectID, Decimal128, Long} = mongodb
+const { ObjectId, Decimal128, Long} = mongodb
 
 import Yadamu from '../../core/yadamu.js';
 import YadamuLibrary from '../../lib/yadamuLibrary.js';

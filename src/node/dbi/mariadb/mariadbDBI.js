@@ -130,7 +130,7 @@ class MariadbDBI extends YadamuDBI {
     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_CONFIGURE_CONNECTION)
 
     let results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_CONNECTION_INFORMATION)
-    this._DATABASE_VERSION = results[0]
+    this._DATABASE_VERSION = results[0][0]
 
     results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SHOW_SYSTEM_VARIABLES)
 	results.forEach((row,i) => { 

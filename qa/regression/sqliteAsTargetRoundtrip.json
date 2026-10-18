@@ -1,0 +1,95 @@
+{
+    "connections": "connections.json",
+    "operation": "dbRoundtrip",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "tests": [
+        {
+            "source": "oracle#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "oracle"
+            ]
+        },
+        {
+            "source": "oracle#2",
+            "target": "sqlite#2",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "oracle#3",
+            "target": "sqlite#2",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "oracle#4",
+            "target": "sqlite#2",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#2",
+            "target": "sqlite#2",
+            "tasks": [
+                "Northwind",
+                "AdventureWorks"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "mysql#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "mysql"
+            ]
+        },
+        {
+            "source": "mariadb#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "mongodb#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        },
+        {
+            "source": "oracle#1",
+            "target": "sqlite#1",
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        }
+    ]
+}

@@ -133,6 +133,7 @@ class YadamuWriter extends Writable {
     this.PIPELINE_STATE.displayName = partitionInfo.displayName
     this.PIPELINE_STATE.partitionCount = partitionInfo.partitionCount
     this.PIPELINE_STATE.partitionedTableName = this.tableName
+    this.PIPELINE_STATE.partitionNumber = partitionInfo.partitionNumber
     await this.initializeTable()
     this.tableInfo.partitionCount = partitionInfo.partitionCount
     this.tableInfo.partitionsRemaining = this.tableInfo.partitionsRemaining || partitionInfo.partitionCount

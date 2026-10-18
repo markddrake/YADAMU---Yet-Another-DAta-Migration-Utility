@@ -8,7 +8,7 @@ TEST_NAME=$1
 
 if [ -z "$TEST_NAME" ]; then
     echo "Usage: $0 <test_name>"
-    echo "Available tests: cmdline, oracle11g, oracle19c, oracle21c, oracle23ai, vertica09, db2, cockroach, yugabyte"
+    echo "Available tests: cmdline, oracle11g, oracle19c, sqlite, oracle21c, oracle23ai, oracle26ai, vertica09, db2, cockroach, yugabyte, snowflake"
     exit 1
 fi
 

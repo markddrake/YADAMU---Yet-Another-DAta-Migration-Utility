@@ -22,6 +22,7 @@ class JSONOutputManager extends _JSONOutputManager{
     this.PIPELINE_STATE.displayName = partitionInfo.displayName
     this.PIPELINE_STATE.partitionCount = partitionInfo.partitionCount
     this.PIPELINE_STATE.partitionedTableName = this.tableName
+    this.PIPELINE_STATE.partitionNumber = partitionInfo.partitionNumber
   }
   
   /*

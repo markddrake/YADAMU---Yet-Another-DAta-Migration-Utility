@@ -212,6 +212,7 @@ class YadamuDataTypes {
   set FLOAT_TYPE(v)                         { YadamuDataTypes.redefineProperty(this,'FLOAT_TYPE',v) }
                                                    
   get REAL_TYPE()                           { return this.FLOAT_TYPE }
+  set REAL_TYPE(v)                          { YadamuDataTypes.redefineProperty(this,'REAL_TYPE',v) }
                                                    
   // Decimal Types                                   
                                                    
@@ -558,6 +559,22 @@ class YadamuDataTypes {
   get PGSQL_REFCURSOR()                     { return this.JSON_TYPE } // "refcursor"       
   
   set PGSQL_REFCURSOR(v)                    { YadamuDataTypes.redefineProperty(this,'PGSQL_REFCURSOR',v) }
+  
+  // pgvector extension. Exported as JSON: vector and halfvec as an array of numbers, sparsevec as {dimensions, indices, values}.
+  
+  get PGSQL_VECTOR_TYPE()                   { return this.JSON_TYPE } // "vector"
+  
+  set PGSQL_VECTOR_TYPE(v)                  { YadamuDataTypes.redefineProperty(this,'PGSQL_VECTOR_TYPE',v) }
+  
+  get PGSQL_HALF_VECTOR_TYPE()              { return this.JSON_TYPE } // "halfvec"
+  
+  set PGSQL_HALF_VECTOR_TYPE(v)             { YadamuDataTypes.redefineProperty(this,'PGSQL_HALF_VECTOR_TYPE',v) }
+  
+  get PGSQL_SPARSE_VECTOR_TYPE()            { return this.JSON_TYPE } // "sparsevec"
+  
+  set PGSQL_SPARSE_VECTOR_TYPE(v)           { YadamuDataTypes.redefineProperty(this,'PGSQL_SPARSE_VECTOR_TYPE',v) }
+  
+  get PGSQL_VECTOR_TYPES()                  { return [this.PGSQL_VECTOR_TYPE, this.PGSQL_HALF_VECTOR_TYPE, this.PGSQL_SPARSE_VECTOR_TYPE] }
   
   // MySQL Specific Types
   

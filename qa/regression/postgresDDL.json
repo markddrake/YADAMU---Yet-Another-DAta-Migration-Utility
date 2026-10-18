@@ -1,0 +1,64 @@
+{
+  "operation"                : "dbRoundTrip"
+, "connections"              : "connections.json"
+, "tasks"                    : "tasks.json"
+, "recreateSchema"           : true
+, "createDirectory"          : true
+, "tests"                    : [{
+    "source"                 : "postgres#1"
+  , "target"                 : "postgres#1"
+  , "tasks"                  : [
+      "postgresDDL"
+    ]
+  },{
+    "operation"              : "export"
+  , "source"                 : "postgres#1"
+  , "target"                 : "file-staging"
+  , "parameters"             : {
+	  "MODE"                 : "DDL_AND_DATA"
+    , "DIRECTORY"            : "%operation%/json/%vendor%"
+    }
+  , "tasks"                  : [
+      "postgresDDL"
+	]
+  },{
+    "operation"              : "fileRoundtrip"
+  , "source"                 : "file-staging"
+  , "targets"                : [
+      "postgres#1"
+    ]
+  , "parameters"             : {
+      "MODE"                 : "DDL_AND_DATA"
+    , "SOURCE_DIRECTORY"     : "export/json/%location%"
+    , "TARGET_DIRECTORY"     : "%operation%/json/%connection%/%location%"
+    }
+  , "tasks"                  : [
+      "postgresDDL"
+    ]
+  },{
+    "operation"              : "export"
+  , "source"                 : "postgres#1"
+  , "target"                 : "file-staging"
+  , "parameters"             : {
+      "MODE"                 : "DDL_ONLY"
+    , "DIRECTORY"            : "%operation%/ddl/%vendor%"
+    }
+  , "tasks"                  : [
+      "postgresDDL"
+    ]
+  },{
+    "operation"              : "fileRoundtrip"
+  , "source"                 : "file-staging"
+  , "targets"                : [
+      "postgres#1"
+    ]
+  , "parameters"             : {
+      "MODE"                 : "DDL_ONLY"
+    , "SOURCE_DIRECTORY"     : "export/ddl/%location%"
+    , "TARGET_DIRECTORY"     : "%operation%/ddl/%connection%/%location%"
+    }
+  , "tasks"                  : [
+      "postgresDDL"
+    ]
+  }]
+}

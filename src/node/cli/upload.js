@@ -6,6 +6,7 @@ import YadamuCLI          from './yadamuCLI.js'
 class Upload extends YadamuCLI {}
 
 async function main() {
+  YadamuCLI.guardExitCode()
 
   try {
     const yadamuUpload = new Upload();
@@ -14,9 +15,11 @@ async function main() {
     } catch (e) {
       yadamuUpload.reportError(e)
 	}
-    await yadamuUpload.close()  
+    await yadamuUpload.close();
+    YadamuCLI.setExitCode(yadamuUpload.EXIT_CODE)
   } catch (e) {
     YadamuLibrary.reportError(e)
+    YadamuCLI.setExitCode(YadamuCLI.getExitCode(e))
   }
   
 }

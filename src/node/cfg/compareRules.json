@@ -12,7 +12,8 @@
 		"redshift": 6,
 		"snowflake": 9,
 		"vertica": 6,
-		"db2": 12
+		"db2": 12,
+		"sqlite": 12
 	},
 	"SPATIAL_PRECISION": {
 		"default": 18,
@@ -22,7 +23,12 @@
 			"postgres": -18,
 			"yugabyte": -18,
 			"cockroach": -18,
-			"snowflake": 17
+			"snowflake": 17,
+			"sqlite": 10
+		},
+		"sqlite": {
+			"oracle": 10,
+			"mssql": 15
 		},
 		"mysql": {
 			"oracle": 10,
@@ -119,6 +125,9 @@
 			"oracle": true
 		,	"csv"   : true
 		},
+		"sqlite": {
+			"oracle": true
+		},
 		"postgres": {
 			"oracle": true
 		},
@@ -189,42 +198,49 @@
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		},
 		"yugabyte": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		},
 		"cockroach":{
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		},
 		"oracle": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		},
 		"mongodb": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		},
 		"snowflake": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		},
 		"vertica": {
 	      "mariadb": true
 		, "mssql": true
 		, "mysql": true
 		, "db2": true
+		, "sqlite": true
 		}
 	},
 	"ORDERED_JSON": {
@@ -254,6 +270,9 @@
 	},
 	"XML_COMPARISON_RULE": {
 	    "default"      : null
+	  , "sqlite"       : {
+		  "mssql"      : "STRIP_XML_DECLARATION"
+	    }
 	  , "oracle"       : {
 		  "mssql"      : "STRIP_XML_DECLARATION"
         , "teradata"   : "SERIALIZE_AS_BLOB"
@@ -286,5 +305,8 @@
 	}
   , "OBJECTS_COMPARISON_RULE": {
 	  "default": null
+	}
+  , "IGNORE_GENERATED_COLUMNS": {
+	  "default": true
 	}
 }

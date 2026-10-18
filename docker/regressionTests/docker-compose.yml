@@ -1,9 +1,25 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   # ORA2303-01: 1521
   
   ORA1120-01: 
+    logging: *default-logging
     container_name: ORA1120-01
     hostname: ORA1120-01
     # image:  oracle/database:11.2.0.4-ee
@@ -35,6 +51,7 @@ services:
   # ORA1210-01: 15212
   
   ORA1220-01: 
+    logging: *default-logging
     container_name: ORA1220-01
     hostname: ORA1220-01
     # image:  oracle/database:12.2.0.1-ee 
@@ -64,6 +81,7 @@ services:
     restart: always
 
   ORA1803-01: 
+    logging: *default-logging
     container_name: ORA1803-01
     hostname: ORA1803-01
     # image:  oracle/database:18.3.0-ee
@@ -93,6 +111,7 @@ services:
     restart: always
 
   ORA1903-01: 
+    logging: *default-logging
     container_name: ORA1903-01
     hostname: ORA1903-01
     # image:  oracle/database:19.3.0-ee
@@ -123,6 +142,7 @@ services:
   
 
   PGSQL18-01: 
+    logging: *default-logging
     container_name: PGSQL18-01
     hostname: PGSQL18-01
     image:  yadamu/postgres:18
@@ -143,10 +163,11 @@ services:
       - PGSQL18-01-DATA:/var/lib/postgresql
     restart: always
     
-  MARIA12-01: 
-    container_name: MARIA12-01
-    hostname: MARIA12-01
-    image:  mariadb:12
+  MARIA13-01: 
+    logging: *default-logging
+    container_name: MARIA13-01
+    hostname: MARIA13-01
+    image:  mariadb:latest
     mem_limit: '16gb'          #
     memswap_limit: -1     # allow unlimited swap
     shm_size: '2gb'
@@ -162,13 +183,14 @@ services:
       MYSQL_ROOT_PASSWORD: oracle  
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MARIA12-01-CONF:/etc/mysql/conf.d
-      - MARIA12-01-DATA:/var/lib/mysql 
+      - MARIA13-01-CONF:/etc/mysql/conf.d
+      - MARIA13-01-DATA:/var/lib/mysql 
     restart: always
 
-  MONGO80-01: 
-    container_name: MONGO80-01
-    hostname: MONGO80-01
+  MONGO90-01: 
+    logging: *default-logging
+    container_name: MONGO90-01
+    hostname: MONGO90-01
     image:  mongo:latest 
     mem_limit: '16gb'          #
     memswap_limit: -1     # allow unlimited swap
@@ -182,10 +204,11 @@ services:
     ports: 
       - "27017:27017"
     volumes:
-      - MONGO80-01-VOLUME:/data/db 
+      - MONGO90-01-VOLUME:/data/db 
     restart: always
 
   MSSQL25-01: 
+    logging: *default-logging
     container_name: MSSQL25-01
     hostname: MSSQL25-01
     image:  mcr.microsoft.com/mssql/server:2025-latest
@@ -212,6 +235,7 @@ services:
     restart: always
   
   MSSQL22-01: 
+    logging: *default-logging
     container_name: MSSQL22-01
     hostname: MSSQL22-01
     image:  mcr.microsoft.com/mssql/server:2022-latest
@@ -235,9 +259,10 @@ services:
       - MSSQL22-01-VOLUME:/var/opt/mssql
     restart: always
 
-  MYSQL95-01: 
-    container_name: MYSQL95-01
-    hostname: MYSQL95-01
+  MYSQL26-01: 
+    logging: *default-logging
+    container_name: MYSQL26-01
+    hostname: MYSQL26-01
     image:  mysql:latest
     command: --secure-file-priv=/mnt/shared 
     mem_limit: '16gb'          #
@@ -257,10 +282,11 @@ services:
       MYSQL_ROOT_PASSWORD: oracle  
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MYSQL95-01-VOLUME:/var/lib/mysql 
+      - MYSQL26-01-VOLUME:/var/lib/mysql 
     restart: always
     
   VRTCA24-01: 
+    logging: *default-logging
     container_name: VRTCA24-01
     hostname: VRTCA24-01
     image:  vertica/vertica-ce:latest 
@@ -288,6 +314,7 @@ services:
     restart: always    
 
   VRTCA10-01: 
+    logging: *default-logging
     container_name: VRTCA10-01
     hostname: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
@@ -313,13 +340,21 @@ services:
     restart: always
 
   MINIO-01: 
+    logging: *default-logging
     container_name: MINIO-01
     hostname: MINIO-01
-    # image:  minio/minio 
-    image:  minio/minio:RELEASE.2024-11-07T00-52-20Z
+    # MinIO AIStor Free (2026-10-09), replacing minio/minio:RELEASE.2024-11-07.
+    # Open-source MinIO is archived, and the 2024 builds reject DeleteObjects
+    # from current AWS SDKs (MissingContentMD5) whenever a QA rerun writes into
+    # a populated folder. Name, hostname, ports and keys are unchanged, so
+    # connections.json (minio#1 -> http://MINIO-01:9000) needs no change.
+    image:  yadamu/aistor:RELEASE.2026-09-19T17-05-25Z
+    build:
+      context: ..
+      dockerfile: regressionTests/aistor/Dockerfile
     mem_limit: '1gb'
     memswap_limit: -1     # allow unlimited swap
-    command:  server /data --console-address  ":9001"
+    command:  server /data --console-address ":9001" --license /minio.license
     networks:
       - YADAMU-NET
     ports: 
@@ -329,10 +364,13 @@ services:
       MINIO_ROOT_USER: AKIAIOSFODNN7EXAMPLE
       MINIO_ROOT_PASSWORD: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
     volumes:
-      - MINIO-01-VOLUME:/data
+      # A fresh volume rather than the MinIO 2024 one; the regression
+      # recreates everything it needs (bucket "yadamu" included).
+      - AISTOR-01-VOLUME:/data
     restart: always
     
   AZURE-01: 
+    logging: *default-logging
     container_name: AZURE-01
     hostname: AZURE-01
     image:   mcr.microsoft.com/azure-storage/azurite 
@@ -348,6 +386,7 @@ services:
     restart: always
 
   YADAMU-SMB: 
+    logging: *default-logging
     container_name: YADAMU-SMB
     hostname: YADAMU-SMB
     image:   dperson/samba
@@ -383,13 +422,13 @@ volumes:
   MSSQL22-01-VOLUME:
   MSSQL25-01-VOLUME:
   PGSQL18-01-DATA:
-  MYSQL95-01-VOLUME:
-  MARIA12-01-CONF:
-  MARIA12-01-DATA:
-  MONGO80-01-VOLUME:
+  MYSQL26-01-VOLUME:
+  MARIA13-01-CONF:
+  MARIA13-01-DATA:
+  MONGO90-01-VOLUME:
   VRTCA10-01-VOLUME:
   VRTCA24-01-VOLUME:
-  MINIO-01-VOLUME:
+  AISTOR-01-VOLUME:
   AZURE-01-VOLUME:
     
 

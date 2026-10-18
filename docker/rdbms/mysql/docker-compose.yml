@@ -1,6 +1,22 @@
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   MYSQL80-01: 
+    logging: *default-logging
     container_name: MYSQL80-01
     hostname: MYSQL80-01
     image:  mysql:8.0.37
@@ -26,6 +42,7 @@ services:
     restart: always
     
   MYSQL90-01: 
+    logging: *default-logging
     container_name: MYSQL90-01
     hostname: MYSQL90-01
     image:  mysql:9.0.1
@@ -51,9 +68,10 @@ services:
       - MYSQL90-01-VOLUME:/var/lib/mysql 
     restart: always  
    
-  MYSQL95-01: 
-    container_name: MYSQL95-01
-    hostname: MYSQL95-01
+  MYSQL26-01: 
+    logging: *default-logging
+    container_name: MYSQL26-01
+    hostname: MYSQL26-01
     image:  mysql:latest
     command: --secure-file-priv=/mnt/shared 
     mem_limit: '16gb'          #
@@ -74,7 +92,7 @@ services:
       LC_ALL: C.UTF-8      
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MYSQL95-01-VOLUME:/var/lib/mysql 
+      - MYSQL26-01-VOLUME:/var/lib/mysql 
     restart: always
     
 networks: 
@@ -86,4 +104,4 @@ volumes:
     name: YADAMU_01-SHARED
   MYSQL80-01-VOLUME:
   MYSQL90-01-VOLUME:
-  MYSQL95-01-VOLUME:
+  MYSQL26-01-VOLUME:

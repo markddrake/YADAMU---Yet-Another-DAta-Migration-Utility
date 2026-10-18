@@ -108,9 +108,19 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
 		  stack = new Error().stack
     	  this.LOGGER.log(tags,`Killing connection.`);
      	  const conn = await this.getConnectionFromPool();
-		  
-		  const res = await conn.query(operation);
-		  await conn.release()
+		  // The pool hands back an idle client, which is the target's own connection once its worker has finished and released it.
+		  // Killing it would kill this connection, and the kill would never reach the worker. Release the client whatever happens,
+		  // or pool.end() waits for it forever.
+		  try {
+		    const [self] = await conn.query(`select connection_id()`)
+		    if (Number(Object.values(self[0])[0]) === Number(pid)) {
+		      this.LOGGER.log(tags,`Target connection already returned to the pool. Kill skipped.`);
+		      return
+		    }
+		    const res = await conn.query(operation);
+		  } finally {
+		    await conn.release()
+		  }
 		}
 		else {
 		  this.LOGGER.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);

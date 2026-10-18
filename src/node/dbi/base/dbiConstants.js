@@ -18,6 +18,7 @@ class DBIConstants {
 	, "STAGING_FILE_RETENTION"     : "FAILED"
 	, "BYTE_TO_CHAR_RATIO"         : 1
 	, "RESET_IDENTITY"             : true
+	, "CONSISTENT_EXPORT"          : true   /* Read every table from a single snapshot of the source database, where the database supports it */
     })
     return this._STATIC_PARAMETERS;
   }
@@ -75,7 +76,8 @@ class DBIConstants {
   static get REMOTE_STAGING_AREA()        { return this.DBI_PARAMETERS.REMOTE_STAGING_AREA };
   static get STAGING_FILE_RETENTION()     { return this.DBI_PARAMETERS.STAGING_FILE_RETENTION };
   static get BYTE_TO_CHAR_RATIO()         { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
-  static get RESET_IDENTITY()             { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
+  static get RESET_IDENTITY()             { return this.DBI_PARAMETERS.RESET_IDENTITY };
+  static get CONSISTENT_EXPORT()          { return this.DBI_PARAMETERS.CONSISTENT_EXPORT };
   
   static get BATCH_COMPLETED()            { return 'batchCompleted' }
   static get BATCH_RELEASED()             { return 'batchReleased' }

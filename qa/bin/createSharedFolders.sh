@@ -9,3 +9,4 @@ mkdir -p $YADMAU_OUTPUT_FOLDER/output
 mkdir -p $YADMAU_OUTPUT_FOLDER/scratch
 mkdir -p $YADMAU_OUTPUT_FOLDER/test
 mkdir -p $YADMAU_OUTPUT_FOLDER/work
+mkdir -p $YADMAU_OUTPUT_FOLDER/sqlite/regression

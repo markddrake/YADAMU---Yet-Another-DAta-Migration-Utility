@@ -10,7 +10,7 @@ import {
 import                                https from 'https'
 import { 
   NodeHttpHandler 
-}                                     from '@aws-sdk/node-http-handler'
+}                                     from '@smithy/node-http-handler'
 import { 
   S3Client
 }                                     from "@aws-sdk/client-s3";
@@ -121,6 +121,9 @@ class AWSS3DBI extends CloudDBI {
 	, forcePathStyle     : connectionProperties.s3ForcePathStyle
 	, endpoint           : connectionProperties.endpoint
 	, signatureVersion   : connectionProperties.signatureVersion
+	// Since @aws-sdk 3.729 the SDK sends and validates CRC32 checksums by default; S3-compatible stores such as older MinIO releases reject them
+	, requestChecksumCalculation  : 'WHEN_REQUIRED'
+	, responseChecksumValidation  : 'WHEN_REQUIRED'
 	, credentials        : {
 	    accessKeyId      : connectionProperties.accessKeyId
 	  , secretAccessKey  : connectionProperties.secretAccessKey  

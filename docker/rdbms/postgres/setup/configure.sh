@@ -8,3 +8,5 @@ psql -U $DB_USER -a -e -f setup/configure.sql > log/configure.log
 psql -U $DB_USER -d $DB_DBNAME -a -e -f sql/YADAMU_IMPORT.sql > log/YADAMU_IMPORT.log
 psql -U $DB_USER -d $DB_DBNAME -a -e -f sql/YADAMU_COMPARE.sql > log/YADAMU_COMPARE.log
 psql -U $DB_USER -d $DB_DBNAME -a -e -f testdata/dataTypeTesting.sql > log/dataTypeTesting.log
+psql -U $DB_USER -d $DB_DBNAME -a -e -f testdata/vectorTesting.sql > log/vectorTesting.log
+psql -U $DB_USER -d $DB_DBNAME -a -e -f testdata/ddlTesting.sql > log/ddlTesting.log

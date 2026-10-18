@@ -55,9 +55,17 @@ class OracleError extends DatabaseError {
     
     this.args = this.obfuscateBindValues(args)
     this.outputFormat = outputFormat
-    
+
   }
-  
+
+  getDiagnostics() {
+	return [
+	  ...super.getDiagnostics()
+	, `Args/Binds: ${JSON.stringify(this.args)}`
+	, `OutputFormat/Rows: ${JSON.stringify(this.outputFormat)}`
+	]
+  }
+
   invalidCredentials() { 
   }
   

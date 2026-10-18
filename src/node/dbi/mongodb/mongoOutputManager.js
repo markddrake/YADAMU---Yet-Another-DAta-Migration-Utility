@@ -8,8 +8,8 @@ import WKX from 'wkx';
 import mongodb                  from 'mongodb'
 
 const { 
-  ObjectID, 
-  Decimal128, 
+  ObjectId,
+  Decimal128,
   Long, 
   Int32, 
   Double
@@ -62,7 +62,7 @@ class MongoOutputManager extends YadamuOutputManager {
 	   switch(dataType.toLowerCase()){
         case this.dbi.DATA_TYPES.MONGO_OBJECTID_TYPE:
 	      return (col,idx) => {
-			return ObjectID(col)
+			return new ObjectId(col)
 	      }
           break;
 		case this.dbi.DATA_TYPES.INTEGER_TYPE:
@@ -117,7 +117,7 @@ class MongoOutputManager extends YadamuOutputManager {
 		case this.dbi.DATA_TYPES.BINARY_TYPE:
 		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx][0] === 12)) {
   	        return (col,idx) => {
-              return ObjectID(col)
+              return new ObjectId(col)
 	        }
 		  }
 		  return null

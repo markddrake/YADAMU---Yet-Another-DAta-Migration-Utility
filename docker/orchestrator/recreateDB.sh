@@ -1,6 +1,6 @@
 docker stop YADAMU-01
 docker rm YADAMU-01
-docker compose --file docker/regressionTests/docker-compose.yml down -v
+docker compose --file docker/regressionTests/docker-compose.yml down -v --remove-orphans
 docker compose --file docker/regressionTests/docker-compose.yml up -d
 #startup 2025-12-14T23:38:32.230+00:00
 #complete "2025-12-14T23:55:33.835+00:00"docker

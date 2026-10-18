@@ -24,6 +24,7 @@ import YadamuLogger       from '../../node/core/yadamuLogger.js';
 import YadamuConstants    from '../../node/lib/yadamuConstants.js';
 import YadamuLibrary      from '../../node/lib/yadamuLibrary.js';
 import YadamuCLI          from '../../node/cli/yadamuCLI.js';
+import YadamuOutcome      from '../../node/cli/yadamuOutcome.js';
 import JSONParser         from '../../node/dbi/file/jsonParser.js';
 import LoaderDBI          from '../../node/dbi/loader/loaderDBI.js';
 import DBIConstants       from '../../node/dbi/base/dbiConstants.js';
@@ -823,7 +824,7 @@ class Test extends YadamuCLI {
 	, includeRowCounts         : false
 	, identifierMappings       : identifierMappings
 	, copyFromCSV              : stagedCopy
-	, ddlApplied               : testResults[batch[0]].target.ddlValid
+	, ddlApplied               : testResults[batch[0]].target.ddlReplayed
 	, includeMaterializedViews : testResults[batch[batch.length-1]].target.hasMaterializedViews
     }
 	
@@ -1079,7 +1080,10 @@ class Test extends YadamuCLI {
    
     let startTime = performance.now()
 	dbComparator.configuration = compareConfiguration1
-    await this.reportRowCounts(sourceConnectionName, targetConnectionName, task.taskName, dbComparator) 
+    // A DDL_ONLY operation imports no rows
+    if (parameters.MODE !== 'DDL_ONLY') {
+      await this.reportRowCounts(sourceConnectionName, targetConnectionName, task.taskName, dbComparator) 
+    }
     let elapsedTime = performance.now() - startTime 
     this.metrics.recordTaskTimings([task.taskName,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(elapsedTime)])
 
@@ -1097,7 +1101,10 @@ class Test extends YadamuCLI {
 
     startTime = performance.now()
 	dbComparator.configuration = compareConfiguration2
-    await this.reportRowCounts(sourceConnectionName, targetConnectionName, task.taskName, dbComparator) 
+    // A DDL_ONLY operation imports no rows
+    if (parameters.MODE !== 'DDL_ONLY') {
+      await this.reportRowCounts(sourceConnectionName, targetConnectionName, task.taskName, dbComparator) 
+    }
     elapsedTime = performance.now() - startTime 
     this.metrics.recordTaskTimings([task.taskName,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(elapsedTime)])
 
@@ -1129,7 +1136,7 @@ class Test extends YadamuCLI {
 	  , metrics                  : results.metrics
 	  , includeRowCounts         : false
       , identifierMappings       : this.COMPARE_MAPPINGS
-	  , ddlApplied               : results.target.ddlValid
+	  , ddlApplied               : results.target.ddlReplayed
 	  , includeMaterializedViews : results.target.hasMaterializedViews
 	  }
 
@@ -1166,7 +1173,7 @@ class Test extends YadamuCLI {
 	, metrics                  : results.metrics
 	, includeRowCounts         : false
 	, identifierMappings       : this.COMPARE_MAPPINGS
-    , ddlApplied               : results.target.ddlValid
+    , ddlApplied               : results.target.ddlReplayed
 	, includeMaterializedViews : results.target.hasMaterializedViews
  	}
 
@@ -1338,7 +1345,7 @@ class Test extends YadamuCLI {
 	    }
     	, parameters               : compareParameters
 	    , metrics                  : results.metrics
-	    , ddlApplied               : results.target.ddlValid
+	    , ddlApplied               : results.target.ddlReplayed
 	    , includeMaterializedViews : results.target.hasMaterializedViews
 		, identifierMappings       : this.COMPARE_MAPPINGS
       }
@@ -1400,6 +1407,9 @@ class Test extends YadamuCLI {
     const directory = this.test.parameters?.TARGET_DIRECTORY || this.TEST_CONFIGURATION.parameters?.TARGET_DIRECTORY || this.test.parameters?.DIRECTORY || this.TEST_CONFIGURATION.parameters?.DIRECTORY || ''
     const exportDirectory = YadamuLibrary.macroSubstitions(path.join(directory,this.EXPORT_PATH),this.yadamu.MACROS)    
 
+    // A loader target, such as an S3 bucket, writes the export to a folder named after the source schema.
+    const fileBasedTarget = YadamuConstants.FILE_BASED_DRIVERS.includes(targetDatabase)
+
     const jobName = "EXPORT"
 	const job = {
 	  source             : {
@@ -1408,6 +1418,7 @@ class Test extends YadamuCLI {
 	  }
 	, target             : {
         connection       : targetConnectionName
+	  , ...(fileBasedTarget ? {} : { schema : "source" })
       }
     , parameters         : { 
         ...parameters
@@ -1426,6 +1437,7 @@ class Test extends YadamuCLI {
 	  const job = {
 	    source             : {
           connection       : targetConnectionName
+		, ...(fileBasedTarget ? {} : { schema : "source" })
 	    }
 	  , target : {
 	      connection       : sourceConnectionName
@@ -1505,7 +1517,7 @@ class Test extends YadamuCLI {
 	    , metrics                  : results.metrics
 	    , includeRowCounts         : true
 	    , identifierMappings       : this.COMPARE_MAPPINGS
-	    , ddlApplied               : results.target.ddlValid
+	    , ddlApplied               : results.target.ddlReplayed
 	    , includeMaterializedViews : results.target.hasMaterializedViews
       }
 	  
@@ -1529,7 +1541,7 @@ class Test extends YadamuCLI {
     const elapsedTime =  performance.now() - testResults.startTime
     this.metrics.recordTaskTimings([task.taskName,'TOTAL','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
 	this.reportTimings(this.metrics.timings)
-    return YadamuConstants.FILE_BASED_DRIVERS.includes(targetDatabase)  ? exportDirectory : path.dirname(fileWriter.CONTROL_FILE_PATH)
+    return exportDirectory
 
   }
   
@@ -1667,6 +1679,9 @@ class Test extends YadamuCLI {
     })
 	
     targetComparator.printCompareResults(compareResults)
+    if (compareResults.failed.length > 0) {
+      this.metrics.recordFailed(compareResults.failed.length)
+    }
     
   }
 
@@ -2014,6 +2029,7 @@ class Test extends YadamuCLI {
       }
     } catch (e) {
 		console.log(e)
+		this.suiteException = e
     }
 
     const elapsedTime = performance.now() - startTime;
@@ -2029,6 +2045,13 @@ class Test extends YadamuCLI {
 	await this.yadamu.close(true)
 	return results
   } 
+
+  getRegressionExitCode() {
+    // 0 when the suite completed with no errors and no failed compares (warnings are allowed), otherwise 1.
+    // These are the totals reported on the final [QA][YADAMU][REGRESSION] line.
+    const suite = this.metrics.suite
+    return ((this.suiteException === undefined) && (suite.errors === 0) && (suite.failed === 0)) ? YadamuOutcome.EXIT_CODES.SUCCESS : YadamuOutcome.EXIT_CODES.FAILED
+  }
 
   createYadamu() {	  
 	return new Yadamu(this.command);
@@ -2117,19 +2140,27 @@ class Test extends YadamuCLI {
 export { Test as default}
 
 async function main() {
- 
+
+  // Exit code: 0 = suite clean (warnings allowed), 1 = errors, failed compares or an aborted suite, 2 = invalid command line or configuration.
+  // The regression scripts pipe the harness through tee and the orchestrator only waits on the container, so none of them stop on a non-zero exit.
+  YadamuCLI.guardExitCode()
   let testHarness
+  let exitCode = YadamuOutcome.EXIT_CODES.FAILED
   try {
     testHarness = new Test();
     try {
 	  await testHarness.doTests();
+	  exitCode = testHarness.getRegressionExitCode()
     } catch (e) {
 	  testHarness.reportError(e)
+	  exitCode = YadamuCLI.getExitCode(e)
     }
     await testHarness.close();
   } catch (e) {
 	YadamuLibrary.reportError(e)
+	exitCode = YadamuCLI.getExitCode(e)
   }
+  YadamuCLI.setExitCode(exitCode)
 
 }
 

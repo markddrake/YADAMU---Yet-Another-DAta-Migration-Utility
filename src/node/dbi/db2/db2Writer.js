@@ -1,6 +1,4 @@
 
-import fs                     from 'fs'
-
 import { 
   performance 
 }                             from 'perf_hooks';
@@ -19,7 +17,9 @@ class DB2Writer extends YadamuWriter {
 	 
   reassembleRow(batch,rowNumber) {
 	return batch.params.map((param) => {
-	  return Array.isArray(param) ? param[3][rowNumber] : param.Data[rowNumber]
+	  const value = Array.isArray(param) ? param[3][rowNumber] : param.Data[rowNumber]
+	  // _writeBatch() replaced binary values with Uint8Array views. Single row inserts and error reports use Buffers.
+	  return ((value instanceof Uint8Array) && !Buffer.isBuffer(value)) ? Buffer.from(value.buffer,value.byteOffset,value.length) : value
 	})
   }
 	 
@@ -52,6 +52,14 @@ class DB2Writer extends YadamuWriter {
 		  }
 		  break;
 	  }
+
+	  // ibm_db 4 binds an array whose first element is a Buffer as one chunked LOB (DATA_AT_EXEC), even in a column-wise ARRAY parameter,
+	  // which merges the rows' values into the first row or crashes the process. A Uint8Array view of the same bytes is bound as one binary value per row.
+	  param.Data.forEach((value,idx) => {
+		if (Buffer.isBuffer(value)) {
+		  param.Data[idx] = new Uint8Array(value.buffer,value.byteOffset,value.length)
+		}
+	  })
 	   
     })
 		
@@ -70,7 +78,6 @@ class DB2Writer extends YadamuWriter {
 	if (this.tableInfo.insertMode === 'Batch') {
       try {    
         // await this.dbi.createSavePoint();
-	    fs.writeFileSync("batch.json",JSON.stringify(batch," ",2))
         const results = await this.dbi.batchInsert(batch);
         this.endTime = performance.now();
         // await this.dbi.releaseSavePoint();

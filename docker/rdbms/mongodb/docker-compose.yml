@@ -1,7 +1,23 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   MONGO40-01: 
+    logging: *default-logging
     container_name: MONGO40-01
     hostname: MONGO40-01
     image:  mongo:4
@@ -66,9 +82,10 @@ services:
     restart: always
 
 
-  MONGO80-01: 
-    container_name: MONGO80-01
-    hostname: MONGO80-01
+  MONGO90-01: 
+    logging: *default-logging
+    container_name: MONGO90-01
+    hostname: MONGO90-01
     image:  mongo:latest 
     mem_limit: '16gb'          #
     memswap_limit: -1     # allow unlimited swap
@@ -82,7 +99,7 @@ services:
     ports: 
       - "27017:27017"
     volumes:
-      - MONGO80-01-VOLUME:/data/db 
+      - MONGO90-01-VOLUME:/data/db 
     restart: always
     
 networks: 
@@ -96,7 +113,7 @@ volumes:
   MONGO50-01-VOLUME:
   MONGO60-01-VOLUME:
   MONGO70-01-VOLUME:
-  MONGO80-01-VOLUME:
+  MONGO90-01-VOLUME:
     
 
     

@@ -1,7 +1,23 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   POSTGRES-01: 
+    logging: *default-logging
     container_name: POSTGRES-01
     hostname: POSTGRES-01
     image:  yadamu/postgres:latest
@@ -23,6 +39,7 @@ services:
     restart: always
 
   PGSQL11-01: 
+    logging: *default-logging
     container_name: PGSQL11-01
     hostname: PGSQL11-01
     image:  postgres:11.2
@@ -42,6 +59,7 @@ services:
     restart: always
 
   PGSQL12-01: 
+    logging: *default-logging
     container_name: PGSQL12-01
     hostname: PGSQL12-01
     image:  yadamu/postgres:12 
@@ -63,6 +81,7 @@ services:
     restart: always
 
   PGSQL13-01: 
+    logging: *default-logging
     container_name: PGSQL13-01
     hostname: PGSQL13-01
     image:  yadamu/postgres:13 
@@ -84,6 +103,7 @@ services:
     restart: always
  
   PGSQL14-01: 
+    logging: *default-logging
     container_name: PGSQL14-01
     image:  yadamu/postgres:14
     build:
@@ -104,6 +124,7 @@ services:
     restart: always
  
   PGSQL15-01: 
+    logging: *default-logging
     container_name: PGSQL15-01
     hostname: PGSQL15-01
     image:  yadamu/postgres:15
@@ -125,6 +146,7 @@ services:
     restart: always
 
   PGSQL16-01: 
+    logging: *default-logging
     container_name: PGSQL16-01
     hostname: PGSQL16-01
     image:  yadamu/postgres:16
@@ -146,6 +168,7 @@ services:
     restart: always
 
   PGSQL17-01: 
+    logging: *default-logging
     container_name: PGSQL17-01
     hostname: PGSQL17-01
     image:  yadamu/postgres:17
@@ -167,6 +190,7 @@ services:
     restart: always
 
   PGSQL18-01: 
+    logging: *default-logging
     container_name: PGSQL18-01
     hostname: PGSQL18-01
     image:  yadamu/postgres:18

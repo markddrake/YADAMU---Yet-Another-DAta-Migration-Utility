@@ -6,6 +6,7 @@ import YadamuCLI          from './yadamuCLI.js'
 class DirectLoad extends YadamuCLI {}
 
 async function main() {
+  YadamuCLI.guardExitCode()
 
   try {
     const yadamuDirectLoad = new DirectLoad();
@@ -15,8 +16,10 @@ async function main() {
       yadamuDirectLoad.reportError(e)
 	}
     await yadamuDirectLoad.close();
+    YadamuCLI.setExitCode(yadamuDirectLoad.EXIT_CODE)
   } catch (e) {
 	YadamuLibrary.reportError(e)
+	YadamuCLI.setExitCode(YadamuCLI.getExitCode(e))
   }
 
 }

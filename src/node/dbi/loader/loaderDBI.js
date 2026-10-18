@@ -56,6 +56,7 @@ import ArrayOutputManager             from './arrayOutputManager.js'
 import CSVOutputManager               from './csvOutputManager.js'
 import CSVParser                      from './csvParser.js'
 import CSVTransform                   from './csvTransform.js'
+import DataFileSequence               from './dataFileSequence.js'
 
 /*
 **
@@ -326,7 +327,46 @@ class LoaderDBI extends YadamuDBI {
   }
   
   getDataFileName(tableName,partitionNumber) {	 
-    return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
+    // PARTITION_NUMBER is 1 based (see getSchemaMetadata()). The list is never consumed, so a retry reads the same file again.
+    return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files[partitionNumber-1] : this.controlFile.data[tableName].file 
+  }
+  
+  getDataFileNames(tableName) {
+    return Array.isArray(this.controlFile.data[tableName].files) ? this.controlFile.data[tableName].files : [this.controlFile.data[tableName].file]
+  }
+  
+  getOutputFileName(tableName) {
+	const tableData = this.controlFile.data[tableName]
+	if (!Array.isArray(tableData.files)) {
+	  return tableData.file
+	}
+	// A writer learns which partition a stream carries only when the data arrives, so the planned files are handed out in turn, from a list shared by all the workers.
+	// Each worker remembers the file it was given: truncateTable() deletes that file and the retried stream rewrites it, rather than taking the next file in the list.
+	this.OUTPUT_FILES = this.OUTPUT_FILES || {}
+	const outputFile = this.OUTPUT_FILES[tableName]
+	if (outputFile?.retry) {
+	  outputFile.retry = false
+	  return outputFile.file
+	}
+	const manager = this.isManager() ? this : this.manager
+	manager.UNASSIGNED_FILES = manager.UNASSIGNED_FILES || {}
+	manager.UNASSIGNED_FILES[tableName] = manager.UNASSIGNED_FILES[tableName] || [...tableData.files]
+	const file = manager.UNASSIGNED_FILES[tableName].shift()
+	this.OUTPUT_FILES[tableName] = { file: file, retry: false }
+	return file
+  }
+  
+  releaseOutputFile(tableName) {
+	// Return the file the current stream was writing, so it can be deleted before a retry, and keep it for the retried stream.
+	const tableData = this.controlFile.data[tableName]
+	if (!Array.isArray(tableData.files)) {
+	  return tableData.file
+	}
+	const outputFile = this.OUTPUT_FILES?.[tableName]
+	if (outputFile) {
+	  outputFile.retry = true
+	}
+	return outputFile?.file
   }
   
   async isValidCopyFormat(supportedFormats) {
@@ -448,11 +488,14 @@ class LoaderDBI extends YadamuDBI {
     })
 	
 	Object.values(this.metadata).forEach((tableMetadata) =>  {
-	  if (tableMetadata.partitionCount) {
+	  // Plan one file per partition only when the reader will deliver the table one partition at a time. Otherwise the whole table arrives as a single stream,
+	  // so plan a single file and drop partitionCount, which staged copy operations use to decide that dataFile is a list of files.
+	  if (tableMetadata.partitionCount && this.yadamu.PARTITION_LEVEL_READS) {
 		const padSize = tableMetadata.partitionCount.toString().length
 		this.controlFile.data[tableMetadata.tableName] = {files : new Array(tableMetadata.partitionCount).fill(0).map((v,i) => { return this.dataRelativePath(`${tableMetadata.tableName}.${(i+1).toString().padStart(padSize,"0")}`)})}
 	  }
 	  else {
+	    delete tableMetadata.partitionCount
 	    const file =  this.dataRelativePath(tableMetadata.tableName) 
         this.controlFile.data[tableMetadata.tableName] = {file : file }
       }
@@ -542,7 +585,7 @@ class LoaderDBI extends YadamuDBI {
   getFileOutputStream(tableName,pipelineState) {
 
     // this.LOGGER.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
-    const outputStream = fs.createWriteStream(this.makeAbsolute(this.getDataFileName(tableName)))
+    const outputStream = fs.createWriteStream(this.makeAbsolute(this.getOutputFileName(tableName)))
 	outputStream.PIPELINE_STATE = pipelineState
 	outputStream.STREAM_STATE = { 
 	  vendor : this.DATABASE_VENDOR
@@ -666,6 +709,25 @@ class LoaderDBI extends YadamuDBI {
 	return iv;
   }	
   
+  async getDecoders(filename) {
+
+	const decoders = []
+	
+	if (this.ENCRYPTED_INPUT) {
+	  const iv = await this.loadInitializationVector(filename)
+	  decoders.push(new IVReader(this.IV_LENGTH))
+  	  // this.LOGGER.trace([this.constructor.name,'DECRYPTION',this.yadamu.parameters.ENCRYPTION_KEY_AVAILABLE,this.parameters.ENCRYPTION_KEY_AVAILABLE,this.CIPHER,this.ENCRYPTION_KEY.toString('hex'), Buffer.from(iv).toString('hex')],'Generating CIPHER stream')
+      const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.ENCRYPTION_KEY,iv)
+	  decoders.push(decipherStream)
+	}
+
+	if (this.COMPRESSED_INPUT) {
+      decoders.push(this.controlFile.settings.compression === 'GZIP' ? createGunzip() : createInflate())
+	}
+	
+	return decoders
+  }
+  
   async getInputStreams(tableInfo,pipelineState) {
 	  
     this.PIPELINE_STATE = pipelineState
@@ -673,9 +735,11 @@ class LoaderDBI extends YadamuDBI {
 	this.resetExceptionTracking()
 	
 	const streams = []
-	const filename = this.makeAbsolute(this.getDataFileName(tableInfo.TABLE_NAME))
+	// A partition level read reads the partition's file. Otherwise every file staged for the table is read, in order, as a single stream.
+	const filenames = (tableInfo.hasOwnProperty('PARTITION_NUMBER') ? [this.getDataFileName(tableInfo.TABLE_NAME,tableInfo.PARTITION_NUMBER)] : this.getDataFileNames(tableInfo.TABLE_NAME)).map((filename) => { return this.makeAbsolute(filename) })
+	const filename = filenames.length === 1 ? filenames[0] : `${filenames[0]} ... ${filenames[filenames.length-1]}`
 
-    const inputStream = await this.getInputStream(filename,pipelineState)
+    const inputStream = filenames.length === 1 ? await this.getInputStream(filename,pipelineState) : this.trackInputStream(DataFileSequence.createReadStream(this,filenames,this.controlFile.settings.contentType),filename,pipelineState)
     const inputStreamState = inputStream.STREAM_STATE
 	
 	inputStream.once('readable',() => {
@@ -691,16 +755,9 @@ class LoaderDBI extends YadamuDBI {
 	
 	streams.push(inputStream)
 	
-	if (this.ENCRYPTED_INPUT) {
-	  const iv = await this.loadInitializationVector(filename)
-	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // this.LOGGER.trace([this.constructor.name,'DECRYPTION',this.yadamu.parameters.ENCRYPTION_KEY_AVAILABLE,this.parameters.ENCRYPTION_KEY_AVAILABLE,this.CIPHER,this.ENCRYPTION_KEY.toString('hex'), Buffer.from(iv).toString('hex')],'Generating CIPHER stream')
-      const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.ENCRYPTION_KEY,iv)
-	  streams.push(decipherStream)
-	}
-
-	if (this.COMPRESSED_INPUT) {
-      streams.push(this.controlFile.settings.compression === 'GZIP' ? createGunzip() : createInflate())
+	if (filenames.length === 1) {
+	  // A DataFileSequence decodes each file itself
+	  streams.push(...await this.getDecoders(filename))
 	}
 	
 	let parser
@@ -828,8 +885,10 @@ class LoaderDBI extends YadamuDBI {
 
   async truncateTable(schema,tableName) {
 
-    const datafilePath = this.makeAbsolute(this.getDataFileName(tableName));
-    await fsp.rm(datafilePath)
+    const dataFile = this.releaseOutputFile(tableName)
+    if (dataFile) {
+      await fsp.rm(this.makeAbsolute(dataFile),{force: true})
+    }
 	
   }
 

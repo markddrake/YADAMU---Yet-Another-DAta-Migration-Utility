@@ -1,0 +1,192 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "CHAR"
+  , "VARCHAR_TYPE"                                         : "VARCHAR"
+  , "NCHAR_TYPE"                                           : "NCHAR"
+  , "NVARCHAR_TYPE"                                        : "NVARCHAR"
+
+  , "BINARY_TYPE"                                          : "BLOB"
+  , "VARBINARY_TYPE"                                       : "BLOB"
+  , "BIT_STRING_TYPE"                                      : "BIT_STRING_TEXT"
+  , "VARBIT_STRING_TYPE"                                   : "VARBIT_STRING_TEXT"
+
+  , "TINYINT_TYPE"                                         : "INTEGER"
+  , "SMALLINT_TYPE"                                        : "INTEGER"
+  , "MEDIUMINT_TYPE"                                       : "INTEGER"
+  , "INTEGER_TYPE"                                         : "INTEGER"
+  , "BIGINT_TYPE"                                          : "INTEGER"
+
+  , "NUMERIC_TYPE"                                         : "NUMERIC_TEXT"
+  , "DECIMAL_TYPE"                                         : "DECIMAL_TEXT"
+  , "NUMBER_TYPE"                                          : "NUMBER_TEXT"
+
+  , "FLOAT_TYPE"                                           : "REAL"
+  , "DOUBLE_TYPE"                                          : "REAL"
+  , "REAL_TYPE"                                            : "REAL"
+
+  , "DATE_TYPE"                                            : "DATE_TEXT"
+  , "TIME_TYPE"                                            : "TIME_TEXT"
+  , "DATETIME_TYPE"                                        : "DATETIME_TEXT"
+  , "TIMESTAMP_TYPE"                                       : "TIMESTAMP_TEXT"
+  , "TIMESTAMP_TZ_TYPE"                                    : "TIMESTAMP_TZ_TEXT"
+  , "TIMESTAMP_LTZ_TYPE"                                   : "TIMESTAMP_LTZ_TEXT"
+  , "INTERVAL_TYPE"                                        : "DURATION_TEXT"
+  , "YEAR_TYPE"                                            : "INTEGER"
+
+  , "BOOLEAN_TYPE"                                         : "INTEGER"
+
+  , "CLOB_TYPE"                                            : "TEXT"
+  , "BLOB_TYPE"                                            : "BLOB"
+
+  , "JSON_TYPE"                                            : "JSON_TEXT"
+  , "XML_TYPE"                                             : "XML_TEXT"
+
+  , "SPATIAL_TYPE"                                         : "GEOMETRY"
+  , "GEOMETRY_TYPE"                                        : "GEOMETRY"
+  , "GEOGRAPHY_TYPE"                                       : "GEOMETRY"
+  , "POINT_TYPE"                                           : "GEOMETRY"
+  , "LINE_TYPE"                                            : "GEOMETRY"
+  , "POLYGON_TYPE"                                         : "GEOMETRY"
+  , "MULTI_POINT_TYPE"                                     : "GEOMETRY"
+  , "MULTI_LINE_TYPE"                                      : "GEOMETRY"
+  , "MULTI_POLYGON_TYPE"                                   : "GEOMETRY"
+  , "GEOMETRY_COLLECTION_TYPE"                             : "GEOMETRY"
+  , "BOX_TYPE"                                             : "GEOMETRY"
+  , "PATH_TYPE"                                            : "GEOMETRY"
+
+  , "UUID_TYPE"                                            : "UUID_TEXT"
+  , "USER_DEFINED_TYPE"                                    : "USER_DEFINED_TEXT"
+
+  , "ORACLE_ROWID_TYPE"                                    : "ORACLE_ROWID_TEXT"
+  , "ORACLE_BFILE_TYPE"                                    : "ORACLE_BFILE_TEXT"
+  , "ORACLE_ANYDATA_TYPE"                                  : "ORACLE_ANYDATA_TEXT"
+  , "ORACLE_OBJECT_TYPE"                                   : "ORACLE_OBJECT_TEXT"
+  , "ORACLE_UNBOUNDED_NUMBER_TYPE"                         : "REAL"
+
+  , "MSSQL_MONEY_TYPE"                                     : "MSSQL_MONEY_TEXT"
+  , "MSSQL_SMALLMONEY_TYPE"                                : "MSSQL_SMALLMONEY_TEXT"
+  , "MSSQL_ROWVERSION_TYPE"                                : "BLOB"
+  , "MSSQL_HIERARCHY_ID_TYPE"                              : "MSSQL_HIERARCHY_ID_TEXT"
+  , "MSSQL_TEXT_TYPE"                                      : "MSSQL_TEXT"
+  , "MSSQL_NTEXT_TYPE"                                     : "MSSQL_NTEXT"
+  , "MSSQL_IMAGE_TYPE"                                     : "BLOB"
+
+  , "PGSQL_NAME_TYPE"                                      : "PGSQL_NAME_TEXT"
+  , "PGSQL_BPCHAR_TYPE"                                    : "BPCHAR"
+  , "PGSQL_MONEY_TYPE"                                     : "PGSQL_MONEY_TEXT"
+  , "PGSQL_BINARY_JSON_TYPE"                               : "PGSQL_BINARY_JSON_TEXT"
+  , "PGSQL_LINE_EQ_TYPE"                                   : "GEOMETRY"
+  , "PGSQL_CIRCLE_TYPE"                                    : "GEOMETRY"
+  , "PGSQL_CIDR_ADDR_TYPE"                                 : "PGSQL_CIDR_ADDR_TEXT"
+  , "PGSQL_INET_ADDR_TYPE"                                 : "PGSQL_INET_ADDR_TEXT"
+  , "PGSQL_MAC_ADDR_TYPE"                                  : "PGSQL_MAC_ADDR_TEXT"
+  , "PGSQL_MAC_ADDR8_TYPE"                                 : "PGSQL_MAC_ADDR8_TEXT"
+  , "PGSQL_RANGE_INT4_TYPE"                                : "PGSQL_RANGE_I4_TEXT"
+  , "PGSQL_RANGE_INT8_TYPE"                                : "PGSQL_RANGE_I8_TEXT"
+  , "PGSQL_RANGE_NUM_TYPE"                                 : "PGSQL_RANGE_NUM_TEXT"
+  , "PGSQL_RANGE_TIMESTAMP_TYPE"                           : "PGSQL_RANGE_TIMESTAMP_TEXT"
+  , "PGSQL_RANGE_TIMESTAMP_TZ_TYPE"                        : "PGSQL_RANGE_TIMESTAMP_TZ_TEXT"
+  , "PGSQL_RANGE_DATE_TYPE"                                : "PGSQL_RANGE_DATE_TEXT"
+  , "PGSQL_TEXTSEACH_VECTOR_TYPE"                          : "PGSQL_TEXTSEACH_VECTOR"
+  , "PGSQL_TEXTSEACH_QUERY_TYPE"                           : "PGSQL_TEXTSEACH_QUERY"
+  , "PGSQL_IDENTIFIER_TYPE"                                : "INTEGER"
+  , "PGSQL_OID_TYPE"                                       : "INTEGER"
+  , "PGSQL_REG_CLASS_TYPE"                                 : "PGSQL_REG_CLASS_TEXT"
+  , "PGSQL_REG_COLLATION_TYPE"                             : "PGSQL_REG_COLLATION_TEXT"
+  , "PGSQL_REG_TEXTSEARCH_CONFIG_TYPE"                     : "PGSQL_REG_TEXTSEARCH_CONFIG"
+  , "PGSQL_REG_TEXTSEARCH_DICT_TYPE"                       : "PGSQL_REG_TEXTSEARCH_DICT"
+  , "PGSQL_REG_NAMESPACE_TYPE"                             : "PGSQL_REG_NAMESPACE_TEXT"
+  , "PGSQL_REG_OPERATOR_NAME_TYPE"                         : "PGSQL_REG_OPERATOR_NAME_TEXT"
+  , "PGSQL_REG_OPERATOR_ARGS_TYPE"                         : "PGSQL_REG_OPERATOR_ARGS_TEXT"
+  , "PGSQL_REG_FUNCTION_NAME_TYPE"                         : "PGSQL_REG_FUNCTION_NAME_TEXT"
+  , "PGSQL_REG_FUNCTION_ARGS_TYPE"                         : "PGSQL_REG_FUNCTION_ARGS_TEXT"
+  , "PGSQL_REG_ROLE_TYPE"                                  : "PGSQL_REG_ROLE_TEXT"
+  , "PGSQL_REG_TYPE_TYPE"                                  : "PGSQL_REG_TYPE_TEXT"
+  , "PGSQL_TID_TYPE"                                       : "PGSQL_TID_TEXT"
+  , "PGSQL_XID_TYPE"                                       : "PGSQL_XID_TEXT"
+  , "PGSQL_CID_TYPE"                                       : "PGSQL_CID_TEXT"
+  , "PGSQL_TXID_SNAPSHOT_TYPE"                             : "PGSQL_TXID_SNAPSHOT_TEXT"
+  , "PGSQL_GTSVECTOR_TYPE"                                 : "PGSQL_GTSVECTOR_TEXT"
+  , "PGSQL_ACLITEM"                                        : "PGSQL_ACLITEM_TEXT"
+  , "PGSQL_REFCURSOR"                                      : "PGSQL_REFCURSOR_TEXT"
+  , "PGSQL_VECTOR_TYPE"                                    : "PGSQL_VECTOR_TEXT"
+  , "PGSQL_HALF_VECTOR_TYPE"                               : "PGSQL_HALFVEC_TEXT"
+  , "PGSQL_SPARSE_VECTOR_TYPE"                             : "PGSQL_SPARSEVEC_TEXT"
+
+  , "MYSQL_SET_TYPE"                                       : "MYSQL_SET_TEXT"
+  , "MYSQL_ENUM_TYPE"                                      : "MYSQL_ENUM_TEXT"
+  , "MYSQL_LONGTEXT_TYPE"                                  : "MYSQL_LONGTEXT"
+  , "MYSQL_MEDIUMTEXT_TYPE"                                : "MYSQL_MEDIUMTEXT"
+  , "MYSQL_TEXT_TYPE"                                      : "MYSQL_TEXT"
+  , "MYSQL_TINYTEXT_TYPE"                                  : "MYSQL_TINYTEXT"
+  , "MYSQL_LONGBLOB_TYPE"                                  : "BLOB"
+  , "MYSQL_MEDIUMBLOB_TYPE"                                : "BLOB"
+  , "MYSQL_BLOB_TYPE"                                      : "BLOB"
+  , "MYSQL_TINYBLOB_TYPE"                                  : "BLOB"
+
+  , "MONGO_OBJECTID_TYPE"                                  : "BLOB"
+  , "MONGO_DECIMAL128_TYPE"                                : "MONGO_DECIMAL128_TEXT"
+  , "MONGO_ARRAY_TYPE"                                     : "MONGO_ARRAY_TEXT"
+  , "MONGO_OBJECT_TYPE"                                    : "MONGO_OBJECT_TEXT"
+  , "MONGO_NULL_TYPE"                                      : "MONGO_NULL_TEXT"
+  , "MONGO_REGEX_TYPE"                                     : "MONGO_REGEX_TEXT"
+  , "MONGO_JS_TYPE"                                        : "MONGO_JS_TEXT"
+  , "MONGO_SCOPED_JS_TYPE"                                 : "MONGO_SCOPED_JS_TEXT"
+  , "MONGO_MINKEY_TYPE"                                    : "MONGO_MINKEY_TEXT"
+  , "MONGO_MAXKEY_TYPE"                                    : "MONGO_MAXKEY_TEXT"
+  , "MONGO_UNDEFINED_TYPE"                                 : "MONGO_UNDEFINED_TEXT"
+  , "MONGO_DBPOINTER_TYPE"                                 : "MONGO_DBPTR_TEXT"
+  , "MONGO_FUNCTION_TYPE"                                  : "MONGO_FUNCTION_TEXT"
+  , "MONGO_SYMBOL_TYPE"                                    : "MONGO_SYMBOL_TEXT"
+
+  , "SNOWFLAKE_VARIANT_TYPE"                               : "SNOWFLAKE_VARIANT_TEXT"
+
+  , "IBMDB2_DECFLOAT_TYPE"                                 : "IBMDB2_DECFLOAT_TEXT"
+  , "IBMDB2_DECFLOAT16_TYPE"                               : "IBMDB2_DECFLOAT16_TEXT"
+  , "IBMDB2_DECFLOAT34_TYPE"                               : "IBMDB2_DECFLOAT34_TEXT"
+
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "UNBOUNDED_NUMERIC_TEXT"
+  , "INTERVAL_DAY_TO_SECOND_TYPE"                          : "DURATION_DAY_TO_SECOND_TEXT"
+  , "INTERVAL_YEAR_TO_MONTH_TYPE"                          : "DURATION_YEAR_TO_MONTH_TEXT"
+  , "INTERVAL_YEAR_TO_MONTH"                               : "DURATION_YEAR_TO_MONTH_TEXT"
+  , "INTERVAL_DAY_TO_HOUR_TYPE"                            : "DURATION_DAY_TO_HOUR_TEXT"
+  , "INTERVAL_DAY_TO_MINUTE_TYPE"                          : "DURATION_DAY_TO_MINUTE_TEXT"
+  , "INTERVAL_DAY_TYPE"                                    : "DURATION_DAY_TEXT"
+  , "INTERVAL_HOUR_TO_MINUTE_TYPE"                         : "DURATION_HOUR_TO_MINUTE_TEXT"
+  , "INTERVAL_HOUR_TO_SECOND_TYPE"                         : "DURATION_HOUR_TO_SECOND_TEXT"
+  , "INTERVAL_HOUR_TYPE"                                   : "DURATION_HOUR_TEXT"
+  , "INTERVAL_MINUTE_TO_SECOND_TYPE"                       : "DURATION_MINUTE_TO_SECOND_TEXT"
+  , "INTERVAL_MINUTE_TYPE"                                 : "DURATION_MINUTE_TEXT"
+  , "INTERVAL_SECOND_TYPE"                                 : "DURATION_SECOND_TEXT"
+  , "TIME_TZ_TYPE"                                         : "TIME_TZ_TEXT"
+  , "NCLOB_TYPE"                                           : "TEXT"
+  , "MSSQL_DATETIME_TYPE"                                  : "MSSQL_DATETIME_TEXT"
+  , "MSSQL_SMALLDATETIME_TYPE"                             : "MSSQL_SMALLDATETIME_TEXT"
+  , "PERIOD_DAY_TYPE"                                      : "PERIOD_DAY_TEXT"
+  , "PERIOD_TIME_TYPE"                                     : "PERIOD_TIME_TEXT"
+  , "PERIOD_TIME_TZ_TYPE"                                  : "PERIOD_TIME_TZ_TEXT"
+  , "PERIOD_TIMESTAMP_TYPE"                                : "PERIOD_TIMESTAMP_TEXT"
+  , "PERIOD_TIMESTAMP_TZ_TYPE"                             : "PERIOD_TIMESTAMP_TZ_TEXT"
+  , "TD_ANYTYPE_TYPE"                                      : "TD_ANYTYPE_TEXT"
+  , "TD_ARRAY_MULTI_TYPE"                                  : "TD_ARRAY_MULTI_TEXT"
+  , "TD_ARRAY_SINGLE_TYPE"                                 : "TD_ARRAY_SINGLE_TEXT"
+  , "TD_UDT_TYPE"                                          : "TD_UDT_TEXT"
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 1000000000
+  , "CHAR_LENGTH"                                          : 1000000000
+  , "VARCHAR_LENGTH"                                       : 1000000000
+  , "BINARY_LENGTH"                                        : 1000000000
+  , "VARBINARY_LENGTH"                                     : 1000000000
+  , "NUMERIC_PRECISION"                                    : 15
+  , "NUMERIC_SCALE"                                        : 15
+  , "TIMESTAMP_PRECISION"                                  : 12
+  , "LOB_LENGTH"                                           : 1000000000
+  , "CLOB_LENGTH"                                          : 1000000000
+  , "BLOB_LENGTH"                                          : 1000000000
+  }
+, "storageOptions": {
+    "SPATIAL_FORMAT"                                       : "GeoJSON"
+  , "BOOLEAN_TYPE"                                         : "INTEGER"
+  }
+}

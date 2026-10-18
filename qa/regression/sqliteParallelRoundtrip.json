@@ -1,0 +1,51 @@
+{
+    "connections": "connections.json",
+    "operation": "dbRoundtrip",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "tests": [
+        {
+            "source": "mssql#1",
+            "target": "sqlite#2",
+            "parameters": {
+                "PARALLEL": 0
+            },
+            "tasks": [
+                "AdventureWorks"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "sqlite#2",
+            "parameters": {
+                "PARALLEL": 8
+            },
+            "tasks": [
+                "AdventureWorks"
+            ]
+        },
+        {
+            "source": "sqlite#2",
+            "target": "mssql#1",
+            "parameters": {
+                "PARALLEL": 8
+            },
+            "tasks": [
+                "AdventureWorks"
+            ]
+        },
+        {
+            "source": "postgres#1",
+            "target": "sqlite#2",
+            "parameters": {
+                "PARALLEL": 1
+            },
+            "tasks": [
+                "HR",
+                "BI"
+            ]
+        }
+    ]
+}

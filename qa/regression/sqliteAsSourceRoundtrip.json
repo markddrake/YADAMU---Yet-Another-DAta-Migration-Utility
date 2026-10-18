@@ -1,0 +1,40 @@
+{
+    "connections": "connections.json",
+    "operation": "dbRoundtrip",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "tests": [
+        {
+            "source": "sqlite#2",
+            "targets": [
+                "oracle#1",
+                "mssql#1",
+                "postgres#1",
+                "mysql#1"
+            ],
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "sqlite#2",
+            "targets": [
+                "oracle#2",
+                "oracle#3",
+                "oracle#4",
+                "mssql#2",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "HR",
+                "sakila",
+                "Northwind"
+            ]
+        }
+    ]
+}

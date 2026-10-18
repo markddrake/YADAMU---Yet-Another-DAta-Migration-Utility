@@ -1,0 +1,742 @@
+{
+	"connections": {
+		"oracle#1": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB11903"
+			}
+		},
+		"oracle23ai": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB12305"
+			}
+		},
+		"oracle21c": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB12103"
+			}
+		},
+		"oracle19c": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB11903"
+			}
+		},
+		"oracle18c": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB11803"
+			}
+		},
+		"oracle12c": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB11220"
+			}
+		},
+		"oracle11g": {
+			"oracle": {
+				"user": "SYSTEM",
+				"password": "oracle",
+				"connectString": "YDB11120"
+			}
+		},
+		"mssql#1": {
+			"mssql": {
+				"user": "sa",
+				"server": "yadamu-db1",
+				"database": "master",
+				"password": "oracle#1",
+				"requestTimeout": 360000000,
+				"options": {
+					"encrypt": false,
+					"abortTransactionOnError": false
+				}
+			}
+		},
+		"mssql22": {
+			"mssql": {
+				"user": "sa",
+				"server": "yadamu-db1",
+				"database": "master",
+				"password": "oracle#1",
+				"requestTimeout": 360000000,
+				"options": {
+					"encrypt": false,
+					"abortTransactionOnError": false
+				}
+			}
+		},
+		"mssql19": {
+			"mssql": {
+				"user": "sa",
+				"server": "yadamu-db1",
+				"database": "master",
+				"password": "oracle#1",
+				"port": 14333,
+				"requestTimeout": 360000000,
+				"options": {
+					"encrypt": false,
+					"abortTransactionOnError": false
+				}
+			}
+		},
+		"mssql17": {
+			"mssql": {
+				"user": "sa",
+				"server": "yadamu-db1",
+				"database": "master",
+				"port": 14332,
+				"password": "oracle#1",
+				"requestTimeout": 360000000,
+				"options": {
+					"encrypt": false,
+					"abortTransactionOnError": false
+				}
+			}
+		},
+		"mssql14": {
+			"mssql": {
+				"user": "sa",
+				"server": "yadamu-lap",
+				"database": "master",
+				"password": "Oracle#1",
+				"requestTimeout": 360000000,
+				"options": {
+					"encrypt": false,
+					"abortTransactionOnError": false
+				}
+			}
+		},
+		"mssql12": {
+			"mssql": {
+				"user": "sa",
+				"server": "192.168.1.239",
+				"database": "master",
+				"password": "oracle#1",
+				"requestTimeout": 360000000,
+				"options": {
+					"encrypt": false,
+					"abortTransactionOnError": false
+				}
+			}
+		},
+		"postgres#1": {
+			"postgres": {
+				"user": "postgres",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 5432
+			}
+		},
+		"postgres16": {
+			"postgres": {
+				"user": "postgres",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 54326
+			}
+		},
+		"postgres15": {
+			"postgres": {
+				"user": "postgres",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 54325
+			}
+		},
+		"postgres14": {
+			"postgres": {
+				"user": "postgres",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 54324
+			}
+		},
+		"postgres13": {
+			"postgres": {
+				"user": "postgres",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 54323
+			}
+		},
+		"mysql#1": {
+			"mysql": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "sys",
+				"password": "oracle",
+				"port": 3306,
+				"multipleStatements": true,
+				"typeCast": true,
+				"supportBigNumbers": true,
+				"bigNumberStrings": true,
+				"dateStrings": true
+			}
+		},
+		"mysql91": {
+			"mysql": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "sys",
+				"password": "oracle",
+				"port": 3306,
+				"multipleStatements": true,
+				"typeCast": true,
+				"supportBigNumbers": true,
+				"bigNumberStrings": true,
+				"dateStrings": true
+			}
+		},
+		"mysql80": {
+			"mysql": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "sys",
+				"password": "oracle",
+				"port": 33061,
+				"multipleStatements": true,
+				"typeCast": true,
+				"supportBigNumbers": true,
+				"bigNumberStrings": true,
+				"dateStrings": true
+			}
+		},
+		"mariadb#1": {
+			"mariadb": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "mysql",
+				"password": "oracle",
+				"port": 3307,
+				"multipleStatements": true,
+				"typeCast": true,
+				"supportBigNumbers": true,
+				"bigNumberStrings": true,
+				"dateStrings": true
+			}
+		},
+		"mariadb11": {
+			"mariadb": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "mysql",
+				"password": "oracle",
+				"port": 3307,
+				"multipleStatements": true,
+				"typeCast": true,
+				"supportBigNumbers": true,
+				"bigNumberStrings": true,
+				"dateStrings": true
+			}
+		},
+		"mariadb10": {
+			"mariadb": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "mysql",
+				"password": "oracle",
+				"port": 33071,
+				"multipleStatements": true,
+				"typeCast": true,
+				"supportBigNumbers": true,
+				"bigNumberStrings": true,
+				"dateStrings": true
+			}
+		},
+		"mongodb#1": {
+			"mongodb": {
+				"host": "yadamu-db1",
+				"port": 27017,
+				"options": {
+					"socketTimeoutMS": 900000
+				}
+			}
+		},
+		"mongodb70": {
+			"mongodb": {
+				"host": "yadamu-db1",
+				"port": 27017,
+				"options": {
+					"socketTimeoutMS": 900000
+				}
+			}
+		},
+		"mongodb60": {
+			"mongodb": {
+				"host": "yadamu-db1",
+				"port": 27020,
+				"options": {
+					"socketTimeoutMS": 900000
+				}
+			}
+		},
+		"mongodb50": {
+			"mongodb": {
+				"host": "yadamu-db1",
+				"port": 27019,
+				"options": {
+					"socketTimeoutMS": 900000
+				}
+			}
+		},
+		"mongodb40": {
+			"mongodb": {
+				"host": "yadamu-db1",
+				"port": 27018,
+				"options": {
+					"socketTimeoutMS": 900000
+				}
+			}
+		},
+		"vertica#1": {
+			"vertica": {
+				"user": "dbadmin",
+				"host": "yadamu-db1",
+				"database": "VMart",
+				"password": "oracle",
+				"port": 5433
+			},
+			"parameters": {
+				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+				"LOCAL_STAGING_AREA": "c:\\stagingArea\\db\\vertica"
+			}
+		},
+		"vertica09": {
+			"vertica": {
+				"user": "dbadmin",
+				"host": "yadamu-db1",
+				"database": "docker",
+				"password": "oracle",
+				"port": 54331
+			},
+			"parameters": {
+				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+				"LOCAL_STAGING_AREA": "y:\\stagingArea\\db\\vertica"
+			}
+		},
+		"vertica10": {
+			"vertica": {
+				"user": "dbadmin",
+				"host": "yadamu-db1",
+				"database": "VMart",
+				"password": "oracle",
+				"port": 54332
+			},
+			"parameters": {
+				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+				"LOCAL_STAGING_AREA": "c:\\stagingArea\\db\\vertica"
+			}
+		},
+		"vertica11": {
+			"vertica": {
+				"user": "dbadmin",
+				"host": "yadamu-db1",
+				"database": "VMart",
+				"password": "oracle",
+				"port": 54333
+			},
+			"parameters": {
+				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+				"LOCAL_STAGING_AREA": "c:\\stagingArea\\db\\vertica"
+			}
+		},
+		"vertica12": {
+			"vertica": {
+				"user": "dbadmin",
+				"host": "yadamu-db1",
+				"database": "VMart",
+				"password": "oracle",
+				"port": 54334
+			},
+			"parameters": {
+				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+				"LOCAL_STAGING_AREA": "c:\\stagingArea\\db\\vertica"
+			}
+		},
+		"vertica23": {
+			"vertica": {
+				"user": "dbadmin",
+				"host": "yadamu-db1",
+				"database": "VMart",
+				"password": "oracle",
+				"port": 5433
+			},
+			"parameters": {
+				"REMOTE_STAGING_AREA": "/mnt/shared/stagingArea/db/vertica",
+				"LOCAL_STAGING_AREA": "c:\\stagingArea\\db\\vertica"
+			}
+		},
+		"db2#1": {
+			"db2": {
+				"user": "DB2INST1",
+				"host": "yadamu-db1",
+				"database": "YADAMU",
+				"password": "oracle",
+				"port": 50000
+			}
+		},
+		"yugabyte#1": {
+			"yugabyte": {
+				"user": "postgres",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 5533
+			}
+		},
+		"croach#1": {
+			"cockroach": {
+				"user": "root",
+				"host": "yadamu-db1",
+				"database": "yadamu",
+				"password": "oracle",
+				"port": 26257
+			}
+		},
+		"tera#1": {
+			"teradata": {
+				"host": "yadamu-db1",
+				"user": "dbc",
+				"password": "dbc",
+				"log": "0"
+			}
+		},
+		"minio#1": {
+			"awsS3": {
+				"accessKeyId": "AKIAIOSFODNN7EXAMPLE",
+				"secretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"region": "us-east-1",
+				"endpoint": "http://yadamu-db1:9000",
+				"s3ForcePathStyle": true,
+				"signatureVersion": "v4"
+			},
+			"settings": {
+				"directory": "aws"
+			}
+		},
+		"azurite#1": {
+			"azure": {
+				"connection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
+			},
+			"settings": {
+				"directory": "azure"
+			}
+		},
+		"file-YADAMU_HOME": {
+			"file": {
+				"directory": ""
+			}
+		},
+		"file-YADAMU_HOME-x": {
+			"file": {
+				"directory": "x:\\"
+			}
+		},
+		"file-ROOT": {
+			"file": {
+				"directory": "c:\\"
+			}
+		},
+		"file-staging": {
+			"file": {
+				"directory": "c:\\stagingArea"
+			}
+		},
+		"file-staging-x": {
+			"file": {
+				"directory": "x:\\stagingArea"
+			}
+		},
+		"file-lRegress": {
+			"file": {
+				"directory": "c:\\longRegress"
+			}
+		},
+		"file-lRegress-x": {
+			"file": {
+				"directory": "x:\\longRegress"
+			}
+		},
+		"file-sRegress": {
+			"file": {
+				"directory": "c:\\shortRegress"
+			}
+		},
+		"file-sRegress-x": {
+			"file": {
+				"directory": "x:\\shortRegress"
+			}
+		},
+		"loader-YADAMU_HOME": {
+			"loader": {
+				"directory": "c:\\"
+			}
+		},
+		"loader-ROOT": {
+			"loader": {
+				"directory": "c:\\"
+			}
+		},
+		"loader-staging": {
+			"loader": {
+				"directory": "x:\\stagingArea"
+			}
+		},
+		"loader-lRegress": {
+			"loader": {
+				"directory": "c:\\longRegress\\loader"
+			}
+		},
+		"loader-sRegress": {
+			"loader": {
+				"directory": "c:\\shortRegress\\loader"
+			}
+		}
+	},
+	"schemas": {
+		"ADVWRK": {
+			"schema": "ADVWRK"
+		},
+		"ADVWRK1": {
+			"schema": "ADVWRK1"
+		},
+		"ADVWRK2": {
+			"schema": "ADVWRK2"
+		},
+		"AdventureWorksAll": {
+			"schema": "AdventureWorksAll"
+		},
+		"AdventureWorksAll1": {
+			"schema": "AdventureWorksAll1"
+		},
+		"AdventureWorksAll2": {
+			"schema": "AdventureWorksAll2"
+		},
+		"AdventureWorksDW": {
+			"schema": "AdventureWorksDW"
+		},
+		"AdventureWorksDW1": {
+			"schema": "AdventureWorksDW1"
+		},
+		"AdventureWorksDW2": {
+			"schema": "AdventureWorksDW2"
+		},
+		"BI": {
+			"schema": "BI"
+		},
+		"BI1": {
+			"schema": "BI1"
+		},
+		"BI2": {
+			"schema": "BI2"
+		},
+		"HR": {
+			"schema": "HR"
+		},
+		"HR1": {
+			"schema": "HR1"
+		},
+		"HR2": {
+			"schema": "HR2"
+		},
+		"HumanResources": {
+			"schema": "HumanResources"
+		},
+		"HumanResources1": {
+			"schema": "HumanResources1"
+		},
+		"HumanResources2": {
+			"schema": "HumanResources2"
+		},
+		"IX": {
+			"schema": "IX"
+		},
+		"IX1": {
+			"schema": "IX1"
+		},
+		"IX2": {
+			"schema": "IX2"
+		},
+		"Northwind": {
+			"schema": "Northwind"
+		},
+		"Northwind1": {
+			"schema": "Northwind1"
+		},
+		"Northwind2": {
+			"schema": "Northwind2"
+		},
+		"OE": {
+			"schema": "OE"
+		},
+		"OE1": {
+			"schema": "OE1"
+		},
+		"OE2": {
+			"schema": "OE2"
+		},
+		"PM": {
+			"schema": "PM"
+		},
+		"PM1": {
+			"schema": "PM1"
+		},
+		"PM2": {
+			"schema": "PM2"
+		},
+		"Person": {
+			"schema": "Person"
+		},
+		"Person1": {
+			"schema": "Person1"
+		},
+		"Person2": {
+			"schema": "Person2"
+		},
+		"Production": {
+			"schema": "Production"
+		},
+		"Production1": {
+			"schema": "Production1"
+		},
+		"Production2": {
+			"schema": "Production2"
+		},
+		"Purchasing": {
+			"schema": "Purchasing"
+		},
+		"Purchasing1": {
+			"schema": "Purchasing1"
+		},
+		"Purchasing2": {
+			"schema": "Purchasing2"
+		},
+		"SH": {
+			"schema": "SH"
+		},
+		"SH1": {
+			"schema": "SH1"
+		},
+		"SH2": {
+			"schema": "SH2"
+		},
+		"Sales": {
+			"schema": "Sales"
+		},
+		"Sales1": {
+			"schema": "Sales1"
+		},
+		"Sales2": {
+			"schema": "Sales2"
+		},
+		"WWI_Application": {
+			"schema": "WWI_Application"
+		},
+		"WWI_Application1": {
+			"schema": "WWI_Application1"
+		},
+		"WWI_Application2": {
+			"schema": "WWI_Application2"
+		},
+		"WWI_Dimension": {
+			"schema": "WWI_Dimension"
+		},
+		"WWI_Dimension1": {
+			"schema": "WWI_Dimension1"
+		},
+		"WWI_Dimension2": {
+			"schema": "WWI_Dimension2"
+		},
+		"WWI_Fact": {
+			"schema": "WWI_Fact"
+		},
+		"WWI_Fact1": {
+			"schema": "WWI_Fact1"
+		},
+		"WWI_Fact2": {
+			"schema": "WWI_Fact2"
+		},
+		"WWI_Integration": {
+			"schema": "WWI_Integration"
+		},
+		"WWI_Integration1": {
+			"schema": "WWI_Integration1"
+		},
+		"WWI_Integration2": {
+			"schema": "WWI_Integration2"
+		},
+		"WWI_Purchasing": {
+			"schema": "WWI_Purchasing"
+		},
+		"WWI_Purchasing1": {
+			"schema": "WWI_Purchasing1"
+		},
+		"WWI_Purchasing2": {
+			"schema": "WWI_Purchasing2"
+		},
+		"WWI_Sales": {
+			"schema": "WWI_Sales"
+		},
+		"WWI_Sales1": {
+			"schema": "WWI_Sales1"
+		},
+		"WWI_Sales2": {
+			"schema": "WWI_Sales2"
+		},
+		"WWI_Warehouse": {
+			"schema": "WWI_Warehouse"
+		},
+		"WWI_Warehouse1": {
+			"schema": "WWI_Warehouse1"
+		},
+		"WWI_Warehouse2": {
+			"schema": "WWI_Warehouse2"
+		},
+		"jtest": {
+			"schema": "jtest"
+		},
+		"jtest1": {
+			"schema": "jtest1"
+		},
+		"jtest2": {
+			"schema": "jtest2"
+		},
+		"sakila": {
+			"schema": "sakila"
+		},
+		"sakila1": {
+			"schema": "sakila1"
+		},
+		"sakila2": {
+			"schema": "sakila2"
+		},
+		"t_postgres": {
+			"schema": "t_postgres"
+		},
+		"t_postgres1": {
+			"schema": "t_postgres1"
+		},
+		"t_postgres2": {
+			"schema": "t_postgres2"
+		}
+	},
+	"jobs": {},
+	"parameters" : {
+	   "encryption" : false
+	}
+}

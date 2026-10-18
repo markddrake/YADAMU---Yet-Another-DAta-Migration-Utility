@@ -5,6 +5,10 @@ import path             from 'path';
 import assert           from 'assert';
 
 import { 
+  Writable 
+}                       from 'stream';
+
+import { 
   pipeline 
 }                       from 'stream/promises';
 
@@ -20,6 +24,10 @@ import NullWriter       from '../../util/nullWritable.js';
 
 import YadamuCompare    from '../base/yadamuCompare.js'
 import DBIConstants     from '../base/dbiConstants.js'
+
+import {
+  FileNotFound
+}                       from '../file/fileException.js'
 
 import LoaderDBI        from './loaderDBI.js';
 import JSONParser       from './jsonParser.js';
@@ -55,7 +63,7 @@ class LoaderCompare extends YadamuCompare {
         try {
           streams.push(...await this.dbi.compareInputStreams(exportFilePath))
         } catch (e) {
-          if (e.FileNotFound && e.FileNotFound()) {
+          if (this.fileNotFound(e)) {
             // this.LOGGER.error(['COMPARE','ROW COUNT'],`Cannot Locate File "${exportFilePath}".`)
             this.LOGGER.handleException(['COMPARE','ROW COUNT'],e)
             return 0
@@ -74,18 +82,33 @@ class LoaderCompare extends YadamuCompare {
       
     }
 	
-	csvRowCount(exportFilePath) {
-      return new Promise((resolve, rejecct) => {
-	      let count = 0
-     	  fs.createReadStream(this.dbi.makeRelative(exportFilePath)).pipe(csv({headers: false}).on('data', (data) => {count++}).on('end', () => {resolve(count)}).on('error',(e) => {reject(e)}))
-		})
+	fileNotFound(e) {
+	  return (e instanceof FileNotFound) || ((typeof e.notFound === 'function') && e.notFound())
+	}
+	
+	async countCSVRows(inputStream) {
+	  let count = 0
+	  await pipeline(inputStream,csv({headers: false}),new Writable({objectMode: true, write(row,encoding,callback) { count++; callback() }}))
+	  return count
+	}
+	
+	async csvRowCount(exportFilePath) {
+	  return this.countCSVRows(await this.dbi.cloudService.createReadStream(this.dbi.makeRelative(exportFilePath)))
 	}
 	
     async getCSVRowCount(controlFile, tableInfo) {
       const fileList = controlFile.data[tableInfo.TABLE_NAME].files || [controlFile.data[tableInfo.TABLE_NAME].file]
       const rowCounts = await Promise.all(fileList.map(async (file) => {
         const exportFilePath = this.dbi.makeAbsolute(file)
-        return this.csvRowCount(exportFilePath)
+        try {
+          return await this.csvRowCount(exportFilePath)
+        } catch (e) {
+          if (this.fileNotFound(e)) {
+            this.LOGGER.handleException(['COMPARE','ROW COUNT'],e)
+            return 0
+          }
+          throw e
+        }
       }))
 	  return rowCounts.reduce((a, b) => {return a + b}, 0)
     }
@@ -209,31 +232,52 @@ class LoaderCompare extends YadamuCompare {
       const sourceFolder = path.dirname(sourceFilePath)
       const targetFolder = path.dirname(targetFilePath)
 
-      let results = await Promise.all(Object.keys(targetControlFile.data).flatMap((tableName) => {
+      const filesMatch = (result) => {
+        return (result[4] === undefined) && (result[0] !== -1) && (result[0] === result[1]) && (result[2] === result[3])
+      }
+
+      // One result per table. A partitioned table matches only if every partition file matches.
+      const tableNames = Object.keys(targetControlFile.data)
+      const results = await Promise.all(tableNames.map(async (tableName) => {
+        const sourceTable = sourceControlFile.data[tableName]
+        const targetTable = targetControlFile.data[tableName]
         switch (true) {
-          case (sourceControlFile.data[tableName].hasOwnProperty('file') && targetControlFile.data[tableName].hasOwnProperty('file')):
-            return this.compareFiles( 
-              this.dbi.makeCloudPath(path.join(sourceFolder,sourceControlFile.data[tableName].file))
-            , this.dbi.makeCloudPath(path.join(targetFolder,targetControlFile.data[tableName].file))
+          case (sourceTable === undefined):
+            return [-1,-1,-1,-1,'Table not found in source control file']
+          case (sourceTable.hasOwnProperty('file') && targetTable.hasOwnProperty('file')):
+            return this.compareFiles(
+              this.dbi.makeCloudPath(path.join(sourceFolder,sourceTable.file))
+            , this.dbi.makeCloudPath(path.join(targetFolder,targetTable.file))
             )
-            break;
-          case (sourceControlFile.data[tableName].hasOwnProperty('files') && targetControlFile.data[tableName].hasOwnProperty('files')):
-            return sourceControlFile.data[tableName].files.map((file,idx) => {
-              return this.compareFiles( 
+          case (sourceTable.hasOwnProperty('files') && targetTable.hasOwnProperty('files')):
+            if (sourceTable.files.length !== targetTable.files.length) {
+              return [-1,-1,-1,-1,`Partition count mismatch: source ${sourceTable.files.length}, target ${targetTable.files.length}`]
+            }
+            const partitionResults = await Promise.all(sourceTable.files.map((file,idx) => {
+              return this.compareFiles(
                 this.dbi.makeCloudPath(path.join(sourceFolder,file))
-              , this.dbi.makeCloudPath(path.join(targetFolder,targetControlFile.data[tableName].files[idx]))
+              , this.dbi.makeCloudPath(path.join(targetFolder,targetTable.files[idx]))
               )
-            })
-            break;
+            }))
+            const sourceSize = partitionResults.reduce((total,result) => { return total + result[0] },0)
+            const targetSize = partitionResults.reduce((total,result) => { return total + result[1] },0)
+            const mismatched = partitionResults.flatMap((result,idx) => { return filesMatch(result) ? [] : [idx+1] })
+            if (mismatched.length === 0) {
+              const tableHash = createHash('sha256').update(partitionResults.map((result) => { return result[2] }).join()).digest('hex')
+              return [sourceSize,targetSize,tableHash,tableHash]
+            }
+            // Report the hashes of the first partition that differs
+            const firstMismatch = partitionResults[mismatched[0]-1]
+            return [sourceSize,targetSize,firstMismatch[2],firstMismatch[3],`Partitions ${mismatched.join(',')} of ${partitionResults.length} differ`]
           default:
             // Cannot meaningfully compare partitioned and non-partitioned data sets
-            return [[-1,-1,-1,-1,'Cannot meaningfully compare partitioned and non-partitioned data']]
+            return [-1,-1,-1,-1,'Cannot meaningfully compare partitioned and non-partitioned data']
         }
       }))
-      
-      Object.keys(targetControlFile.data).map((tableName,idx) => {
+
+      tableNames.forEach((tableName,idx) => {
         const result = results[idx]
-        if ((result[0] !== -1) && (result[0] === result[1]) && (result[2] === result[3])) {
+        if (filesMatch(result)) {
           report.successful.push([source,target,tableName,result[0]])
         }
         else {

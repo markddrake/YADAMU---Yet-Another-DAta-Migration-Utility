@@ -1,0 +1,28 @@
+{
+    "connections": "connections.json",
+    "operation": "dbRoundtrip",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "parameters": {
+        "CIRCLE_FORMAT": "CIRCLE",
+        "INFINITY_MANAGEMENT": "NULLIFY"
+    },
+    "tests": [
+        {
+            "source": "postgres#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        },
+        {
+            "source": "sqlite#2",
+            "target": "postgres#1",
+            "tasks": [
+                "postgresDataTypes"
+            ]
+        }
+    ]
+}

@@ -1,0 +1,427 @@
+SET SESSION SQL_MODE=ANSI_QUOTES;
+--
+-- YADAMU_EXPORT_DDL - MySQL DDL Export
+--
+-- Generates DDL statements for all objects in a given database/schema.
+-- Equivalent to the Oracle YADAMU_EXPORT_DDL package.
+--
+-- Usage:
+--   CALL YADAMU_EXPORT_DDL('my_database');
+--
+-- Returns a result set of DDL statements in correct replay order.
+--
+DROP PROCEDURE IF EXISTS YADAMU_EXPORT_DDL;
+--
+DELIMITER $$
+--
+CREATE PROCEDURE YADAMU_EXPORT_DDL(P_SCHEMA VARCHAR(128))
+BEGIN
+  DECLARE V_DONE              INT DEFAULT FALSE;
+  DECLARE V_DDL_STATEMENT     TEXT;
+  DECLARE V_TABLE_NAME        VARCHAR(128);
+  DECLARE V_OBJECT_NAME       VARCHAR(128);
+  DECLARE V_COLUMN_DEF        TEXT;
+  DECLARE V_CONSTRAINT_DEF    TEXT;
+  DECLARE V_RAW_DDL           TEXT;
+  DECLARE V_SQLSTATE           INT;
+  DECLARE V_SQLERRM            TEXT;
+  --
+  -- Accumulator for ordered DDL output
+  --
+  DROP TEMPORARY TABLE IF EXISTS YADAMU_DDL_RESULTS;
+  CREATE TEMPORARY TABLE YADAMU_DDL_RESULTS (
+    ORDINAL       INT AUTO_INCREMENT PRIMARY KEY,
+    DDL_STATEMENT TEXT
+  );
+  --
+  -- =============================================
+  -- 1. TABLES
+  -- =============================================
+  --
+  -- Build CREATE TABLE from INFORMATION_SCHEMA to strip storage clauses
+  --
+  BEGIN
+    DECLARE V_TABLE_DONE INT DEFAULT FALSE;
+    DECLARE TABLE_LIST CURSOR FOR
+      select TABLE_NAME
+        from INFORMATION_SCHEMA.TABLES
+       where TABLE_SCHEMA = P_SCHEMA
+         and TABLE_TYPE = 'BASE TABLE'
+       order by TABLE_NAME;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_TABLE_DONE = TRUE;
+    --
+    OPEN TABLE_LIST;
+    TABLE_LOOP : LOOP
+      FETCH TABLE_LIST INTO V_TABLE_NAME;
+      IF V_TABLE_DONE THEN
+        LEAVE TABLE_LOOP;
+      END IF;
+      --
+      -- Build column definitions from INFORMATION_SCHEMA.COLUMNS
+      --
+      SET V_COLUMN_DEF = NULL;
+      select GROUP_CONCAT(
+               CONCAT(
+                 '  ', CONCAT('"', COLUMN_NAME, '"'), ' ',
+                 COLUMN_TYPE,
+                 CASE WHEN IS_NULLABLE = 'NO' THEN ' NOT NULL' ELSE '' END,
+                 CASE WHEN COLUMN_DEFAULT IS NOT NULL AND EXTRA NOT LIKE '%auto_increment%' AND EXTRA NOT LIKE '%DEFAULT_GENERATED%'
+                      THEN CONCAT(' DEFAULT ',
+                        CASE
+                          WHEN DATA_TYPE IN ('char','varchar','text','mediumtext','longtext','tinytext','enum','set','date','datetime','timestamp','time')
+                            THEN CONCAT('''', REPLACE(COLUMN_DEFAULT, '''', ''''''), '''')
+                          ELSE COLUMN_DEFAULT
+                        END)
+                      WHEN EXTRA LIKE '%DEFAULT_GENERATED%' AND GENERATION_EXPRESSION = ''
+                        THEN CONCAT(' DEFAULT ', COLUMN_DEFAULT)
+                      ELSE ''
+                 END,
+                 CASE WHEN EXTRA LIKE '%auto_increment%' THEN ' AUTO_INCREMENT' ELSE '' END,
+                 CASE WHEN GENERATION_EXPRESSION IS NOT NULL AND GENERATION_EXPRESSION <> ''
+                      THEN CONCAT(' GENERATED ALWAYS AS (', GENERATION_EXPRESSION, ')',
+                           CASE WHEN EXTRA LIKE '%VIRTUAL%' THEN ' VIRTUAL' ELSE ' STORED' END)
+                      ELSE ''
+                 END
+               )
+               ORDER BY ORDINAL_POSITION
+               SEPARATOR CONCAT(',', CHAR(10))
+             )
+        INTO V_COLUMN_DEF
+        FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = P_SCHEMA
+         AND TABLE_NAME = V_TABLE_NAME;
+      --
+      -- Add PRIMARY KEY constraint inline
+      --
+      SET V_CONSTRAINT_DEF = NULL;
+      select CONCAT('  PRIMARY KEY (', GROUP_CONCAT(CONCAT('"', COLUMN_NAME, '"') ORDER BY ORDINAL_POSITION SEPARATOR ', '), ')')
+        INTO V_CONSTRAINT_DEF
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+        JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+          ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+         AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+         AND tc.TABLE_NAME = kcu.TABLE_NAME
+       WHERE kcu.TABLE_SCHEMA = P_SCHEMA
+         AND kcu.TABLE_NAME = V_TABLE_NAME
+         AND tc.CONSTRAINT_TYPE = 'PRIMARY KEY';
+      --
+      IF V_CONSTRAINT_DEF IS NOT NULL THEN
+        SET V_COLUMN_DEF = CONCAT(V_COLUMN_DEF, ',', CHAR(10), V_CONSTRAINT_DEF);
+      END IF;
+      --
+      -- Add UNIQUE constraints inline
+      --
+      BEGIN
+        DECLARE V_UQ_DONE INT DEFAULT FALSE;
+        DECLARE V_UQ_NAME VARCHAR(128);
+        DECLARE V_UQ_COLS TEXT;
+        DECLARE UQ_LIST CURSOR FOR
+          select tc.CONSTRAINT_NAME,
+                 GROUP_CONCAT(CONCAT('"', kcu.COLUMN_NAME, '"') ORDER BY kcu.ORDINAL_POSITION SEPARATOR ', ')
+            from INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+            join INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+              on kcu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+             and kcu.TABLE_SCHEMA = tc.TABLE_SCHEMA
+             and kcu.TABLE_NAME = tc.TABLE_NAME
+           where tc.TABLE_SCHEMA = P_SCHEMA
+             and tc.TABLE_NAME = V_TABLE_NAME
+             and tc.CONSTRAINT_TYPE = 'UNIQUE'
+           group by tc.CONSTRAINT_NAME
+           order by tc.CONSTRAINT_NAME;
+        DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_UQ_DONE = TRUE;
+        --
+        OPEN UQ_LIST;
+        UQ_LOOP : LOOP
+          FETCH UQ_LIST INTO V_UQ_NAME, V_UQ_COLS;
+          IF V_UQ_DONE THEN
+            LEAVE UQ_LOOP;
+          END IF;
+          SET V_COLUMN_DEF = CONCAT(V_COLUMN_DEF, ',', CHAR(10), '  UNIQUE KEY ', CONCAT('"', V_UQ_NAME, '"'), ' (', V_UQ_COLS, ')');
+        END LOOP;
+        CLOSE UQ_LIST;
+      END;
+      --
+      SET V_DDL_STATEMENT = CONCAT('CREATE TABLE ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_TABLE_NAME, '"'), ' (', CHAR(10), V_COLUMN_DEF, CHAR(10), ')');
+      INSERT INTO YADAMU_DDL_RESULTS (DDL_STATEMENT) VALUES (V_DDL_STATEMENT);
+      --
+    END LOOP;
+    CLOSE TABLE_LIST;
+  END;
+  --
+  -- =============================================
+  -- 2. INDEXES (non-primary, non-unique — those are already inline)
+  -- =============================================
+  --
+  BEGIN
+    DECLARE V_IDX_DONE INT DEFAULT FALSE;
+    DECLARE V_IDX_NAME VARCHAR(128);
+    DECLARE V_IDX_TABLE VARCHAR(128);
+    DECLARE V_IDX_COLS TEXT;
+    DECLARE V_IDX_NON_UNIQUE INT;
+    DECLARE V_IDX_TYPE VARCHAR(16);
+    DECLARE IDX_LIST CURSOR FOR
+      select s.TABLE_NAME,
+             s.INDEX_NAME,
+             s.NON_UNIQUE,
+             s.INDEX_TYPE,
+             GROUP_CONCAT(
+               CASE WHEN s.SUB_PART IS NOT NULL
+                    THEN CONCAT(CONCAT('"', s.COLUMN_NAME, '"'), '(', s.SUB_PART, ')')
+                    ELSE CONCAT('"', s.COLUMN_NAME, '"')
+               END
+               ORDER BY s.SEQ_IN_INDEX
+               SEPARATOR ', '
+             ) as IDX_COLS
+        from INFORMATION_SCHEMA.STATISTICS s
+       where s.TABLE_SCHEMA = P_SCHEMA
+         and s.INDEX_NAME <> 'PRIMARY'
+         and s.INDEX_NAME not in (
+           select tc.CONSTRAINT_NAME
+             from INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+            where tc.TABLE_SCHEMA = P_SCHEMA
+              and tc.TABLE_NAME = s.TABLE_NAME
+              and tc.CONSTRAINT_TYPE = 'UNIQUE'
+         )
+       group by s.TABLE_NAME, s.INDEX_NAME, s.NON_UNIQUE, s.INDEX_TYPE
+       order by s.TABLE_NAME, s.INDEX_NAME;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_IDX_DONE = TRUE;
+    --
+    OPEN IDX_LIST;
+    IDX_LOOP : LOOP
+      FETCH IDX_LIST INTO V_IDX_TABLE, V_IDX_NAME, V_IDX_NON_UNIQUE, V_IDX_TYPE, V_IDX_COLS;
+      IF V_IDX_DONE THEN
+        LEAVE IDX_LOOP;
+      END IF;
+      --
+      SET V_DDL_STATEMENT = 'CREATE ';
+      IF V_IDX_NON_UNIQUE = 0 THEN
+        SET V_DDL_STATEMENT = CONCAT(V_DDL_STATEMENT, 'UNIQUE ');
+      END IF;
+      IF V_IDX_TYPE = 'FULLTEXT' THEN
+        SET V_DDL_STATEMENT = CONCAT(V_DDL_STATEMENT, 'FULLTEXT ');
+      ELSEIF V_IDX_TYPE = 'SPATIAL' THEN
+        SET V_DDL_STATEMENT = CONCAT(V_DDL_STATEMENT, 'SPATIAL ');
+      END IF;
+      SET V_DDL_STATEMENT = CONCAT(V_DDL_STATEMENT, 'INDEX ', CONCAT('"', V_IDX_NAME, '"'), ' ON ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_IDX_TABLE, '"'), ' (', V_IDX_COLS, ')');
+      --
+      INSERT INTO YADAMU_DDL_RESULTS (DDL_STATEMENT) VALUES (V_DDL_STATEMENT);
+    END LOOP;
+    CLOSE IDX_LIST;
+  END;
+  --
+  -- =============================================
+  -- 3. FOREIGN KEYS (ALTER TABLE ADD CONSTRAINT)
+  -- =============================================
+  --
+  BEGIN
+    DECLARE V_FK_DONE INT DEFAULT FALSE;
+    DECLARE V_FK_NAME VARCHAR(128);
+    DECLARE V_FK_TABLE VARCHAR(128);
+    DECLARE V_FK_COLS TEXT;
+    DECLARE V_FK_REF_SCHEMA VARCHAR(128);
+    DECLARE V_FK_REF_TABLE VARCHAR(128);
+    DECLARE V_FK_REF_COLS TEXT;
+    DECLARE V_FK_DELETE_RULE VARCHAR(64);
+    DECLARE V_FK_UPDATE_RULE VARCHAR(64);
+    DECLARE FK_LIST CURSOR FOR
+      select tc.TABLE_NAME,
+             tc.CONSTRAINT_NAME,
+             GROUP_CONCAT(CONCAT('"', kcu.COLUMN_NAME, '"') ORDER BY kcu.ORDINAL_POSITION SEPARATOR ', ') as FK_COLS,
+             kcu.REFERENCED_TABLE_SCHEMA,
+             kcu.REFERENCED_TABLE_NAME,
+             GROUP_CONCAT(CONCAT('"', kcu.REFERENCED_COLUMN_NAME, '"') ORDER BY kcu.ORDINAL_POSITION SEPARATOR ', ') as REF_COLS,
+             rc.DELETE_RULE,
+             rc.UPDATE_RULE
+        from INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+        join INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+          on kcu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+         and kcu.TABLE_SCHEMA = tc.TABLE_SCHEMA
+         and kcu.TABLE_NAME = tc.TABLE_NAME
+        join INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+          on rc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+         and rc.CONSTRAINT_SCHEMA = tc.TABLE_SCHEMA
+       where tc.TABLE_SCHEMA = P_SCHEMA
+         and tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+       group by tc.TABLE_NAME, tc.CONSTRAINT_NAME, kcu.REFERENCED_TABLE_SCHEMA, kcu.REFERENCED_TABLE_NAME, rc.DELETE_RULE, rc.UPDATE_RULE
+       order by tc.TABLE_NAME, tc.CONSTRAINT_NAME;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_FK_DONE = TRUE;
+    --
+    OPEN FK_LIST;
+    FK_LOOP : LOOP
+      FETCH FK_LIST INTO V_FK_TABLE, V_FK_NAME, V_FK_COLS, V_FK_REF_SCHEMA, V_FK_REF_TABLE, V_FK_REF_COLS, V_FK_DELETE_RULE, V_FK_UPDATE_RULE;
+      IF V_FK_DONE THEN
+        LEAVE FK_LOOP;
+      END IF;
+      --
+      SET V_DDL_STATEMENT = CONCAT(
+        'ALTER TABLE ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_FK_TABLE, '"'),
+        ' ADD CONSTRAINT ', CONCAT('"', V_FK_NAME, '"'),
+        ' FOREIGN KEY (', V_FK_COLS, ')',
+        ' REFERENCES ', CONCAT('"', V_FK_REF_SCHEMA, '"'), '.', CONCAT('"', V_FK_REF_TABLE, '"'), ' (', V_FK_REF_COLS, ')'
+      );
+      --
+      IF V_FK_DELETE_RULE IS NOT NULL AND V_FK_DELETE_RULE <> 'RESTRICT' THEN
+        SET V_DDL_STATEMENT = CONCAT(V_DDL_STATEMENT, ' ON DELETE ', V_FK_DELETE_RULE);
+      END IF;
+      IF V_FK_UPDATE_RULE IS NOT NULL AND V_FK_UPDATE_RULE <> 'RESTRICT' THEN
+        SET V_DDL_STATEMENT = CONCAT(V_DDL_STATEMENT, ' ON UPDATE ', V_FK_UPDATE_RULE);
+      END IF;
+      --
+      INSERT INTO YADAMU_DDL_RESULTS (DDL_STATEMENT) VALUES (V_DDL_STATEMENT);
+    END LOOP;
+    CLOSE FK_LIST;
+  END;
+  --
+  -- =============================================
+  -- 4. VIEWS
+  -- =============================================
+  --
+  BEGIN
+    DECLARE V_VIEW_DONE INT DEFAULT FALSE;
+    DECLARE V_VIEW_NAME VARCHAR(128);
+    DECLARE V_VIEW_DEF  LONGTEXT;
+    DECLARE VIEW_LIST CURSOR FOR
+      select TABLE_NAME, VIEW_DEFINITION
+        from INFORMATION_SCHEMA.VIEWS
+       where TABLE_SCHEMA = P_SCHEMA
+       order by TABLE_NAME;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_VIEW_DONE = TRUE;
+    --
+    OPEN VIEW_LIST;
+    VIEW_LOOP : LOOP
+      FETCH VIEW_LIST INTO V_VIEW_NAME, V_VIEW_DEF;
+      IF V_VIEW_DONE THEN
+        LEAVE VIEW_LOOP;
+      END IF;
+      --
+      IF V_VIEW_DEF IS NOT NULL THEN
+        SET V_DDL_STATEMENT = CONCAT('CREATE OR REPLACE VIEW ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_VIEW_NAME, '"'), ' AS ', V_VIEW_DEF);
+        INSERT INTO YADAMU_DDL_RESULTS (DDL_STATEMENT) VALUES (V_DDL_STATEMENT);
+      END IF;
+    END LOOP;
+    CLOSE VIEW_LIST;
+  END;
+  --
+  -- =============================================
+  -- 5. FUNCTIONS and PROCEDURES
+  -- =============================================
+  --
+  BEGIN
+    DECLARE V_ROUTINE_DONE INT DEFAULT FALSE;
+    DECLARE V_ROUTINE_NAME VARCHAR(128);
+    DECLARE V_ROUTINE_TYPE VARCHAR(20);
+    DECLARE V_ROUTINE_DEF  LONGTEXT;
+    DECLARE V_ROUTINE_PARAMS TEXT;
+    DECLARE V_ROUTINE_RETURNS TEXT;
+    DECLARE V_ROUTINE_DETERMINISTIC VARCHAR(3);
+    DECLARE V_SQL_DATA_ACCESS VARCHAR(64);
+    DECLARE ROUTINE_LIST CURSOR FOR
+      select ROUTINE_NAME, ROUTINE_TYPE, ROUTINE_DEFINITION,
+             DTD_IDENTIFIER, IS_DETERMINISTIC, SQL_DATA_ACCESS
+        from INFORMATION_SCHEMA.ROUTINES
+       where ROUTINE_SCHEMA = P_SCHEMA
+         and ROUTINE_NAME <> 'YADAMU_EXPORT_DDL'
+       order by ROUTINE_TYPE, ROUTINE_NAME;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_ROUTINE_DONE = TRUE;
+    --
+    OPEN ROUTINE_LIST;
+    ROUTINE_LOOP : LOOP
+      FETCH ROUTINE_LIST INTO V_ROUTINE_NAME, V_ROUTINE_TYPE, V_ROUTINE_DEF, V_ROUTINE_RETURNS, V_ROUTINE_DETERMINISTIC, V_SQL_DATA_ACCESS;
+      IF V_ROUTINE_DONE THEN
+        LEAVE ROUTINE_LOOP;
+      END IF;
+      --
+      IF V_ROUTINE_DEF IS NOT NULL THEN
+        -- Build parameter list
+        SET V_ROUTINE_PARAMS = NULL;
+        select GROUP_CONCAT(
+                 CONCAT(
+                   CASE WHEN PARAMETER_MODE IS NOT NULL THEN CONCAT(PARAMETER_MODE, ' ') ELSE '' END,
+                   PARAMETER_NAME, ' ', DTD_IDENTIFIER
+                 )
+                 ORDER BY ORDINAL_POSITION
+                 SEPARATOR ', '
+               )
+          INTO V_ROUTINE_PARAMS
+          FROM INFORMATION_SCHEMA.PARAMETERS
+         WHERE SPECIFIC_SCHEMA = P_SCHEMA
+           AND SPECIFIC_NAME = V_ROUTINE_NAME
+           AND ORDINAL_POSITION > 0;
+        --
+        IF V_ROUTINE_PARAMS IS NULL THEN
+          SET V_ROUTINE_PARAMS = '';
+        END IF;
+        --
+        IF V_ROUTINE_TYPE = 'FUNCTION' THEN
+          SET V_DDL_STATEMENT = CONCAT(
+            'CREATE FUNCTION ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_ROUTINE_NAME, '"'),
+            '(', V_ROUTINE_PARAMS, ')',
+            ' RETURNS ', V_ROUTINE_RETURNS,
+            CASE WHEN V_ROUTINE_DETERMINISTIC = 'YES' THEN ' DETERMINISTIC' ELSE ' NOT DETERMINISTIC' END,
+            ' ', V_SQL_DATA_ACCESS,
+            CHAR(10), V_ROUTINE_DEF
+          );
+        ELSE
+          SET V_DDL_STATEMENT = CONCAT(
+            'CREATE PROCEDURE ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_ROUTINE_NAME, '"'),
+            '(', V_ROUTINE_PARAMS, ')',
+            ' ', V_SQL_DATA_ACCESS,
+            CHAR(10), V_ROUTINE_DEF
+          );
+        END IF;
+        INSERT INTO YADAMU_DDL_RESULTS (DDL_STATEMENT) VALUES (V_DDL_STATEMENT);
+      END IF;
+    END LOOP;
+    CLOSE ROUTINE_LIST;
+  END;
+  --
+  -- =============================================
+  -- 6. TRIGGERS
+  -- =============================================
+  --
+  BEGIN
+    DECLARE V_TRIG_DONE INT DEFAULT FALSE;
+    DECLARE V_TRIG_NAME VARCHAR(128);
+    DECLARE V_TRIG_TABLE VARCHAR(128);
+    DECLARE V_TRIG_EVENT VARCHAR(6);
+    DECLARE V_TRIG_TIMING VARCHAR(6);
+    DECLARE V_TRIG_BODY LONGTEXT;
+    DECLARE TRIG_LIST CURSOR FOR
+      select TRIGGER_NAME, EVENT_OBJECT_TABLE, EVENT_MANIPULATION, ACTION_TIMING, ACTION_STATEMENT
+        from INFORMATION_SCHEMA.TRIGGERS
+       where TRIGGER_SCHEMA = P_SCHEMA
+       order by EVENT_OBJECT_TABLE, TRIGGER_NAME;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET V_TRIG_DONE = TRUE;
+    --
+    OPEN TRIG_LIST;
+    TRIG_LOOP : LOOP
+      FETCH TRIG_LIST INTO V_TRIG_NAME, V_TRIG_TABLE, V_TRIG_EVENT, V_TRIG_TIMING, V_TRIG_BODY;
+      IF V_TRIG_DONE THEN
+        LEAVE TRIG_LOOP;
+      END IF;
+      --
+      SET V_DDL_STATEMENT = CONCAT(
+        'CREATE TRIGGER ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_TRIG_NAME, '"'),
+        ' ', V_TRIG_TIMING, ' ', V_TRIG_EVENT,
+        ' ON ', CONCAT('"', P_SCHEMA, '"'), '.', CONCAT('"', V_TRIG_TABLE, '"'),
+        ' FOR EACH ROW ',
+        V_TRIG_BODY
+      );
+      INSERT INTO YADAMU_DDL_RESULTS (DDL_STATEMENT) VALUES (V_DDL_STATEMENT);
+    END LOOP;
+    CLOSE TRIG_LIST;
+  END;
+  --
+  -- Return the ordered result set
+  --
+  SELECT DDL_STATEMENT
+    FROM YADAMU_DDL_RESULTS
+   ORDER BY ORDINAL;
+  --
+  DROP TEMPORARY TABLE IF EXISTS YADAMU_DDL_RESULTS;
+  --
+END;
+$$
+--
+DELIMITER ;
+--

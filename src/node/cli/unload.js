@@ -6,6 +6,7 @@ import YadamuCLI          from './yadamuCLI.js'
 class Unload extends YadamuCLI {}
 
 async function main() {
+  YadamuCLI.guardExitCode()
 
   try {
     const yadamuUnload = new Unload();
@@ -15,8 +16,10 @@ async function main() {
       yadamuUnload.reportError(e)
 	}
     await yadamuUnload.close();
+    YadamuCLI.setExitCode(yadamuUnload.EXIT_CODE)
   } catch (e) {
 	YadamuLibrary.reportError(e)
+	YadamuCLI.setExitCode(YadamuCLI.getExitCode(e))
   }
 
 }

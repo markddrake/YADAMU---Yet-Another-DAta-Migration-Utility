@@ -207,7 +207,9 @@ class DBWriter extends Writable {
                 throw results;
               }
               this.ddlCompleted = true
-            }1
+              // The target schema was created from the source's DDL, rather than from DDL generated from the metadata
+              this.dbi.DDL_REPLAYED = true
+            }
           }
           break;
         case 'metadata':
@@ -250,9 +252,14 @@ class DBWriter extends Writable {
       this.yadamuLogger.handleException([`WRITER`,`WRITE`,messageType,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],err)
       this.underlyingError = err;
       // Attempt a rollback, however if the rollback fails throw the err that led to the rollback operation
-      try {
-        await this.transactionManager.rollbackTransaction(e)
-      } catch (rollbackError) {}      
+      if (this.transactionManager.TRANSACTION_IN_PROGRESS) {
+        try {
+          await this.transactionManager.rollbackTransaction(err)
+        } catch (rollbackError) {}
+      }
+      // The StreamSwitcher and the table writers wait on cacheLoaded. Fail it, otherwise they wait forever, destroy() waits on them, and the pipeline never settles.
+      // Do this after the rollback: releasing them fails the pipeline, which closes the connection. No-op if the cache was already loaded.
+      this.dbi.emit(YadamuConstants.CACHE_LOADED,err)
       throw err
     }
     

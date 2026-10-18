@@ -10,3 +10,4 @@ psql -U %DB_USER% -f setup/configure.sql > log/configure.log
 psql -U %DB_USER% -d %DB_DBNAME% -a -f sql/YADAMU_IMPORT.sql > log/YADAMU_IMPORT.log
 psql -U %DB_USER% -d %DB_DBNAME% -a -f sql/YADAMU_COMPARE.sql > log/YADAMU_COMPARE.log
 psql -U %DB_USER% -d %DB_DBNAME% -a -f testdata/dataTypeTesting.sql > log/dataTypeTesting.log
+psql -U %DB_USER% -d %DB_DBNAME% -a -f testdata/ddlTesting.sql > log/ddlTesting.log

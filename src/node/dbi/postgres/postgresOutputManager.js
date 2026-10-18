@@ -151,7 +151,8 @@ class PostgresOutputManager extends YadamuOutputManager  {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 	this.rowTransformation(row)
-    this.batch.push(...row);
+	// Generated columns only accept DEFAULT, so their values are not bound.
+    this.batch.push(...(this.tableInfo.includeColumn ? row.filter((value,idx) => { return this.tableInfo.includeColumn[idx] }) : row));
     this.PIPELINE_STATE.cached++
 	return this.skipTable
   }

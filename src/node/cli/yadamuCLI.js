@@ -15,6 +15,7 @@ import YadamuLogger       from '../core/yadamuLogger.js';
 import YadamuConstants    from '../lib/yadamuConstants.js';
 import YadamuLibrary      from '../lib/yadamuLibrary.js';
 import YadamuCompare      from '../dbi/base/yadamuCompare.js'
+import YadamuOutcome      from './yadamuOutcome.js'
 
 
 import {
@@ -196,23 +197,58 @@ class YadamuCLI {
   }
   
   set CONFIGURATION(v) {
-    this.#configuration = v
-	if (this.CONFIGURATION.connections) {
-      this.CONNECTION_NAMES = Object.keys(this.CONFIGURATION.connections)
-    }
-	else {
+	// Validate before assigning, so that an invalid configuration (e.g. one uploaded to the service) does not replace a valid one.
+	if (!v?.connections) {
 	  const err = new CommandLineError(`Invalid Configuration file: Missing 'connections' section`)
       throw err
 	}
-	if (this.CONFIGURATION.schemas) {
-	  this.SCHEMA_NAMES = Object.keys(this.CONFIGURATION.schemas)
-    }
-	else {
+	if (!v.schemas) {
 	  const err = new CommandLineError(`Invalid Configuration file: Missing 'schemas' section`)
       throw err
 	}
+    this.#configuration = v
+    this.CONNECTION_NAMES = Object.keys(this.CONFIGURATION.connections)
+	this.SCHEMA_NAMES = Object.keys(this.CONFIGURATION.schemas)
 	this.JOB_NAMES = Object.keys(this.CONFIGURATION.jobs || {})
 	this.BATCH_NAMES = Object.keys(this.CONFIGURATION.batchOperations || {})
+  }
+
+  #jobOutcomes = []
+  #failure = undefined
+
+  // The outcome of each job run by this CLI invocation. See yadamuOutcome.js
+  get JOB_OUTCOMES() {
+	return this.#jobOutcomes
+  }
+
+  // The process exit code for this CLI invocation. See yadamuOutcome.js
+  get EXIT_CODE() {
+	if (this.#failure !== undefined) {
+	  return YadamuOutcome.getExitCode(this.#failure)
+	}
+	return this.JOB_OUTCOMES.some((job) => { return job.outcome === YadamuOutcome.FAILED }) ? YadamuOutcome.EXIT_CODES.FAILED : YadamuOutcome.EXIT_CODES.SUCCESS
+  }
+
+  static getExitCode(e) {
+	return YadamuOutcome.getExitCode(e)
+  }
+
+  static #EXIT_CODE_SET = false
+
+  static guardExitCode() {
+	// Called first by each command line script. If the event loop drains before the operation completes (e.g. a pipeline that stalls
+	// after an error, with nothing left to wait on) node would exit with code 0 without reporting anything. Report failure instead.
+	process.once('exit',() => {
+	  if (!YadamuCLI.#EXIT_CODE_SET) {
+		console.log(`${new Date().toISOString()} [ERROR][YADAMU][CLI]: Process exiting before the operation completed. Exit code: ${YadamuOutcome.EXIT_CODES.FAILED}.`)
+	    process.exitCode = YadamuOutcome.EXIT_CODES.FAILED
+	  }
+	})
+  }
+
+  static setExitCode(exitCode) {
+	YadamuCLI.#EXIT_CODE_SET = true
+	process.exitCode = exitCode
   }
   
   set CONNECTION_NAMES(v) {
@@ -302,6 +338,7 @@ class YadamuCLI {
   }
 
   reportError(e) {
+	this.#failure = e
 	YadamuLibrary.reportError(e)
   }
 
@@ -636,7 +673,11 @@ class YadamuCLI {
 	if (job.parser === 'SQL' ) {
       const targetDBI = await this.getTargetConnection(yadamu,job)
 	  const startTime = performance.now()
-	  const metrics = await this.yadamu.doUpload(targetDBI);
+	  const metrics = await yadamu.doUpload(targetDBI);
+	  if (yadamu.STATUS.operationSuccessful === false) {
+		// Yadamu.uploadData() reports the failure and returns the error rather than throwing it.
+		throw yadamu.STATUS.err
+	  }
 	  const endTime = performance.now();
 	  const elapsedTime = endTime - startTime
 
@@ -679,6 +720,21 @@ class YadamuCLI {
    	}
   }
   
+  async executeTrackedJob(yadamu,configuration,job,jobName = 'JOB',jobOutcomes = this.JOB_OUTCOMES) {
+
+    // Run executeJob() and record whether the job succeeded or failed in jobOutcomes. See yadamuOutcome.js
+
+    const tracker = YadamuOutcome.startJob(jobName,yadamu)
+	try {
+	  const results = await this.executeJob(yadamu,configuration,job,jobName)
+	  jobOutcomes.push(YadamuOutcome.completeJob(tracker,results?.metrics))
+	  return results
+	} catch (e) {
+	  jobOutcomes.push(YadamuOutcome.completeJob(tracker,yadamu.metrics,e))
+	  throw e
+	}
+  }
+
   getSchemaDefinition(key) {
 	switch (this.yadamu.RDBMS) {
 	  case 'mssql':
@@ -735,7 +791,7 @@ class YadamuCLI {
       ...job.parameters || {} 
     }
 	
-	await this.executeJob(this.yadamu,configuration,job,'UPLOAD')	
+	await this.executeTrackedJob(this.yadamu,configuration,job,'UPLOAD')	
     await this.yadamu.close()
   }
     
@@ -758,7 +814,7 @@ class YadamuCLI {
       }
 	, parser        : "SQL"
 	}
-	await this.executeJob(this.yadamu,configuration,job,'UPLOAD')	
+	await this.executeTrackedJob(this.yadamu,configuration,job,'UPLOAD')	
     await this.yadamu.close()
   }
     
@@ -787,7 +843,7 @@ class YadamuCLI {
 	  , schema      : 'target'
       }
 	}
-	await this.executeJob(this.yadamu,configuration,job,'UNLOAD')	
+	await this.executeTrackedJob(this.yadamu,configuration,job,'UNLOAD')	
     await this.yadamu.close()
   }
 
@@ -815,7 +871,7 @@ class YadamuCLI {
 	  , schema      : 'target'
       }
 	}
-	await this.executeJob(this.yadamu,configuration,job,'LOAD')	
+	await this.executeTrackedJob(this.yadamu,configuration,job,'LOAD')	
     await this.yadamu.close()
   }
 
@@ -843,7 +899,7 @@ class YadamuCLI {
 	  , schema      : 'target'
       }
 	}
-	await this.executeJob(this.yadamu,configuration,job,'EXPORT')	
+	await this.executeTrackedJob(this.yadamu,configuration,job,'EXPORT')	
     await this.yadamu.close()
   }
    
@@ -871,7 +927,7 @@ class YadamuCLI {
 	  , schema      : 'target'
       }
 	}
-	await this.executeJob(this.yadamu,configuration,job,'IMPORT')	
+	await this.executeTrackedJob(this.yadamu,configuration,job,'IMPORT')	
     await this.yadamu.close()
   }
 
@@ -924,8 +980,8 @@ class YadamuCLI {
 	let results
 	let startTime = performance.now()
 	try {
-	  this.yadamu.reset(job.parameters)
-      results = await this.executeJob(this.yadamu,this.CONFIGURATION,job,jobName)
+	  await this.yadamu.reset(job.parameters)
+      results = await this.executeTrackedJob(this.yadamu,this.CONFIGURATION,job,jobName)
     } catch (e) {
 	  if (job.abortOnError) {
 		throw e 
@@ -985,8 +1041,12 @@ class YadamuCLI {
 	  , elapsedTime : YadamuLibrary.stringifyDuration(endTime - startTime)
 	  }
 	} catch(e) {
+	  if (job === undefined) {
+		// The job could not be started (unknown job name), so runJob() did not record its outcome.
+		this.JOB_OUTCOMES.push(YadamuOutcome.failedJob(jobName,e))
+	  }
 	  if (job && job.abortOnError) {
-		throw e 
+		throw e
 	  }
 	  const endTime = performance.now()
 	  return {
@@ -1097,21 +1157,21 @@ class YadamuCLI {
 	    // Run a set of anonymous jobs
 	    results = await this.runAnonymousJobs(false)
         break
-      case (this.JOB_NAMES.length === 1):
-	    // Run the only named job
-	    results = await this.runNamedJob(this.JOB_NAMES[0],false)
-	    break
 	  case (this.yadamu.COMMAND_LINE_PARAMETERS.hasOwnProperty('JOB_NAME')):
 	    // Run the specified job
 	    results = await this.runNamedJob(this.yadamu.COMMAND_LINE_PARAMETERS.JOB_NAME,false)
         break
+	  case (this.yadamu.COMMAND_LINE_PARAMETERS.hasOwnProperty('BATCH_NAME')):
+	    // Run the specified Batch
+	    results = await this.runNamedBatch(this.yadamu.COMMAND_LINE_PARAMETERS.BATCH_NAME,false)
+        break
+      case (this.JOB_NAMES.length === 1):
+	    // Run the only named job
+	    results = await this.runNamedJob(this.JOB_NAMES[0],false)
+	    break
       case (this.BATCH_NAMES.length === 1):
 	    // Run the only Batch
-	    results = this.runNamedBatch(this.BATCH_NAMES[0],false)
-        break
-	  case (this.yadamu.COMMAND_LINE_PARAMETERS.BATCH_NAME):
-	    // Run the specified Batch
-	    results = this.runNamedBatch(this.yadamu.COMMAND_LINE_PARAMETERS.BATCH_NAME,false)
+	    results = await this.runNamedBatch(this.BATCH_NAMES[0],false)
         break
 	  default:
 	    // Run all available jobs
@@ -1119,9 +1179,11 @@ class YadamuCLI {
 	}
 	
 	if (results.e) {
-	   throw results.e 
+	   throw results.e
 	 }
-	 
+
+	// Jobs that fail are logged and recorded in JOB_OUTCOMES rather than thrown, so that the remaining jobs run. They determine EXIT_CODE.
+
   }
   
   async doEncrypt() {

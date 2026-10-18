@@ -1,17 +1,11 @@
 # Temp Install MySQLShell to configure database. Changes will be lost when container restarts but that's OK
+# Uses the self-contained glibc tarball rather than a distro .deb, so it does not depend on the Ubuntu release the mariadb image is built on
 export DEBIAN_FRONTEND=noninteractive
+export MYSQLSH_VERSION=26.7.0
 apt-get update
-apt-get install -y wget lsb-release gnupg
-
-# Download the .deb file
-wget http://repo.mysql.com/apt/ubuntu/pool/mysql-8.0/m/mysql-shell/mysql-shell_8.0.44-1ubuntu24.04_amd64.deb
-
-# Install dependencies first
-apt-get update
-apt-get install -y libantlr4-runtime4.10 libtinyxml2-10 libprotobuf32t64
-
-# Install the downloaded .deb
-apt-get install -y ./mysql-shell_8.0.44-1ubuntu24.04_amd64.deb
+apt-get install -y curl ca-certificates
+curl -sL https://dev.mysql.com/get/Downloads/MySQL-Shell/mysql-shell-${MYSQLSH_VERSION}-linux-glibc2.28-x86-64bit.tar.gz | tar xz -C /opt
+ln -sf /opt/mysql-shell-${MYSQLSH_VERSION}-linux-glibc2.28-x86-64bit/bin/mysqlsh /usr/local/bin/mysqlsh
 
 export STAGE=/var/lib/mysql/stage
 cd $STAGE

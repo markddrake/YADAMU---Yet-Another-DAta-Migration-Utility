@@ -272,7 +272,19 @@ class DatabaseError extends YadamuError {
   getTags() {
 	return this.tags
   }
-  
+
+  /*
+  **
+  ** Lines the logger writes after the message and stack. Subclasses extend or replace this with
+  ** their own context (bind values, file paths). The logger must not know about specific vendors:
+  ** naming a vendor's error class there forces that vendor's driver to be installed everywhere.
+  **
+  */
+
+  getDiagnostics() {
+	return [`SQL: ${this.sql}`]
+  }
+
 }
 
 class ContentTooLarge extends DatabaseError {

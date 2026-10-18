@@ -207,7 +207,13 @@ run_test() {
         oracle19c)
             run_test_suite "oracle19c"
             ;;
-            
+
+        sqlite)
+            # SQLite is a file, so there is no container to start: the suites use the standing
+            # stack and the source schemas built by sqliteStageDataSets during initialization.
+            run_test_suite "sqlite"
+            ;;
+
         oracle21c)
             compose_up "docker/rdbms/oracle/docker-compose.yml" "ORA2103-01" "Oracle 21c"
             
@@ -331,7 +337,7 @@ run_test() {
             
         *)
             error_message "Unknown test: $test_name"
-            echo "Available tests: cmdline, oracle11g, oracle19c, oracle21c, oracle23ai, oracle26ai, vertica09, db2, cockroach, yugabyte, snowflake"
+            echo "Available tests: cmdline, oracle11g, oracle19c, sqlite, oracle21c, oracle23ai, oracle26ai, vertica09, db2, cockroach, yugabyte, snowflake"
             exit 1
             ;;
     esac
@@ -349,6 +355,7 @@ run_all_tests() {
         "cmdline"
         "oracle11g"
         "oracle19c"
+        "sqlite"
         "oracle21c"
         "oracle23ai"
         "oracle26ai"

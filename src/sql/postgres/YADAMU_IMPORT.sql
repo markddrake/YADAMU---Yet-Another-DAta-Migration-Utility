@@ -701,16 +701,73 @@ returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select array_to_json(tsvector_to_array($1))::jsonb
+-- A tsvector without positions or weights is exported as an array of lexemes. Otherwise the array would lose them, so the text form is exported as a JSON string.
+select case
+         when strip($1) = $1 then array_to_json(tsvector_to_array($1))::jsonb
+         else to_jsonb($1::text)
+       end
 $$
 LANGUAGE SQL;
 --
-CREATE OR REPLACE FUNCTION YADAMU.AS_TS_VECTOR(jsonb) 
+CREATE OR REPLACE FUNCTION YADAMU.AS_TS_VECTOR(jsonb)
 returns tsvector
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select array_to_tsvector(array_agg(value)) from jsonb_array_elements_text($1)
+select case
+         when jsonb_typeof($1) = 'string' then ($1 #>> '{}')::tsvector
+         else (select array_to_tsvector(array_agg(value)) from jsonb_array_elements_text($1))
+       end
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_TS_VECTOR(text)
+returns tsvector
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+-- An untyped bind variable resolves to this overload. It may hold either JSON form, a Postgres array of lexemes, or the text form of the tsvector.
+select case
+         when left($1,1) in ('[','"') then YADAMU.AS_TS_VECTOR($1::jsonb)
+         when left($1,1) = '{' then array_to_tsvector($1::text[])
+         else $1::tsvector
+       end
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** JSON Based Export/Import of the pgvector SPARSEVEC type.
+**
+** sparsevec's text form is {index:value,...}/dimensions, with 1 based indices. It maps to {"dimensions": n, "indices": [...], "values": [...]}.
+**
+** These functions work on the text form, rather than on sparsevec, so that this library installs whether or not pgvector is installed.
+** vector and halfvec need no functions: they are exported as a JSON array, and their input functions accept one.
+**
+*/
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_SPARSEVEC_JSON(text)
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select jsonb_build_object(
+         'dimensions', split_part($1,'/',2)::int
+        ,'indices',    coalesce(jsonb_agg(split_part(ELEMENT,':',1)::int order by IDX),'[]'::jsonb)
+        ,'values',     coalesce(jsonb_agg(split_part(ELEMENT,':',2)::real::double precision order by IDX),'[]'::jsonb)
+       )
+  from unnest(string_to_array(btrim(split_part($1,'/',1),'{}'),',')) with ordinality as e(ELEMENT, IDX)
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU.AS_SPARSEVEC_TEXT(jsonb)
+returns text
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select '{' || coalesce(string_agg(i.VALUE || ':' || v.VALUE, ',' order by i.IDX),'') || '}/' || ($1 ->> 'dimensions')
+  from jsonb_array_elements_text($1 -> 'indices')      with ordinality as i(VALUE, IDX)
+  join jsonb_array_elements_text($1 -> 'values')       with ordinality as v(VALUE, IDX) on i.IDX = v.IDX
 $$
 LANGUAGE SQL;
 --
@@ -778,9 +835,10 @@ begin
                               when ((c.data_type = 'character') and (c.character_maximum_length is null)) then
                                 c.udt_name 
                               when c.data_type = 'USER-DEFINED' then
-                                c.udt_name 
+                                quote_ident(c.udt_name)
                               when c.data_type = 'ARRAY' then
-                                e.data_type || ' ARRAY'
+                                /* Arrays of enums, domains and composite types are reported by the element type's name */
+                                case when e.data_type = 'USER-DEFINED' then quote_ident(e.udt_name) else e.data_type end || ' ARRAY'
                               when ((c.data_type = 'interval') and (c.interval_type is not null)) then
                                 c.data_type || ' ' || c.interval_type
                               else 
@@ -789,6 +847,12 @@ begin
                             order by ordinal_position
                            ) "DATA_TYPE_ARRAY"
                  ,jsonb_agg(case
+                              when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('vector','halfvec','sparsevec'))) then
+                                /* pgvector keeps the dimension in atttypmod, which information_schema does not expose */
+                                (select case when a.atttypmod > 0 then jsonb_build_array(a.atttypmod) else jsonb_build_array() end
+                                   from pg_attribute a
+                                  where a.attrelid = format('%I.%I',c.table_schema,c.table_name)::regclass
+                                    and a.attname = c.column_name)
                               when (c.numeric_precision is not null) and (c.numeric_scale is not null) then
                                 jsonb_build_array(c.numeric_precision,c.numeric_scale)
                               when (c.numeric_precision is not null) then 
@@ -915,8 +979,13 @@ begin
                                   end  
                                when (c.data_type in ('int4range','int8range','numrange','tsrange','tstzrange','daterange','tsvector')) then
                                  'YADAMU.AS_JSON("' || column_name || '") "' || COLUMN_NAME || '"'
-                               when (c.data_type in ('real')) then 
+                               when (c.data_type in ('real')) then
                                  '"' || column_name || '"::double precision "' || COLUMN_NAME || '"'
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('vector','halfvec'))) then
+                                 /* Widening each element to double precision is exact, so the JSON number reads back as the original element */
+                                 'array_to_json("' || column_name || '"::real[]::double precision[]) "' || COLUMN_NAME || '"'
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name = 'sparsevec')) then
+                                 'YADAMU.AS_SPARSEVEC_JSON("' || column_name || '"::text) "' || COLUMN_NAME || '"'
                                else
                                  '"' || column_name || '"'
                              end,
@@ -929,6 +998,17 @@ begin
               on ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier) = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))
            where t.table_type = 'BASE TABLE'
              and t.table_schema =  P_SCHEMA
+             /* Tables that belong to an extension, such as PostGIS's spatial_ref_sys, are created and populated by the extension */
+             and not exists (select 1
+                               from pg_catalog.pg_depend d
+                              where d.classid = 'pg_catalog.pg_class'::regclass
+                                and d.objid = format('%I.%I',t.table_schema,t.table_name)::regclass
+                                and d.deptype = 'e')
+             /* A partition's rows are exported, and imported, through the partitioned table */
+             and not exists (select 1
+                               from pg_catalog.pg_class pc
+                              where pc.oid = format('%I.%I',t.table_schema,t.table_name)::regclass
+                                and pc.relispartition)
         group by t.table_schema, t.table_name
     
   loop
@@ -1100,8 +1180,10 @@ begin
                    ,CHR(10) || '  ,' ORDER BY IDX
                    ) COLUMNS_CLAUSE
         ,STRING_AGG(case 
-                      when TARGET_DATA_TYPE = 'bytea' then  
+                      when TARGET_DATA_TYPE = 'bytea' then
                         'decode( value ->> ' || IDX-1 || ',''hex'')'
+                      when TARGET_DATA_TYPE = 'sparsevec' then
+                        'YADAMU.AS_SPARSEVEC_TEXT(( value -> ' || IDX-1 || ')::jsonb)::sparsevec'
                       when TARGET_DATA_TYPE in ('geometry','geography') then 
                         case 
                           when P_SPATIAL_FORMAT = 'WKB' then

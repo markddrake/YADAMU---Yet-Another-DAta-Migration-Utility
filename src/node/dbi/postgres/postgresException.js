@@ -27,7 +27,13 @@ class PostgresError extends DatabaseError {
   
   serverUnavailable() {
 	const knownErrors = ['Connection terminated unexpectedly','Client has encountered a connection error and is not queryable']
-    return (this.cause.message && (knownErrors.indexOf(this.cause.message) > -1))
+	// While a server restarts, connection attempts are refused (ECONNREFUSED) or rejected with SQLSTATE 57P03 (cannot_connect_now):
+	// the database system is shutting down, is starting up, is in recovery mode, or is not yet accepting connections.
+    return (
+	  (this.cause.message && (knownErrors.indexOf(this.cause.message) > -1)) ||
+	  (this.cause.code === '57P03') ||
+	  (this.cause.code === 'ECONNREFUSED')
+	)
   }
 
   missingTable() {

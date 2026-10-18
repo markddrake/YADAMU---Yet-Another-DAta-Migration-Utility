@@ -189,6 +189,8 @@ class JSONOutputManager extends YadamuOutputManager {
 
     this.push(this.formatRow(row));
 	this.rowSeperator = ','
+    // Rows are pushed straight to the output stream, so received and committed advance together. reportPipelineStatus() counts read - received as skipped on failure.
+    this.PIPELINE_STATE.received++;
     this.PIPELINE_STATE.committed++;
     if ((this.FEEDBACK_INTERVAL > 0) && ((this.PIPELINE_STATE.committed % this.FEEDBACK_INTERVAL) === 0)) {
       this.LOGGER.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.PIPELINE_STATE.committed}.`);

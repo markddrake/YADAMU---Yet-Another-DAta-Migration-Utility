@@ -1,7 +1,23 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   ORA1120-01: 
+    logging: *default-logging
     container_name: ORA1120-01
     hostname: ORA1120-01
     # image:  oracle/database:11.2.0.4-ee
@@ -36,6 +52,7 @@ services:
     restart: always
 
   ORA1210-01: 
+    logging: *default-logging
     container_name: ORA1210-01
     hostname: ORA1210-01
     # image:  oracle/database:12.1.0.2-ee 
@@ -67,6 +84,7 @@ services:
     restart: always
 
   ORA1220-01: 
+    logging: *default-logging
     container_name: ORA1220-01
     hostname: ORA1220-01
     # image:  oracle/database:12.2.0.1-ee 
@@ -101,6 +119,7 @@ services:
     restart: always
 
   ORA1803-01: 
+    logging: *default-logging
     container_name: ORA1803-01
     hostname: ORA1803-01
     # image:  oracle/database:18.3.0-ee
@@ -135,6 +154,7 @@ services:
     restart: always
 
   ORA1903-01: 
+    logging: *default-logging
     container_name: ORA1903-01
     hostname: ORA1903-01
     # image:  oracle/database:19.3.0-ee
@@ -168,6 +188,7 @@ services:
     restart: always
 
   ORA2103-01: 
+    logging: *default-logging
     container_name: ORA2103-01
     hostname: ORA2103-01
     # image:  oracle/database:21.3.0-ee
@@ -200,6 +221,7 @@ services:
     restart: always
 
   ORACL23-01: 
+    logging: *default-logging
     container_name: ORACL23-01
     hostname: ORACL23-01
     #image:  container-registry.oracle.com/database/free:latest
@@ -227,10 +249,11 @@ services:
     restart: always
 
   ORACL26-01: 
+    logging: *default-logging
     container_name: ORACL26-01
     hostname: ORACL26-01
     #image:  container-registry.oracle.com/database/free:latest
-    image:  gvenzl/oracle-free:23.26.0-full
+    image:  gvenzl/oracle-free:full
     mem_limit: '16gb'
     security_opt:
       - seccomp:unconfined

@@ -66,6 +66,12 @@ class MsSQLOutputManager extends YadamuOutputManager {
             return YadamuLibrary.toBoolean(col)
 		  }
           break;
+		case this.dbi.DATA_TYPES.BIGINT_TYPE:
+		  // bigint is bound as VarChar to avoid rounding (see MsSQLDBI), so a number must arrive as a string: a SQLite INTEGER(5) maps to bigint and is read as a number.
+		  return (col,idx) => {
+            return ((typeof col === 'number') || (typeof col === 'bigint')) ? col.toString() : col
+		  }
+          break;
         case this.dbi.DATA_TYPES.MSSQL_DATETIME_TYPE:
 		  return (col,idx) => {
             if (typeof col === "string") {

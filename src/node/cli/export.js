@@ -6,6 +6,7 @@ import YadamuCLI          from './yadamuCLI.js'
 class Export extends YadamuCLI {}
 
 async function main() {
+  YadamuCLI.guardExitCode()
 
   try {
     const yadamuExport = new Export();
@@ -15,8 +16,10 @@ async function main() {
 	  yadamuExport.reportError(e)
 	}
     await yadamuExport.close();
+    YadamuCLI.setExitCode(yadamuExport.EXIT_CODE)
   } catch (e) {
     YadamuLibrary.reportError(e)
+    YadamuCLI.setExitCode(YadamuCLI.getExitCode(e))
   }
 
 }

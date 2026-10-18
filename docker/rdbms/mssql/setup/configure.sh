@@ -18,15 +18,35 @@ sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i sql/YADAMU_COMPARE.s
 cat log/YADAMU_COMPARE.log
 # Install Northwind
 sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i testdata/Northwind/instnwnd.sql > log/instnwnd.log 2>&1
+# Restore a sample database with setup/<name>.sql, then check that it is ONLINE.
+# SQL Server occasionally fails to recover a restore (Msg 3414 on WorldWideImportersDW's In-Memory OLTP filegroup, 2022-latest, 2026-10-08) and a
+# second attempt succeeds. Each script drops the database first, so it can simply be rerun. The second attempt is logged to log/<name>.retry.log.
+RESTORE_FAILURES=0
+restoreDatabase() {
+  local DB_NAME=$1
+  local LOG_FILE=log/$DB_NAME.log
+  for ATTEMPT in 1 2; do
+    sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i setup/$DB_NAME.sql -v MSSQL_VERSION=$MSSQL_VERSION > $LOG_FILE 2>&1
+    cat $LOG_FILE
+    local DB_STATE=$(sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -C -h-1 -W -Q "set nocount on; select state_desc from sys.databases where name = '$DB_NAME'")
+    if [ "$DB_STATE" = "ONLINE" ]; then
+      return 0
+    fi
+    echo "Restore of $DB_NAME failed on attempt $ATTEMPT. Database state: ${DB_STATE:-not found}."
+    LOG_FILE=log/$DB_NAME.retry.log
+  done
+  echo "ERROR: $DB_NAME is not ONLINE after 2 attempts."
+  RESTORE_FAILURES=$((RESTORE_FAILURES+1))
+}
 # Install AdventureWorks
-sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i setup/AdventureWorks.sql -v MSSQL_VERSION=$MSSQL_VERSION > log/AdventureWorks.log 2>&1
-cat log/AdventureWorks.log
+restoreDatabase AdventureWorks
 # Install AdventureWorks Data Warehouse
-sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i setup/AdventureWorksDW.sql -v MSSQL_VERSION=$MSSQL_VERSION  > log/AdventureWorksDW.log 2>&1
-cat log/AdventureWorksDW.log
+restoreDatabase AdventureWorksDW
 # Install Wide World Importers
-sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i setup/WorldWideImporters.sql -v MSSQL_VERSION=$MSSQL_VERSION > log/WorldWideImporters.log 2>&1
-cat log/WorldWideImporters.log
+restoreDatabase WorldWideImporters
 # Install Wide World Importers Data Warehouse
-sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -C -e -i setup/WorldWideImportersDW.sql -v MSSQL_VERSION=$MSSQL_VERSION > log/WorldWideImportersDW.log 2>&1
-cat log/WorldWideImportersDW.log 
+restoreDatabase WorldWideImportersDW
+if [ $RESTORE_FAILURES -gt 0 ]; then
+  echo "ERROR: $RESTORE_FAILURES sample database restores failed."
+  exit 1
+fi

@@ -439,7 +439,7 @@ class MySQLDBI extends YadamuDBI {
   setLibraries() {
 	this.setSpatialSerializer(this.SPATIAL_FORMAT)
 	switch (true) {
-	  case (this.DATABASE_VERSION < 8.0):
+	  case (YadamuLibrary.compareVersions(this.DATABASE_VERSION,'8.0') < 0):
         this.STATEMENT_LIBRARY_CLASS = StatementLibrary57
 	    break;
       default:

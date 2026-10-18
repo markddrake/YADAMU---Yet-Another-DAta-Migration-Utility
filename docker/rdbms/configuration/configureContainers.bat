@@ -27,7 +27,7 @@ goto :eof
   REM call %~dp0\linux\configureMongoDB.bat  MONGO50-01
   REM call %~dp0\linux\configureMongoDB.bat  MONGO60-01
   REM call %~dp0\linux\configureMongoDB.bat  MONGO70-01
-  call %~dp0\linux\configureMongoDB.bat  MONGO80-01
+  call %~dp0\linux\configureMongoDB.bat  MONGO90-01
   REM call %~dp0\linux\configureVertica.bat  VRTCA09-01
   call %~dp0\linux\configureVertica.bat  VRTCA10-01
   REM call %~dp0\linux\configureVertica.bat  VRTCA11-01
@@ -63,7 +63,7 @@ goto :eof
   REM call %~dp0\windows\configureMongoDB.bat  MONGO50-01
   REM call %~dp0\windows\configureMongoDB.bat  MONGO60-01
   REM call %~dp0\windows\configureMongoDB.bat  MONGO70-01
-  call %~dp0\windows\configureMongoDB.bat  MONGO80-01
+  call %~dp0\windows\configureMongoDB.bat  MONGO90-01
   exit /b
 :end
 

@@ -6,6 +6,7 @@ import YadamuCLI          from './yadamuCLI.js'
 class Encrypt extends YadamuCLI {}
 
 async function main() {
+  YadamuCLI.guardExitCode()
   
   try {
 	const yadamuEncrypt = new Encrypt();
@@ -15,8 +16,10 @@ async function main() {
 	  yadamuEncrypt.reportError(e)
     }
     await yadamuEncrypt.close();
+    YadamuCLI.setExitCode(yadamuEncrypt.EXIT_CODE)
   } catch (e) {
     YadamuLibrary.reportError(e)
+    YadamuCLI.setExitCode(YadamuCLI.getExitCode(e))
   }
 
 }

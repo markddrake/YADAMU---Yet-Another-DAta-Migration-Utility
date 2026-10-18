@@ -1,0 +1,27 @@
+{
+    "connections": "connections.json",
+    "operation": "dbRoundtrip",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "tests": [
+        {
+            "source": "sqlite#2",
+            "target": "sqlite#2",
+            "tasks": [
+                "oracle",
+                "mysql",
+                "mssql"
+            ]
+        },
+        {
+            "source": "mssql#1",
+            "target": "sqlite#2",
+            "tasks": [
+                "WorldWideImporters",
+                "WorldWideImportersDW"
+            ]
+        }
+    ]
+}

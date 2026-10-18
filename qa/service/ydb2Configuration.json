@@ -1,0 +1,24 @@
+{
+    "connections": "./qa/connections/YDB2.json",
+    "schemas": "./qa/connections/schemas.json",
+    "jobs": {
+        "t1": {
+            "source": {
+                "connection": "oracle19c",
+                "schema": "HR"
+            },
+            "target": {
+                "connection": "minio#1File"
+            },
+            "parameters": {
+                "MODE": "DATA_ONLY",
+                "DIRECTORY": "daily_backups/%date%",
+                "FILE": "broadway.json",
+                "BUCKET": "broadway"
+            }
+        }
+    },
+    "parameters": {
+        "encryption": false
+    }
+}

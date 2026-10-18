@@ -1,7 +1,23 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
 
   VRTCA09-01:
+    logging: *default-logging
     container_name: VRTCA09-01
     hostname: VRTCA09-01
     image:  dataplatform/docker-vertica
@@ -20,6 +36,7 @@ services:
     restart: always
 
   VRTCA10-01: 
+    logging: *default-logging
     container_name: VRTCA10-01
     hostname: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
@@ -45,6 +62,7 @@ services:
     restart: always
 
   VRTCA11-01: 
+    logging: *default-logging
     container_name: VRTCA11-01
     hostname: VRTCA11-01
     image:  vertica/vertica-ce:11.1.1-0 
@@ -70,6 +88,7 @@ services:
 
 
   VRTCA12-01: 
+    logging: *default-logging
     container_name: VRTCA12-01
     hostname: VRTCA12-01
     image:  vertica/vertica-ce:12.0.4-0 
@@ -94,6 +113,7 @@ services:
     restart: always    
         
   VRTCA24-01: 
+    logging: *default-logging
     container_name: VRTCA24-01
     hostname: VRTCA24-01
     image:  vertica/vertica-ce:latest 

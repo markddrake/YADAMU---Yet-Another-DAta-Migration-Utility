@@ -3,8 +3,8 @@
 LOG_ROOT="/mount/log"
 
 # Header
-printf "%-32s %-32s %8s %8s %8s %8s %15s\n" \
-       "folder" "run_id" "lines" "errors" "warnings" "failed" "elapsed"
+printf "%-32s %-32s %8s %8s %8s %8s %8s %15s\n" \
+       "folder" "run_id" "lines" "info" "errors" "warnings" "failed" "elapsed"
 
 
 # Build sorted list of top-level folders by creation time
@@ -28,6 +28,7 @@ for suite in $top_folders; do
         [ -f "$log_file" ] || continue
 
         lines=$(wc -l < "$log_file")
+        info=$(grep -c '\[INFO\]' "$log_file")
 
         # Last non-empty line
         last_line=$(tac "$log_file" | sed '/./q')
@@ -38,8 +39,8 @@ for suite in $top_folders; do
         failed=$(echo "$last_line"   | sed -n 's/.*Failed: \([0-9]*\).*/\1/p')
         elapsed=$(echo "$last_line"  | sed -n 's/.*Elapsed Time: \([^ .]*\).*/\1/p')
 
-        printf "%-32s %-32s %8s %8s %8s %8s %15s\n" \
-            "$suite_name" "$run_id" "$lines" \
+        printf "%-32s %-32s %8s %8s %8s %8s %8s %15s\n" \
+            "$suite_name" "$run_id" "$lines" "$info" \
             "${errors:-}" "${warnings:-}" "${failed:-}" "${elapsed:-}"
     done
 done

@@ -1,0 +1,17 @@
+{
+    "connections": "connections.json",
+    "operation": "dbRoundtrip",
+    "tasks": "tasks.json",
+    "recreateSchema": true,
+    "createDirectory": true,
+    "verifyOperation": true,
+    "tests": [
+        {
+            "source": "oracle#1",
+            "target": "sqlite#1",
+            "tasks": [
+                "OE"
+            ]
+        }
+    ]
+}

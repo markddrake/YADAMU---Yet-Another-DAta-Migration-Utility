@@ -1,6 +1,8 @@
 
 import path                     from 'path';
 
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+
 import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
@@ -60,7 +62,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
         */
 
         const setOperators = dataTypes.map((dataType,idx) => {
-	      if (this.dbi.DATABASE_VERSION < '8.0.19' || false) {
+	      if (YadamuLibrary.compareVersions(this.dbi.DATABASE_VERSION,'8.0.19') < 0) {
             switch (dataType.type) {
               case this.dbi.DATA_TYPES.POINT_TYPE:
 			  case this.dbi.DATA_TYPES.LINE_TYPE:

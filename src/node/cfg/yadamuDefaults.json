@@ -21,6 +21,7 @@
 		"cockroach": "../dbi/cockroach/cockroachDBI.js",
 		"oracle": "../dbi/oracle/oracleDBI.js",
 		"postgres": "../dbi/postgres/postgresDBI.js",
+		"sqlite": "../dbi/sqlite/sqliteDBI.js",
 		"vertica": "../dbi/vertica/verticaDBI.js",
 		"redshift": "../dbi/redshift/redshiftDBI.js",
 		"mssql": "../dbi/mssql/mssqlDBI.js",

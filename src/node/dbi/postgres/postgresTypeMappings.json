@@ -84,9 +84,12 @@
                                                                                                              
   , "PGSQL_ACLITEM"                                        : "aclitem"                                          
   , "PGSQL_REFCURSOR"                                      : "refcursor"       
+  , "PGSQL_VECTOR_TYPE"                                    : "vector"
+  , "PGSQL_HALF_VECTOR_TYPE"                               : "halfvec"
+  , "PGSQL_SPARSE_VECTOR_TYPE"                             : "sparsevec"
    
   , "MONGO_OBJECTID_TYPE"                                  : "bytea"
-  , "UNBOUNDED_NUMERIC_TYPE"                               : "select"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric"
   }
 , "limits": {
     "SCALAR_LENGTH"                                        : 10485760

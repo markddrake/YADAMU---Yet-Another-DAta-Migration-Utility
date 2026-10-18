@@ -26,8 +26,9 @@ class HttpDBI extends FileDBI {
 	 return this.httpStream
   }
 
-  getInputStream() {
- 	// this.yadamuLogger.trace([this.constructor.name,],'getInputStream()')
+  _getInputStream() {
+ 	// this.yadamuLogger.trace([this.constructor.name,],'_getInputStream()')
+	// Override _getInputStream(), not getInputStream(): YadamuDBI.getInputStream() attaches the STREAM_STATE and PIPELINE_STATE that FileDBI.getInputStreams() requires.
 	this.inputStream = this.httpStream;
 	return this.inputStream;
   }

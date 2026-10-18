@@ -32,7 +32,17 @@ EOF
 }
 trap _kill SIGKILL
 
-export DB_CREATED=`cat /etc/oratab | grep CDB18300 | wc -l`
+# The database exists once its spfile is on the data volume (moved there below
+# after the first dbca). Do not rely on /etc/oratab alone: this image skips
+# root.sh (see dockerfile), so /etc/oratab is never written, and the check used
+# to grep for CDB18300. Both sent every restart down the create path, where dbca
+# fails on the existing datafiles and the database is never started.
+DB_CREATED=0
+if [ -f $ORACLE_BASE/oradata/dbconfig/spfile$ORACLE_SID.ora ] || grep -q "^$ORACLE_SID:" /etc/oratab 2>/dev/null
+then
+  DB_CREATED=1
+fi
+export DB_CREATED
 if [ "$DB_CREATED" == "0" ]
 then
   netca -silent -responseFile $ORACLE_HOME/assistants/netca/netca.rsp
@@ -56,6 +66,7 @@ else
   lsnrctl start
   sqlplus / as sysdba << EOF
    STARTUP;
+   alter pluggable database all open;
    exit;
 EOF
 fi

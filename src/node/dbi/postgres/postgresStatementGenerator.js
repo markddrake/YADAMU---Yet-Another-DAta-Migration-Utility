@@ -7,10 +7,42 @@ import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
 class PostgreStatementGenerator extends YadamuStatementGenerator {
 
-  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) { 
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
-  
+
+  applyUserSpecifiedMappings(vendorTypeMappings) {
+
+	/*
+	**
+	** The DDL is generated server side, by mapping each source data type through vendorTypeMappings, so a data type specified in the identifier mappings,
+	** e.g. "dataType" : "vector(1536)" for a column that arrives as JSON, has to be applied here. It is already a Postgres type, so it maps to itself.
+	**
+	*/
+
+	const metadata = {}
+	const sourceTypes = new Set(vendorTypeMappings.map((mapping) => { return mapping[0].toLowerCase() }))
+	Object.keys(this.metadata).forEach((key) => {
+	  const tableMetadata = this.metadata[key]
+	  const dataTypes = [...tableMetadata.dataTypes]
+	  const sizeConstraints = [...tableMetadata.sizeConstraints]
+	  tableMetadata.columnNames.forEach((columnName,idx) => {
+	    const dataType = this.getUserSpecifiedMapping(tableMetadata.tableName,columnName)
+		if (dataType) {
+		  const typeDefinition = YadamuDataTypes.decomposeDataType(dataType)
+		  dataTypes[idx] = typeDefinition.type
+		  sizeConstraints[idx] = typeDefinition.hasOwnProperty('scale') ? [typeDefinition.length,typeDefinition.scale] : typeDefinition.hasOwnProperty('length') ? [typeDefinition.length] : []
+		  if (!sourceTypes.has(typeDefinition.type.toLowerCase())) {
+		    vendorTypeMappings.push([typeDefinition.type,typeDefinition.type])
+			sourceTypes.add(typeDefinition.type.toLowerCase())
+		  }
+		}
+	  })
+	  metadata[key] = {...tableMetadata, dataTypes, sizeConstraints}
+	})
+	return metadata
+  }
+
   async generateStatementCache () {    
 
 	await this.init()
@@ -23,10 +55,11 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
 	}
 	
 	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
-	
+	const metadata = this.applyUserSpecifiedMappings(vendorTypeMappings)
+
 	// Passing vendorTypeMappings as Native Javascript Array causes Parsing errors...
 
-    const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, JSON.stringify(vendorTypeMappings), this.targetSchema, options])
+    const results = await this.dbi.executeSQL(sqlStatement,[{metadata : metadata}, JSON.stringify(vendorTypeMappings), this.targetSchema, options])
     let statementCache = results.rows[0][0]
 
     // this.debugStatementGenerator(options,statementCache)
@@ -35,6 +68,13 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
       statementCache = {}
     }
     else {
+	  // Generated columns in tables that already exist in the target schema, e.g. tables created from the source DDL.
+	  const generatedColumns = (await this.dbi.executeSQL(this.dbi.STATEMENT_LIBRARY_CLASS.SQL_GENERATED_COLUMNS,[this.targetSchema])).rows.reduce((generatedColumns,[tableName,columnName]) => {
+		generatedColumns[tableName] = generatedColumns[tableName] || []
+		generatedColumns[tableName].push(columnName)
+		return generatedColumns
+	  },{})
+
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
         const tableMetadata = this.metadata[table];
@@ -167,6 +207,13 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
 			  return `YADAMU.AS_RANGE($%)::${dataTypeDefinition.type}`
 			case this.dbi.DATA_TYPES.PGSQL_TEXTSEACH_VECTOR_TYPE:
 			  return `YADAMU.AS_TS_VECTOR($%)`
+			case this.dbi.DATA_TYPES.PGSQL_SPARSE_VECTOR_TYPE:
+			  // A target whose type mappings have no sparsevec (e.g. Yugabyte) maps it to its JSON type, so this case also matches JSON columns.
+			  if (dataTypeDefinition.type !== 'sparsevec') {
+			    return '$%'
+			  }
+			  // vector and halfvec accept the JSON array as is. sparsevec arrives as {dimensions, indices, values}.
+			  return `YADAMU.AS_SPARSEVEC_TEXT($%::jsonb)::sparsevec`
 			case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
 			  switch (dataTypeDefinitions[idx].typeQualifier) {
 				 case null:
@@ -176,9 +223,16 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
               return '$%';
             default:
               return '$%';
-          }            
+          }
         })
-		
+
+		if (generatedColumns.hasOwnProperty(tableName)) {
+		  // A generated column only accepts DEFAULT. The value supplied by the source is not bound.
+		  tableInfo.includeColumn = tableInfo.columnNames.map((columnName) => { return !generatedColumns[tableName].includes(columnName) })
+		  tableInfo.insertOperators = tableInfo.insertOperators.map((operator,idx) => { return tableInfo.includeColumn[idx] ? operator : 'DEFAULT' })
+		  tableInfo.boundColumnCount = tableInfo.includeColumn.filter((include) => { return include }).length
+		}
+
         if (tableMetadata.dataFile) {
 		  const columnDefinitions = []
           const copyOperators = dataTypeDefinitions.map((dataTypeDefinition,idx) => {
@@ -197,8 +251,15 @@ class PostgreStatementGenerator extends YadamuStatementGenerator {
 		        return `case when length("${tableInfo.columnNames[idx]}") > 16 then substring("${tableInfo.columnNames[idx]}",12,15)::time when  length("${tableInfo.columnNames[idx]}") > 15 then substring("${tableInfo.columnNames[idx]}",1,15)::time else "${tableInfo.columnNames[idx]}"::time end`				
 			  case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
 		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
-		        return `case when length("${tableInfo.columnNames[idx]}") > 26 then substring("${tableInfo.columnNames[idx]}",1,26)::timestamp without time zone  else "${tableInfo.columnNames[idx]}"::timestamp without time zone end`				
-			  default:	
+		        return `case when length("${tableInfo.columnNames[idx]}") > 26 then substring("${tableInfo.columnNames[idx]}",1,26)::timestamp without time zone  else "${tableInfo.columnNames[idx]}"::timestamp without time zone end`
+			  case this.dbi.DATA_TYPES.PGSQL_SPARSE_VECTOR_TYPE:
+			    // As above: on a target without sparsevec this case also matches JSON columns, which take the default path.
+			    if (dataTypeDefinition.type !== 'sparsevec') {
+			      break
+			    }
+		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" jsonb`)
+		        return `YADAMU.AS_SPARSEVEC_TEXT("${tableInfo.columnNames[idx]}")::sparsevec`
+			  default:
 		    }		  
 		    columnDefinitions.push(`"${tableInfo.columnNames[idx]}" ${tableInfo.targetDataTypes[idx]}`)
 		    return `"${tableInfo.columnNames[idx]}"`

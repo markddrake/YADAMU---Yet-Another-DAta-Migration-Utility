@@ -71,6 +71,11 @@ services:
     container_name: yadamu-test-oracle19c
     command: sh -c "/usr/local/bin/runIndividualTest.sh oracle19c && tail -f /dev/null"
 
+  sqlite:
+    <<: *orchestrator-common
+    container_name: yadamu-test-sqlite
+    command: sh -c "/usr/local/bin/runIndividualTest.sh sqlite && tail -f /dev/null"
+
   oracle21c:
     <<: *orchestrator-common
     container_name: yadamu-test-oracle21c

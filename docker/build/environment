@@ -1,8 +1,8 @@
-FROM node:22.12
+FROM node:lts
 WORKDIR /usr/src/YADAMU
 
 # Add Oracle instant client
-ADD https://download.oracle.com/otn_software/linux/instantclient/2350000/oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm .
+ADD https://download.oracle.com/otn_software/linux/instantclient/2326300/oracle-instantclient-basic-23.26.3.0.0-1.el9.x86_64.rpm .
 
 COPY src/package*.json ./
 
@@ -11,7 +11,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends libaio1 alien python3 make g++ \
  && rm -rf /var/lib/apt/lists/* \
  # Convert & install Oracle client
- && alien -i --scripts ./oracle-instantclient-basic-23.5.0.24.07-1.el9.x86_64.rpm \
+ && alien -i --scripts ./oracle-instantclient-basic-23.26.3.0.0-1.el9.x86_64.rpm \
  # npm hygiene
  && npm set progress=false \
  && npm set fund=false \
@@ -19,7 +19,11 @@ RUN apt-get update \
  && npm set fetch-retries=3 \
  && npm set fetch-timeout=30000 \
  && npm config set loglevel=warn \
- # Main install
- && npm install --no-fund --no-audit --prefer-offline --foreground-scripts=false \
+ # Install exactly what src/package-lock.json records, so the image tests what is committed
+ && npm ci --no-fund --no-audit --foreground-scripts=false \
  && npm ls --omit=dev \
+ # sqlite3's prebuilt Linux binary needs a newer glibc than the node:lts (Debian bookworm) base provides
+ && npm rebuild sqlite3 --build-from-source \
+ # Fail the build if npm skipped a native install script (see allowScripts in src/package.json)
+ && for m in sqlite3 ibm_db oracledb; do node -e "require('$m'); console.log('$m loads')" || exit 1; done \
  && node --version

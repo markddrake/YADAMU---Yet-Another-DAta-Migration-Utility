@@ -1,11 +1,33 @@
 
+# Bounded container logs. json-file has NO size limit by default, so a
+# container's log grows until the container is removed. 5 x 20MB = 100MB
+# ceiling per container, rotated segments gzipped.
+#
+# Declared PER SERVICE rather than as a daemon-wide default: log options are
+# stamped onto a container when it is CREATED, so setting them here needs no
+# dockerd restart, and the value is visible in the file you are reading instead
+# of in /etc/docker/daemon.json on some host.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
   YUGABYTE-01:
+      logging: *default-logging
       container_name: YUGABYTE-01
       hostname: YUGABYTE-01
-      # image: yugabytedb/yugabyte:latest
-      image: yugabytedb/yugabyte:2024.1.3.0-b105
-      command: /home/yugabyte/bin/yugabyted start --background=false --base_dir=/home/yugabyte/yb_data
+      # Floating tag (2026-10-12); was pinned to 2024.1.3.0-b105. Pin again only for a recorded reason.
+      image: yugabytedb/yugabyte:latest
+      # Images from 2025 on run as the non-root user yugabyte (uid 10001), which can't write the
+      # root-owned named volume mounted at /home/yugabyte/yb_data. The 2024 images ran as root.
+      user: root
+      # yb-tserver sizes its memory limits from /proc/meminfo, which shows the host's RAM (125 GB on yadamu-db1,
+      # giving a 75 GB hard limit), not mem_limit. Under load it then grew to the 16 GB container limit without
+      # throttling, and YSQL restarted twice during ydbCopy (2026-10-15). Give it a hard limit that fits mem_limit.
+      command: /home/yugabyte/bin/yugabyted start --background=false --base_dir=/home/yugabyte/yb_data --tserver_flags=memory_limit_hard_bytes=12884901888
       # command: sleep 365d
       mem_limit: '16Gb'
       volumes:

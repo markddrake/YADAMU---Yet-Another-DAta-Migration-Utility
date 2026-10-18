@@ -454,6 +454,29 @@ class YadamuLibrary {
   static getVendorSettings(connectionProperties) {
     return connectionProperties(this.getVendorName(connectionProperties))
   }
+
+  static compareVersions(v1,v2) {
+    /*
+    **
+    ** Numeric comparison of dotted version numbers, e.g. '8.0.19', '26.7.0', 'v24.1.0-0', '160002' or 19.3. 
+    ** The first dotted numeric sequence in each value is compared component by component; missing components are treated as 0.
+    ** Returns -1, 0 or 1, or NaN if either value does not contain a version number, so that any comparison of the result with 0 is false.
+    **
+    */
+    const parse = (version) => String(version).match(/\d+(\.\d+)*/)?.[0].split('.').map(Number)
+    const a = parse(v1)
+    const b = parse(v2)
+    if (!a || !b) {
+      return NaN
+    }
+    for (let i = 0; i < Math.max(a.length,b.length); i++) {
+      const diff = (a[i] || 0) - (b[i] || 0)
+      if (diff !== 0) {
+        return Math.sign(diff)
+      }
+    }
+    return 0
+  }
   
   static stripInsignificantZeros(numericValue) {
 	return numericValue.replace(/(\.0*|(?<=(\..*))0*)$/, '')

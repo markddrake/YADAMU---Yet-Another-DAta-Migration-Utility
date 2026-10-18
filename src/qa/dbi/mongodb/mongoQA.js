@@ -89,7 +89,7 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
 		  // this.listCurrentOps()
 		  
 		  this.LOGGER.log(tags,`Killing connection.`);
-          const killClient = await new MongoClient(this.getMongoURL(),{ useUnifiedTopology: true});
+          const killClient = await new MongoClient(this.getMongoURL());
           await killClient.connect();
           const dbAdmin = await killClient.db('admin',{returnNonCachedInstance:true});  
           const dropConnections = {

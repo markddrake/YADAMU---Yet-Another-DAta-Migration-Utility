@@ -96,6 +96,9 @@ class AWSS3FileDBI extends FileDBI {
 	, forcePathStyle     : connectionProperties.s3ForcePathStyle
 	, endpoint           : connectionProperties.endpoint
 	, signatureVersion   : connectionProperties.signatureVersion
+	// Since @aws-sdk 3.729 the SDK sends and validates CRC32 checksums by default; S3-compatible stores such as older MinIO releases reject them
+	, requestChecksumCalculation  : 'WHEN_REQUIRED'
+	, responseChecksumValidation  : 'WHEN_REQUIRED'
 	, credentials        : {
 	    accessKeyId      : connectionProperties.accessKeyId
 	  , secretAccessKey  : connectionProperties.secretAccessKey  

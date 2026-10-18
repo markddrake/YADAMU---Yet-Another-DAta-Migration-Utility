@@ -118,6 +118,8 @@ class Yadamu {
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
   get PARALLEL_ENABLED()              { return this._PARALLEL_ENABLED || false }
   set PARALLEL_ENABLED(v)             { this._PARALLEL_ENABLED = ((this.PARALLEL && (this.PARALLEL > 0)) && v )}
+  get PARTITION_LEVEL_READS()         { return this._PARTITION_LEVEL_READS || false }
+  set PARTITION_LEVEL_READS(v)        { this._PARTITION_LEVEL_READS = !!v }
 
   get SOURCE_DIRECTORY()              { return this.parameters.SOURCE_DIRECTORY || this.parameters.DIRECTORY }
   get TARGET_DIRECTORY()              { return this.parameters.TARGET_DIRECTORY || this.parameters.DIRECTORY }
@@ -239,9 +241,16 @@ class Yadamu {
     })() 
   }
   
-  constructor(operation,configParameters) {
-	
+  constructor(operation,configParameters,commandLineParameters) {
+
 	this._OPERATION = operation
+
+	// A long running process (the service) supplies the command line parameters it parsed and validated at startup,
+	// rather than having every Yadamu re-parse process.argv and re-validate files named there (e.g. CONFIG).
+	if (commandLineParameters !== undefined) {
+	  this._COMMAND_LINE_PARAMETERS = { ...commandLineParameters }
+	}
+
     this.activeConnections = new Set();
 	this.mappedDataTypes = new Set();
 	      
@@ -266,7 +275,9 @@ class Yadamu {
 	  // this.LOGGER.trace(['UNHANDLED REJECTION','IGNORED','YADAMU',this.STATUS.operation],err);
 	  return;
 	}
-    
+
+	// Ensure the process reports failure to its caller, whether it exits via process.exit() below or when the event loop drains.
+	process.exitCode = 1
 	this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
     this.LOGGER.handleException(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
 	this.STATUS.errorRaised = true;
@@ -851,11 +862,14 @@ class Yadamu {
 	      case 'TRUNCATE_ON_LOAD':		  
 	        parameters.TRUNCATE_ON_LOAD = this.getBooleanValue(parameterName,parameterValue)
 		    break;
-	      case 'RESET_IDENTITY':		  
+	      case 'RESET_IDENTITY':
 	        parameters.RESET_IDENTITY = this.getBooleanValue(parameterName,parameterValue)
 		    break;
+	      case 'CONSISTENT_EXPORT':
+	        parameters.CONSISTENT_EXPORT = this.getBooleanValue(parameterName,parameterValue)
+		    break;
           case 'IDENTIFIER_MAPPING_FILE':
-            parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);
+            parameters.IDENTIFIER_MAPPING_FILE = this.isExistingFile(parameterName,parameterValue);
             break;
           case 'IDENTIFIER_TRANSFORMATION':
             parameters.IDENTIFIER_TRANSFORMATION = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_IDENTIFIER_TRANSFORMATION);
@@ -931,6 +945,8 @@ class Yadamu {
   
   async getDBReader(dbi,isDatabase) {
 	const dbReader = isDatabase ? this.PARALLEL_ENABLED ? new DBReaderParallel(dbi, this.LOGGER) : new DBReader(dbi, this.LOGGER) : new DBReaderFile(dbi, this.LOGGER)
+	// Only the parallel reader splits a partitioned table into one stream per partition (DBReaderParallel.pipelineTables). Writers that plan per-partition output (the loader) must follow the same rule.
+	this.PARTITION_LEVEL_READS = (dbReader instanceof DBReaderParallel) && dbi.PARTITION_LEVEL_OPERATIONS
 	await dbReader.initialize();
     return dbReader;
   }

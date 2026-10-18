@@ -67,6 +67,7 @@ function initApp() {
   // Do not use bodyParser due to restrictions on JSON payload size...
   // app.use(bodyParser.json()); // for parsing application/json
   
+  app.use(Routes.recordStartTime);
   app.use('/yadamu', getRouter());
 
   app.use((req, res, next) => {
@@ -79,7 +80,12 @@ function initApp() {
   app.use(Routes.handleException);
 	
   
-  app.listen(port,() => {
+  app.listen(port,(e) => {
+    // Express 5 passes listen errors (e.g. EADDRINUSE) to the callback instead of throwing them
+    if (e) {
+      Routes.log(`Yadamu Server failed to listen on localhost:${port}: ${e.message}`);
+      process.exit(1);
+    }
     Routes.log('Yadamu Server Listening on localhost:' + port);
   });
 }

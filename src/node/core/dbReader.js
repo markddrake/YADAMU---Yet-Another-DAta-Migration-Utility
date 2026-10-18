@@ -117,7 +117,7 @@ class DBReader extends Readable {
 	}) 
   }
   
-  async pipelineTable(task,readerDBI,writerDBI,retryOnError) {
+  async pipelineTable(task,readerDBI,writerDBI,retryOnError,retrying) {
 	 
 	retryOnError = retryOnError && (readerDBI.ON_ERROR === 'RETRY')
 
@@ -169,6 +169,8 @@ class DBReader extends Readable {
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
 	} catch (err) {
 	  pipelineState.endTime = performance.now();
+	  // The pipeline rejected, so this attempt failed even if no stream flagged it, e.g. a fault before the first row, or one outside the YADAMU streams.
+	  pipelineState.failed = true
 		
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME,readerDBI.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
 	  
@@ -190,6 +192,8 @@ class DBReader extends Readable {
 	  
 	  // Report Pipeline state and determine the underlying cause of the error.  
 	  // console.log(pipelineState)
+	  // A failed attempt that will be retried, or a retry that retryPipelineTable() may retry again, is provisional. retryPipelineTable() finalizes the last attempt.
+	  pipelineState.retryPending = (retryOnError || retrying) === true
 	  let cause =  writerDBI.reportPipelineStatus(pipelineState,err)
 
       // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,queryInfo.MAPPED_TABLE_NAME],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:[${s.readableLength},${s.writableLength}]` }).join(',')}`)
@@ -223,7 +227,8 @@ class DBReader extends Readable {
   }
   
   pipelineSucceeded(pipelineState) {
-	return (pipelineState.read === pipelineState.committed) 
+	// A failed attempt is never a success, even when read === committed: a fault before the first row reports 0 of 0.
+	return (!pipelineState.failed && (pipelineState.read === pipelineState.committed))
   }
   
   isDuplicateException(a,b){
@@ -256,8 +261,9 @@ class DBReader extends Readable {
 	  await writerDBI.truncateTable(writerDBI.CURRENT_SCHEMA,task.TABLE_NAME)
 	  readerDBI.adjustQuery(task)
 	  retryCount++
-	  currentState = await this.pipelineTable(task,readerDBI,writerDBI,false)
+	  currentState = await this.pipelineTable(task,readerDBI,writerDBI,false,true)
     } while (!this.pipelineSucceeded(currentState) && !this.duplicateCause(previousState,currentState) && (retryCount < 6))
+	writerDBI.finalizePipelineState(currentState)
   }
 
   async pipelineTables(taskList,readerDBI,writerDBI) {

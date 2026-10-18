@@ -14,6 +14,7 @@ class PostgresConstants {
 	, "BYTEA_SIZING_MODEL"        : "100%"
 	, "TIMESTAMP_PRECISION"       : 6
 	, "COPY_SERVER_NAME"          : "YADAMU_CSV_SERVER"
+	, "MAINTENANCE_WORK_MEM"      : "512MB"   /* Used when building the indexes deferred until the data is loaded, e.g. pgvector's ivfflat requires more than the server default */
     })
     return this._STATIC_PARAMETERS;
   }
@@ -38,6 +39,7 @@ class PostgresConstants {
   static get BYTEA_SIZING_MODEL()     { return this.DBI_PARAMETERS.BYTEA_SIZING_MODEL };
   static get POSTGRES_JSON_TYPE()     { return this.DBI_PARAMETERS.POSTGRES_JSON_TYPE };
   static get COPY_SERVER_NAME()       { return this.DBI_PARAMETERS.COPY_SERVER_NAME };
+  static get MAINTENANCE_WORK_MEM()   { return this.DBI_PARAMETERS.MAINTENANCE_WORK_MEM };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
 }

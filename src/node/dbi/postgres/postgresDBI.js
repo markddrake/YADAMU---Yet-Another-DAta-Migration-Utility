@@ -99,6 +99,7 @@ class PostgresDBI extends YadamuDBI {
   get CIRCLE_FORMAT()                 { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
   get BYTEA_SIZING_MODEL()            { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
   get COPY_SERVER_NAME()              { return this.parameters.COPY_SERVER_NAME || PostgresConstants.COPY_SERVER_NAME }
+  get MAINTENANCE_WORK_MEM()          { return this.parameters.MAINTENANCE_WORK_MEM || PostgresConstants.MAINTENANCE_WORK_MEM }
 							         
   get POSTGIS_VERSION()               { return this._POSTGIS_VERSION || "Not Installed" }
   set POSTGIS_VERSION(v)              { this._POSTGIS_VERSION = v }
@@ -155,7 +156,10 @@ class PostgresDBI extends YadamuDBI {
     connectionProperties.password     = process.env.PGPASSWORD         || connectionProperties.password
     connectionProperties.port         = process.env.PGHPORT            || connectionProperties.port 	
     connectionProperties.sslrootcert  = process.env.PGSSLROOTCERT      || this.parameters.SSL_ROOT_CERT  || connectionProperties.sslrootcert 
-
+    
+    const opts = process.env.PGOPTIONS || connectionProperties.options || []
+    connectionProperties.options = Array.isArray(opts) ? opts.join(' ') : opts
+	
     if (connectionProperties.sslrootcert) {
 	  const sslCert = fs.readFileSync(path.resolve(connectionProperties.sslrootcert),'ascii')
 	  connectionProperties.ssl = {
@@ -321,6 +325,62 @@ class PostgresDBI extends YadamuDBI {
 	if (this.isManager()) {
       this.LOGGER.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
 	}
+
+	if (this.EXPORT_SNAPSHOT) {
+	  await this.importSnapshot(this.EXPORT_SNAPSHOT)
+	}
+  }
+
+  /*
+  **
+  ** Consistent Export (CONSISTENT_EXPORT=true, the default).
+  **
+  ** As pg_dump does, the manager starts a repeatable read transaction and exports its snapshot, and every other connection used to read the schema imports it,
+  ** so the DDL, the metadata and every table are read as of the same moment, even while the database is being updated.
+  **
+  ** The snapshot can only be imported while the manager's transaction is open, so it remains open until finalizeExport(). If the manager loses its connection
+  ** the export fails, rather than continuing with inconsistent reads.
+  **
+  ** The cost is that the transaction holds back the vacuum horizon for the duration of the export. On a database that is not being updated it gains nothing,
+  ** and CONSISTENT_EXPORT=false reads each table as of the moment it is read.
+  **
+  */
+
+  get EXPORT_SNAPSHOT()               { return this.isManager() ? this._EXPORT_SNAPSHOT : this.manager.EXPORT_SNAPSHOT }
+  // Workers generate their own queries, but only the manager loads the schema metadata.
+  get INHERITANCE_PARENTS()           { return this.isManager() ? this._INHERITANCE_PARENTS : this.manager.INHERITANCE_PARENTS }
+  set INHERITANCE_PARENTS(v)          { this._INHERITANCE_PARENTS = v }
+
+  async initializeExport() {
+	await super.initializeExport()
+	if (this.CONSISTENT_EXPORT) {
+	  await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_CONSISTENT_EXPORT)
+	  this.SNAPSHOT_TRANSACTION_ACTIVE = true
+	  this._EXPORT_SNAPSHOT = (await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_EXPORT_SNAPSHOT)).rows[0][0]
+	  this.LOGGER.info([this.DATABASE_VENDOR,'EXPORT'],`Consistent export: all tables are read from snapshot "${this._EXPORT_SNAPSHOT}".`)
+	}
+  }
+
+  async importSnapshot(snapshotId) {
+	if (!/^[0-9A-F]+-[0-9A-F]+-[0-9]+$/i.test(snapshotId)) {
+	  throw new Error(`Invalid snapshot identifier "${snapshotId}".`)
+	}
+	await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_CONSISTENT_EXPORT)
+	this.SNAPSHOT_TRANSACTION_ACTIVE = true
+	await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SET_TRANSACTION_SNAPSHOT(snapshotId))
+  }
+
+  async endSnapshotTransaction() {
+	if (this.SNAPSHOT_TRANSACTION_ACTIVE) {
+	  this.SNAPSHOT_TRANSACTION_ACTIVE = false
+	  await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_END_CONSISTENT_EXPORT)
+	}
+  }
+
+  async finalizeExport() {
+	this._EXPORT_SNAPSHOT = undefined
+	await this.endSnapshotTransaction()
+	await super.finalizeExport()
   }
   
   async closeConnection(options) {
@@ -329,6 +389,11 @@ class PostgresDBI extends YadamuDBI {
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
+	  try {
+	    await this.endSnapshotTransaction()
+	  } catch (e) {
+	    // The connection is being released. A failed transaction is rolled back by the server.
+	  }
       try {
      	stack = new Error().stack;
         await this.connection.release()
@@ -369,6 +434,26 @@ class PostgresDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
+
+  async truncateTable(schema,tableName) {
+	 
+	 
+	const activeTransaction = this.TRANSACTION_IN_PROGRESS
+	if (this.TRANSACTION_IN_PROGRESS) {
+	  await this.rollbackTransaction()
+	}
+	
+	const sqlStatement = `${this.SQL_TRUNCATE_TABLE_OPERATION} "${schema}"."${tableName}" cascade`
+	
+	await this.beginTransaction()
+	await this.executeSQL(sqlStatement)
+	await this.commitTransaction()
+	
+	if (activeTransaction) {
+	  await this.beginTransaction()
+	}
+	
+  }  
   
   async executeSQL(sqlStatement,args) {
 		
@@ -683,9 +768,33 @@ class PostgresDBI extends YadamuDBI {
   */
 
   async getDDLOperations() {
-	const schema = this.CURRENT_SCHEMA === this.CURRENT_SCHEMA.toLowerCase() ? this.CURRENT_SCHEMA : `"${this.CURRENT_SCHEMA}"`
-	const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_DDL_STATEMENTS,[schema])
-	return results.rows.map((row) => { return row[0] })
+	return await this.generateDDL(this.CURRENT_SCHEMA)
+  }
+
+  async generateDDL(schema,...searchPath) {
+	// With the search_path set to the schema being exported, the pg_get_*def() functions qualify every object that is not in the schema.
+	const currentSearchPath = await this.setSearchPath([schema,...searchPath],false)
+	try {
+	  const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_DDL_STATEMENTS,[schema])
+	  return results.rows.map((row) => { return row[0] })
+	} finally {
+	  await this.restoreSearchPath(currentSearchPath)
+	}
+  }
+
+  async setSearchPath(schemas,appendCurrentSearchPath) {
+	// Returns the current search_path, so that it can be restored.
+	const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_GET_SEARCH_PATH)
+	const searchPath = schemas.filter((schema) => { return schema }).map((schema) => { return `"${schema.replaceAll('"','""')}"` })
+	if (appendCurrentSearchPath) {
+	  searchPath.push(results.rows[0][0])
+	}
+	await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SET_SEARCH_PATH,[searchPath.join(', ')])
+	return results.rows[0][0]
+  }
+
+  async restoreSearchPath(searchPath) {
+	await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SET_SEARCH_PATH,[searchPath])
   }
   
   async getSchemaMetadata() {
@@ -701,7 +810,17 @@ class PostgresDBI extends YadamuDBI {
        this.processLog(results.rows[0][6],`EXPORT_JSON('${this.CURRENT_SCHEMA}','${this.SPATIAL_FORMAT}')`)
 	}
 	// console.dir(results,{depth:null})
+	// A query on an inheritance parent also returns its children's rows. The children are exported separately.
+	this.INHERITANCE_PARENTS = (await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_INHERITANCE_PARENTS,[this.CURRENT_SCHEMA])).rows.map((row) => { return row[0] })
     return this.generateSchemaInfo(results.rows)
+  }
+
+  generateSQLQuery(tableMetadata) {
+    const queryInfo = super.generateSQLQuery(tableMetadata)
+	if (this.INHERITANCE_PARENTS?.includes(tableMetadata.TABLE_NAME)) {
+	  queryInfo.SQL_STATEMENT = queryInfo.SQL_STATEMENT.replace(' from "',' from only "')
+	}
+	return queryInfo
   }
 
   async _getInputStream(queryInfo) {        
@@ -789,32 +908,71 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async _executeDDL(ddl) {
-	
+
+	/*
+	**
+	** Statements marked POST_DATA (indexes, foreign keys and triggers) and DATA (sequence values and materialized view contents) are deferred until finalizeData(), so the data is loaded without them.
+	** A DDL_ONLY operation applies the POST_DATA statements immediately, and never applies the DATA statements.
+	**
+	*/
+
+	const schema = `"${this.CURRENT_SCHEMA.replaceAll('"','""')}"`
+	const statements = ddl.filter((ddlStatement) => { return ddlStatement }).map((ddlStatement) => { return ddlStatement.replace(/%%SCHEMA%%/g,schema) })
+
+	const isPostData = (ddlStatement) => { return ddlStatement.startsWith(this.STATEMENT_LIBRARY_CLASS.POST_DATA_MARKER) }
+	const isData     = (ddlStatement) => { return ddlStatement.startsWith(this.STATEMENT_LIBRARY_CLASS.DATA_MARKER) }
+
+	const immediate = statements.filter((ddlStatement) => { return !isPostData(ddlStatement) && !isData(ddlStatement) })
+	const deferred = statements.filter((ddlStatement) => { return isPostData(ddlStatement) || isData(ddlStatement) })
+
+	if (this.MODE === 'DDL_ONLY') {
+	  immediate.push(...deferred.filter(isPostData))
+	  this.DEFERRED_DDL = []
+	}
+	else {
+	  this.DEFERRED_DDL = deferred
+	}
+
+	return await this.applyDDL(immediate)
+  }
+
+  async applyDDL(statements) {
+
     let results = []
-    //  await this.createSchema(this.CURRENT_SCHEMA)
-   
+
     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.DISABLE_FUNCTION_COMPILATION)
 
-	const schema = this.CURRENT_SCHEMA === this.CURRENT_SCHEMA.toLowerCase() ? this.CURRENT_SCHEMA : `"${this.CURRENT_SCHEMA}"`
-   
+	// Unqualified names in replayed DDL refer either to objects in the target schema, or to objects, such as extension types, that remain in the source schema.
+	// Generated DDL relies on the connection's search_path, e.g. to find PostGIS types in public.
+	const searchPath = await this.setSearchPath([this.CURRENT_SCHEMA,this.systemInformation?.schema],true)
+
     try {
-	  for (let ddlStatement of ddl) {
-	    if (ddlStatement) {
-          ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema)
-		  ddlStatement = ddlStatement.replaceAll(` ${this.systemInformation.schema}.`,` ${schema}.`)
-		  ddlStatement = ddlStatement.replaceAll(`(${this.systemInformation.schema}.`,`(${schema}.`)
-		  ddlStatement = ddlStatement.replaceAll(` "${this.systemInformation.schema}"."`,` "${this.CURRENT_SCHEMA}"."`)
-		  ddlStatement = ddlStatement.replaceAll(` ("${this.systemInformation.schema}"."`,` ("${this.CURRENT_SCHEMA}"."`)
-		  results.push (await this.executeSQL(ddlStatement))
-	    }
+	  for (const ddlStatement of statements) {
+		results.push(await this.executeSQL(ddlStatement))
       }
     } catch (e) {
 	  this.LOGGER.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	  results = e;
     }
+
+	await this.restoreSearchPath(searchPath)
     await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.ENABLE_FUNCTION_COMPILATION)
 
 	return results;
+  }
+
+  async finalizeData() {
+	if (this.DEFERRED_DDL?.length > 0) {
+	  const startTime = performance.now()
+	  await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SET_MAINTENANCE_WORK_MEM,[this.MAINTENANCE_WORK_MEM])
+	  const results = await this.applyDDL(this.DEFERRED_DDL)
+	  await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_RESET_MAINTENANCE_WORK_MEM)
+	  this.DEFERRED_DDL = []
+	  if (results instanceof Error) {
+	    throw results
+	  }
+	  this.LOGGER.ddl([this.DATABASE_VENDOR],`Executed ${results.length} deferred DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
+	}
   }
    
   async generateStatementCache(schema) {

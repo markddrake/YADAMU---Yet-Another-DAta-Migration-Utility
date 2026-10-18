@@ -1,4 +1,5 @@
 
+import crypto                 from 'crypto'
 import path                   from 'path'
 
 import {
@@ -16,6 +17,7 @@ import {
 import { 
   HeadBucketCommand
 , CreateBucketCommand
+, DeleteObjectCommand
 , DeleteObjectsCommand
 , GetObjectCommand
 , HeadObjectCommand
@@ -62,9 +64,24 @@ class AWSS3StorageService {
   get DEBUGGER()           { return this._DEBUGGER }
   set DEBUGGER(v)          { this._DEBUGGER = v }
 
+  static addContentMD5(s3Client) {
+	// DeleteObjects requires an integrity header. Since @aws-sdk 3.729 the SDK sends a CRC32 checksum instead of Content-MD5,
+	// which MinIO releases before 2025-01 reject with "Missing required header for this request: Content-Md5".
+	if (s3Client.middlewareStack.identify().some((name) => name.startsWith('yadamuContentMD5'))) {
+	  return
+	}
+	s3Client.middlewareStack.add((next,context) => async (args) => {
+	  if ((context.commandName === 'DeleteObjectsCommand') && args.request?.body) {
+	    args.request.headers['content-md5'] = crypto.createHash('md5').update(args.request.body).digest('base64')
+	  }
+	  return next(args)
+	},{ step: 'build', name: 'yadamuContentMD5' })
+  }
+
   constructor(dbi,parameters) {
 	this.dbi = dbi
 	this.s3Client = this.dbi.cloudConnection
+	AWSS3StorageService.addContentMD5(this.s3Client)
 	this.parameters = parameters || {}
 	this.LOGGER = this.dbi.LOGGER
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
@@ -116,6 +133,9 @@ class AWSS3StorageService {
     })
 	
 	activeWriters.add(writeOperation)
+	// The failure reaches the pipeline through Body.destroy(), and workersFinished() settles activeWriters only when the copy ends,
+	// so mark the rejection as handled here. Otherwise it surfaces as an unhandled rejection, which aborts the copy and defeats ON_ERROR=RETRY.
+	writeOperation.catch(() => {})
 	return input.params.Body
   }
   

@@ -9,13 +9,17 @@ case $YADAMU_TEST_NAME  in
     source qa/bin/createOutputFolders.sh mnt
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh initialize
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh stageDataSets
-  ;;	
+    # Last, because it raises the threadpool for the SQLite writers (see the sqlite test).
+    export UV_THREADPOOL_SIZE=8
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteStageDataSets
+  ;;
   
   standard)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDDL
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
@@ -69,6 +73,7 @@ case $YADAMU_TEST_NAME  in
     source qa/bin/createOutputFolders.sh mnt
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDDL
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
@@ -89,6 +94,7 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10ShortRegression
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDDL
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
@@ -205,6 +211,20 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2012TestSuite
   ;;
 
+  sqlite)
+    # A SQLite writer blocked on the write lock holds a libuv threadpool thread, so SqliteDBI caps
+    # PARALLEL at UV_THREADPOOL_SIZE-1 and warns. The default pool of 4 would cap the harness
+    # default PARALLEL of 4 on every SQLite target. 8 leaves PARALLEL 4 alone, and
+    # sqliteParallelRoundtrip exercises the cap deliberately. The source schemas are built by
+    # sqliteStageDataSets during initialization.
+    export UV_THREADPOOL_SIZE=8
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteAsTargetRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteAsSourceRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteMultiSchema
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteParallelRoundtrip
+  ;;
+
   db2)
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh db2ShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh db2DataTypes
@@ -306,6 +326,6 @@ case $YADAMU_TEST_NAME  in
   
   
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, snowflake, vertica, vertica09, cmdLine, copy, interactive or custom"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, snowflake, sqlite, vertica, vertica09, cmdLine, copy, interactive or custom"
   ;;
 esac
