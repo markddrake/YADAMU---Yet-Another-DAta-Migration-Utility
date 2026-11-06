@@ -63,6 +63,13 @@ then
   /
 EOF
 else
+  # The links created above live in the container layer, so a container recreated
+  # on the existing data volume starts without them.
+  ln -sf $ORACLE_BASE/oradata/dbconfig/spfile$ORACLE_SID.ora $ORACLE_HOME/dbs/spfile$ORACLE_SID.ora
+  ln -sf $ORACLE_BASE/oradata/dbconfig/orapw$ORACLE_SID      $ORACLE_HOME/dbs/orapw$ORACLE_SID
+  ln -sf $ORACLE_BASE/oradata/dbconfig/sqlnet.ora            $ORACLE_HOME/network/admin/sqlnet.ora
+  ln -sf $ORACLE_BASE/oradata/dbconfig/listener.ora          $ORACLE_HOME/network/admin/listener.ora
+  ln -sf $ORACLE_BASE/oradata/dbconfig/tnsnames.ora          $ORACLE_HOME/network/admin/tnsnames.ora
   lsnrctl start
   sqlplus / as sysdba << EOF
    STARTUP;

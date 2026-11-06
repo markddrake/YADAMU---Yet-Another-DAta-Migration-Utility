@@ -1,0 +1,13 @@
+ARG BASE_IMAGE=yadamu/secure:latest
+FROM ${BASE_IMAGE}
+WORKDIR /usr/src/YADAMU
+# The Teradata driver is kept out of the base images (src/package.json) for now and is only installed here.
+# teradatasql is pinned exactly: since 20.0.20 it leaks every fetched row buffer, and the worker's workaround
+# (freeFetchedRowBuffers in src/node/dbi/teradata/worker/teradataWorker.js) depends on the driver's internals.
+ARG TERADATASQL_VERSION=20.0.72
+RUN npm install --no-save --no-fund --no-audit teradatasql@${TERADATASQL_VERSION} \
+ && node -e "require('teradatasql'); console.log('teradatasql ' + require('teradatasql/package.json').version + ' loads')"
+COPY src src
+COPY docker/regressionTests/bin/chooseTest.sh bin/chooseTest.sh
+COPY qa/regression/teradata*.json qa/regression/
+ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

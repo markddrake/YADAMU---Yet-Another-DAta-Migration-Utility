@@ -39,6 +39,9 @@ class CloudService {
 
 class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
 
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
+
   static #DBI_PARAMETERS
 	
   static get DBI_PARAMETERS()  { 

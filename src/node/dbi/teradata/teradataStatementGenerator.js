@@ -2,6 +2,8 @@
 import YadamuDataTypes           from '../base/yadamuDataTypes.js'
 import YadamuStatementGenerator  from '../base/yadamuStatementGenerator.js'
 
+import TeradataIntervals         from './teradataIntervals.js'
+
 class TeradataStatementGenerator extends YadamuStatementGenerator {
 
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
@@ -30,6 +32,12 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
 	
   }
   
+  generateDMLStatement(schema,tableName,columnNames,insertOperators) {
+    // The partitions of a partitioned source table are written by concurrent sessions, and their row hash locks deadlock (Error 2631).
+    // Locking the table for the whole transaction makes them wait for each other instead.
+    return `LOCKING TABLE "${schema}"."${tableName}" FOR WRITE ${super.generateDMLStatement(schema,tableName,columnNames,insertOperators)}`
+  }
+
   refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint) {
 	  
     const dataType = super.refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint)
@@ -104,12 +112,9 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.CHAR_TYPE:
         case this.dbi.DATA_TYPES.VARCHAR_TYPE:
         case this.dbi.DATA_TYPES.CLOB_TYPE:
-          switch (true) {    
-            case ((sourceDataType === this.SOURCE_DATA_TYPES.NCHAR_TYPE)    && (this.SOURCE_DATA_TYPES.CHAR_TYPE    !== this.SOURCE_DATA_TYPES.NCHAR_TYPE)):
-            case ((sourceDataType === this.SOURCE_DATA_TYPES.NVARCHAR_TYPE) && (this.SOURCE_DATA_TYPES.VARCHAR_TYPE !== this.SOURCE_DATA_TYPES.NVARCHAR_TYPE)):
-            case ((sourceDataType === this.SOURCE_DATA_TYPES.NCLOB_TYPE)    && (this.SOURCE_DATA_TYPES.CLOB_TYPE    !== this.SOURCE_DATA_TYPES.NCLOB_TYPE)):
-              characterSetClause = 'CHARACTER SET UNICODE';
-         }
+          // Source character data is Unicode, whatever its type, and an export from Teradata doesn't record the character set.
+          // The VARCHAR and CLOB limits in teradataTypeMappings.json are the UNICODE limits.
+          characterSetClause = 'CHARACTER SET UNICODE';
 	     break
 	   case this.dbi.DATA_TYPES.JSON_TYPE:
 	     batchSize = 1000
@@ -127,6 +132,24 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
 	  }
 	  
 	  columnDataTypes[idx] = this.generateStorageClause(columnDataTypes[idx],tableMetadata.sizeConstraints[idx])
+	  switch (dataTypeDefinition.type) {
+	    case this.dbi.DATA_TYPES.TIME_TYPE:
+	    case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
+	    case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+	    case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+	      // generateStorageClause() ignores a precision of 0, and Teradata's default is 6
+	      if ((tableMetadata.sizeConstraints[idx]?.[0] === 0) && !columnDataTypes[idx].includes('(')) {
+	        const components = columnDataTypes[idx].split(' ')
+	        columnDataTypes[idx] = [`${components.shift()}(0)`,...components].join(' ')
+	      }
+	  }
+	  switch (true) {
+	    case TeradataIntervals.isInterval(dataTypeDefinition.type):
+	      columnDataTypes[idx] = TeradataIntervals.intervalDDL(dataTypeDefinition.type,tableMetadata.sizeConstraints[idx])
+	      break
+	    case TeradataIntervals.isPeriod(dataTypeDefinition.type):
+	      columnDataTypes[idx] = TeradataIntervals.periodDDL(dataTypeDefinition.type,tableMetadata.sizeConstraints[idx])
+	  }
 	  insertOperators.push(this.getInsertOperator(targetDataType))
   	  return `"${columnName}" ${columnDataTypes[idx]} ${characterSetClause}`    
     })
@@ -138,6 +161,7 @@ class TeradataStatementGenerator extends YadamuStatementGenerator {
     , dml              : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
     , columnNames      : tableMetadata.columnNames
     , targetDataTypes  : targetDataTypes
+    , sizeConstraints  : tableMetadata.sizeConstraints
     , insertMode       : insertMode
     , _BATCH_SIZE      : batchSize
     , _SPATIAL_FORMAT  : this.SPATIAL_FORMAT

@@ -44,6 +44,7 @@ import {
 }                         from '../../core/yadamuException.js'
 
 import DBIConstants       from './dbiConstants.js'
+import WorkerThreadSupport from '../../core/workerThreadSupport.js'
 import YadamuDataTypes    from './yadamuDataTypes.js'
 
 import {
@@ -532,7 +533,9 @@ class YadamuDBI extends EventEmitter {
 	  // Add the Worker to the list of Active Workers here so it synchronous
       manager.activeWorkers.add(this)
       this.workerReady = new Promise((resolve,reject) => {
-        this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { this.LOGGER.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e) })
+        // A driver's initializeWorker() may fail after the base class has handled its own errors (e.g. setting the session's schema).
+        // Settle anyway, so the copy fails table by table instead of waiting forever.
+        this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { this.LOGGER.handleException([this.DATABASE_VENDOR,'INITIALIZE WORKER'],e); resolve() })
       })
     }
     else {
@@ -2116,6 +2119,84 @@ class YadamuDBI extends EventEmitter {
     return dbi
   }
  
+  /*
+  **
+  ** Threaded PARALLEL operations (prototype, enabled with THREADED=true).
+  **
+  ** A worker running on a worker thread cannot share its manager's objects. The thread rebuilds a "shadow" manager from a structured-clonable copy
+  ** of the state that an in-process worker clones from its manager (see cloneSettings()), and creates its workers from the shadow, which owns the thread's pool.
+  ** Drivers whose workers depend on other manager state extend getWorkerState() and hydrateWorkerState().
+  **
+  */
+
+  get THREADED_PARALLEL_SUPPORTED()   { return false }
+
+  // The module that defines the DBI class, so that a worker thread can load the same class. Each class that supports threads returns its own import.meta.url.
+  get WORKER_MODULE_URL()             { return undefined }
+
+  getWorkerState() {
+	return {
+	  moduleURL            : this.WORKER_MODULE_URL
+	, className            : this.constructor.name
+	, connectionSettings   : this.CONNECTION_SETTINGS
+	, parameters           : this.parameters
+	, connectionProperties : this.CONNECTION_PROPERTIES
+	// Information from the source (e.g. a MongoDB client's metadata) may not be clonable.
+	, systemInformation    : WorkerThreadSupport.clonable(this.systemInformation)
+	, metadata             : WorkerThreadSupport.clonable(this.metadata)
+	, statementCache       : this.statementCache
+	, partitionMetadata    : this.partitionMetadata
+	, identifierMappings   : this.IDENTIFIER_MAPPINGS
+	// The shadow manager never connects, so setLibraries() needs the version to pick version specific classes (Oracle 11.2 and 18c, SQL Server 2014, MySQL 5.7)
+	, databaseVersion      : this.DATABASE_VERSION
+	}
+  }
+
+  hydrateWorkerState(state) {
+    this.setParameters(state.parameters)
+	this._DATABASE_VERSION      = state.databaseVersion
+	this.#CONNECTION_PROPERTIES = state.connectionProperties
+    this.systemInformation      = state.systemInformation
+    this.metadata               = state.metadata
+    this.statementCache         = state.statementCache
+    this.partitionMetadata      = state.partitionMetadata
+    this.IDENTIFIER_MAPPINGS    = state.identifierMappings
+  }
+
+  // Manager methods that a worker thread's shadow manager forwards to the real manager on the main thread. The main thread performs no others.
+  get THREAD_RPC_METHODS()            { return ['executeManagerSQL'] }
+
+  getPostDDLWorkerState() {
+	// State the manager sets once the DDL is complete. Workers created earlier receive it then.
+	return { partitionMetadata : this.partitionMetadata }
+  }
+
+  hydratePostDDLWorkerState(state) {
+	this.partitionMetadata = state.partitionMetadata
+  }
+
+  async executeManagerSQL(sqlStatement,args) {
+	// Statements a driver routes through its manager's connection (e.g. Oracle trigger operations). A worker thread's shadow manager has no connection and forwards them to the main thread.
+	return await this.executeSQL(sqlStatement,args)
+  }
+  
+  getThreadResults() {
+	// State a worker thread's shadow manager hands back to the real manager once the thread's workers have finished.
+	return {}
+  }
+  
+  mergeThreadResults(results) {
+  }
+  
+  trackThreadedPartitionState(partitionState) {
+	// A worker thread posts the state of each partition it copies to the manager, which tracks the table as it does for an in-process worker.
+	const tracker = Object.create(this)
+	tracker.workerNumber = 'THREAD'
+	tracker.manager = this
+	tracker.PIPELINE_STATE = { partitionedTableName : partitionState.partitionedTableName }
+	this.trackPartitionedTableState.call(tracker,partitionState)
+  }
+
   async getConnectionID() {
     // ### Get a Unique ID for the connection
     throw new UnimplementedMethod('getConnectionID()',`YadamuDBI`,this.constructor.name)

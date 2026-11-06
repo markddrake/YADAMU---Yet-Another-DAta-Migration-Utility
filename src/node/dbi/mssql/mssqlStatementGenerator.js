@@ -11,6 +11,18 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
+
+  // SQL Server's tinyint is unsigned (0 to 255). Teradata's BYTEINT is signed (-128 to 127), so it becomes a smallint.
+
+  get TYPE_MAPPINGS() {
+    if (this._TYPE_MAPPINGS === undefined) {
+      const typeMappings = super.TYPE_MAPPINGS
+      if (this.SOURCE_VENDOR === 'Teradata') {
+        typeMappings.set(this.SOURCE_DATA_TYPES.TINYINT_TYPE,this.dbi.DATA_TYPES.SMALLINT_TYPE)
+      }
+    }
+    return this._TYPE_MAPPINGS
+  }
     
   bulkSupported(dataTypes) {
     

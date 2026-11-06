@@ -20,8 +20,16 @@ class PostgresWriter extends YadamuWriter {
   }
 
   generateValuesClause(rowCount) {
-    let argNumber = 1;
-    return Array(rowCount).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.includes('$%') ? operator.replace('$%',`$${argNumber++}`) : operator}).join(',')})`}).join(',');
+    // Every full batch has the same row count, so the placeholder list is built once per row count and reused.
+    // Rebuilding it for every batch took about a quarter of the main thread's time on large copies.
+    this.VALUES_CLAUSES = this.VALUES_CLAUSES || new Map()
+    let valuesClause = this.VALUES_CLAUSES.get(rowCount)
+    if (valuesClause === undefined) {
+      let argNumber = 1;
+      valuesClause = Array(rowCount).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.includes('$%') ? operator.replace('$%',`$${argNumber++}`) : operator}).join(',')})`}).join(',');
+      this.VALUES_CLAUSES.set(rowCount,valuesClause)
+    }
+    return valuesClause
   }
       
   async _writeBatch(batch,rowCount) {

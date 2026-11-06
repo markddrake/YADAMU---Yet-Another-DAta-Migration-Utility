@@ -34,6 +34,13 @@ services:
       context: ../..
       dockerfile: docker/build/secure
 
+  # secure plus the Teradata driver, which the base images don't include yet
+  teradata:
+    image: yadamu/teradata:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/teradata
+
   service:
     image: yadamu/service:latest
     build:

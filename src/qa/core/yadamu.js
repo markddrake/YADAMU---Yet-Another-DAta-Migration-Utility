@@ -70,6 +70,7 @@ class Yadamu extends _Yadamu {
   }
  
   get QA_TEST()               { return true }
+  get MODULE_URL()            { return import.meta.url }
   
   get YADAMU_PARAMETERS()     { return Yadamu.YADAMU_PARAMETERS }
   get DBI_PARAMETERS()        { return Yadamu.DBI_PARAMETERS }

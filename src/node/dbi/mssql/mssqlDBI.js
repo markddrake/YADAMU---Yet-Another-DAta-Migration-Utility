@@ -1607,6 +1607,9 @@ class MsSQLDBI extends YadamuDBI {
     return new MsSQLDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  
   async getConnectionID() {
     const results = await this.executeSQL(`select @@SPID "SPID"`)
     const pid = results.recordset[0].SPID

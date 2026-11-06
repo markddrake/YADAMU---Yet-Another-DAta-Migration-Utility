@@ -102,7 +102,8 @@ class YadamuOutputManager extends Transform {
   }
   
   releaseBatch(batch) {
-	if (batch) {
+	// A batch can reach the writer's error handling after it was released (e.g. BEGIN fails after the batch was written and committed). Never cache it twice.
+	if (batch && !this.batchCache.includes(batch)) {
 	  this.resetBatch(batch)
 	  this.batchCache.push(batch)
 	}

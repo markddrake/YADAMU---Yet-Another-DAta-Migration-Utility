@@ -396,7 +396,9 @@ class PostgresDBI extends YadamuDBI {
 	  }
       try {
      	stack = new Error().stack;
-        await this.connection.release()
+        // When reconnecting, destroy the client rather than returning it to the pool. pg-pool only discards a client it already knows is broken,
+        // and reuses the most recently released idle client first, so a lost connection could be handed straight back to reconnect().
+        await this.connection.release(this.RECONNECT_IN_PROGRESS === true)
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
@@ -998,6 +1000,23 @@ class PostgresDBI extends YadamuDBI {
 
   classFactory(yadamu) {
 	return new PostgresDBI(yadamu,this,this.connectionParameters,this.parameters)
+  }
+  
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+
+  getWorkerState() {
+	return {
+	  ...super.getWorkerState()
+	, exportSnapshot     : this.EXPORT_SNAPSHOT
+	, inheritanceParents : this.INHERITANCE_PARENTS
+	}
+  }
+
+  hydrateWorkerState(state) {
+	super.hydrateWorkerState(state)
+	this._EXPORT_SNAPSHOT = state.exportSnapshot
+	this.INHERITANCE_PARENTS = state.inheritanceParents
   }
   
   async getConnectionID() {

@@ -231,6 +231,13 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh db2TestSuite
   ;;
 
+  teradata)
+    # Needs the yadamu/teradata image (the driver isn't in the base images) and TDATA17-01 running on yadamu-db3.
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh teradataShortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh teradataDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh teradataTestSuite
+  ;;
+
   snowflake)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeShortRegression
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes

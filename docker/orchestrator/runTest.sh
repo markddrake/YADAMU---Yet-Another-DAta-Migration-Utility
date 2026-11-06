@@ -62,8 +62,10 @@ run_yadamu_test() {
         -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt \
         --network YADAMU-NET \
         -e YADAMU_TEST_NAME="$test_suite" \
+        -e YADAMU_THREADED \
         ${MSSQL12:+--add-host="MSSQL12-01:${MSSQL12}"} \
         ${MSSQL14:+--add-host="MSSQL14-01:${MSSQL14}"} \
+        ${TERADATA:+--add-host="TDATA17-01:${TERADATA}"} \
         -d "$image"
     
     docker logs -f YADAMU-01 2>&1 &

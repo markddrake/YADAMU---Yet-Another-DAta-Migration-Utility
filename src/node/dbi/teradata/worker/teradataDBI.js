@@ -1,5 +1,8 @@
 
 import path                           from 'path'
+import {
+  createRequire
+}                                     from 'module'
 import {                               
   performance                          
 }                                     from 'perf_hooks';
@@ -55,6 +58,41 @@ import {
 const  __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+let TASK_ID = 0
+
+/*
+**
+** teradatasql is not one of YADAMU's dependencies: it is installed separately (see docs/Teradata.md). The worker's workaround for the driver's
+** row buffer leak (freeFetchedRowBuffers in teradataWorker.js) depends on the driver's internals, and has only been tested with this version.
+**
+*/
+
+const TERADATASQL_VERSION = '20.0.72'
+let TERADATASQL_CHECKED = false
+
+/*
+**
+** A worker must not be terminated while it is inside a teradatasql (koffi) call: Node aborts with
+** "FATAL ERROR: Error::ThrowAsJavaScriptException napi_throw". If the process exits with workers still running, ask each one to stop
+** and block until it has finished its current call and closed its cursor and connection. 'exit' listeners must be synchronous, hence Atomics.wait().
+**
+*/
+
+const ACTIVE_WORKERS = new Map()
+const SHUTDOWN_TIMEOUT = 30000
+
+process.on('exit',() => {
+  ACTIVE_WORKERS.forEach((state,worker) => {
+	Atomics.store(state,TeradataConstants.WORKER_STOP,1)
+	// Wakes an idle worker, which then closes its connection. A busy worker stops once its current call returns.
+	worker.postMessage({action: 'disconnect'})
+  })
+  const deadline = performance.now() + SHUTDOWN_TIMEOUT
+  ACTIVE_WORKERS.forEach((state) => {
+	Atomics.wait(state,TeradataConstants.WORKER_CLOSED,0,Math.max(deadline - performance.now(),0))
+  })
+})
+
 class TeradataDBI extends _TeradataDBI {
 	
   /*
@@ -69,25 +107,63 @@ class TeradataDBI extends _TeradataDBI {
   
   async enqueueTask(task) {
 	  
+	// Deligate the task to the worker. Responses are matched to tasks by id, so a response that nobody is waiting for is ignored.
 	
-	// Deligate the task to the worker
-	
+	const stack = new Error().stack
+	if (this.worker === undefined) {
+	  throw this.getDatabaseException(new Error('Teradata worker is not connected.'),stack,task.sql)
+	}
+	task.id = ++TASK_ID
 	const taskComplete = new Promise((resolve,reject) => {
-	  this.worker.once('message',(response) => {
-	    if (response.success) {
-		  resolve(response)
-		}
-        else {
-		  reject(this.trackExceptions( response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : this.createDatabaseError(response.cause,task.sql)))
-	    }
-      })
+	  this.pendingTasks.set(task.id,{resolve, reject, stack, sql: task.sql})
 	})
 	this.worker.postMessage(task)
 	return taskComplete
   }	
 
+  checkDriver() {
+	if (TERADATASQL_CHECKED) return
+	let version
+	try {
+	  version = createRequire(import.meta.url)('teradatasql/package.json').version
+	} catch (e) {
+	  throw new Error(`The Teradata driver is not installed. Install it with "npm install --no-save teradatasql@${TERADATASQL_VERSION}" in the directory that holds YADAMU's node_modules. See docs/Teradata.md.`)
+	}
+	if (version !== TERADATASQL_VERSION) {
+	  this.LOGGER.warning([this.DATABASE_VENDOR,'DRIVER'],`teradatasql ${version} is installed. YADAMU is tested with teradatasql ${TERADATASQL_VERSION}, and its workaround for the driver's row buffer leak depends on that version.`)
+	}
+	TERADATASQL_CHECKED = true
+  }
+
   async getTeradataWorker() {
-	const worker = new Worker(path.resolve(path.join(__dirname, 'teradataWorker.js')),{workerData: {}})
+	this.checkDriver()
+	const state = new Int32Array(new SharedArrayBuffer(2 * Int32Array.BYTES_PER_ELEMENT))
+	const worker = new Worker(path.resolve(path.join(__dirname, 'teradataWorker.js')),{workerData: {state: state.buffer}})
+	const pendingTasks = new Map()
+	this.pendingTasks = pendingTasks
+	ACTIVE_WORKERS.set(worker,state)
+	
+	worker.on('message',(response) => {
+	  const task = pendingTasks.get(response.id)
+	  if (task) {
+		pendingTasks.delete(response.id)
+	    if (response.success) {
+		  task.resolve(response)
+		}
+        else {
+		  const cause = Object.assign(new Error(response.cause.message),response.cause)
+		  task.reject(this.getDatabaseException(cause,task.stack,task.sql))
+	    }
+	  }
+	})
+	
+	const rejectPendingTasks = (cause) => {
+	  ACTIVE_WORKERS.delete(worker)
+	  pendingTasks.forEach((task) => { task.reject(this.getDatabaseException(cause,task.stack,task.sql)) })
+	  pendingTasks.clear()
+	}
+	worker.on('error',(e) => { rejectPendingTasks(e) })
+	worker.on('exit',(exitCode) => { rejectPendingTasks(new Error(`Teradata worker exited (${exitCode}).`)) })
 	
 	/*
 	**
@@ -134,13 +210,20 @@ class TeradataDBI extends _TeradataDBI {
       this.consoleChannel.port1.unref()
       this.consoleChannel.port2.unref()
 	  
-	  this.worker.removeAllListeners('message')
- 	  
 	  **
 	  */
-	  await this.enqueueTask({action : "disconnect" })
-      this.worker.unref()
-      this.worker = undefined
+	  
+	  // The worker processes messages in order, so the response to disconnect means it has finished any call in progress and closed its 
+	  // cursor and connection. Only then is it safe to terminate it.
+	  
+	  const worker = this.worker
+	  try {
+	    await this.enqueueTask({action : "disconnect" })
+	  } finally {
+        this.worker = undefined
+		ACTIVE_WORKERS.delete(worker)
+	    await worker.terminate()
+	  }
 
       // this.LOGGER.trace([`${this.constructor.name}.closeConnection()`,this.ROLE,this.getWorkerNumber()],'Terminated')	  
 	}
@@ -161,9 +244,7 @@ class TeradataDBI extends _TeradataDBI {
       
   resetTransactionCursor() { /* OVERRRIDE */ }
   
-  async _getInputStream(tableInfo) {
-
-    // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
+  async _getInputStream(queryInfo) {
 
     // this.LOGGER.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
 
@@ -176,11 +257,11 @@ class TeradataDBI extends _TeradataDBI {
         this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
 		stack = new Error().stack
         const sqlStartTime = performance.now()
-		const is = new TeradataReader(this.worker,this.CONNECTION_PROPERTIES,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.FETCH_SIZE)
+		const is = new TeradataReader(this,queryInfo.SQL_STATEMENT,queryInfo.TABLE_NAME,this.FETCH_SIZE)
 	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = this.getDatabaseException(e,stack,sqlStatement)
+		const cause = this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -192,9 +273,9 @@ class TeradataDBI extends _TeradataDBI {
     } 	
   }  
   
-  async setWorkerConnection() {    
-    this.CONNECTION_PROPERTIES = this.manager.CONNECTION_PROPERTIES
-	await this.getConnectionFromPool()
+  async setWorkerConnection() {
+    // Each worker gets its own worker thread and connection. cloneSettings() has already copied the manager's CONNECTION_PROPERTIES.
+	this.connection = await this.getConnectionFromPool()
   }
 
   classFactory(yadamu) {

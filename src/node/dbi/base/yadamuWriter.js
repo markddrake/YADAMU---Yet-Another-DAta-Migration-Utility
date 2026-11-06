@@ -378,6 +378,8 @@ class YadamuWriter extends Writable {
         }
         else {
           this.LOGGER.handleException([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],err)
+          // Return the batch to the cache. The output manager waits for a released batch once the cache is empty, so a batch kept by a failed write deadlocks the pipeline.
+          this.releaseBatch(batch)
         }
       }
     }

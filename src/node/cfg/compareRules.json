@@ -13,7 +13,8 @@
 		"snowflake": 9,
 		"vertica": 6,
 		"db2": 12,
-		"sqlite": 12
+		"sqlite": 12,
+		"teradata": 6
 	},
 	"SPATIAL_PRECISION": {
 		"default": 18,
@@ -63,6 +64,9 @@
 		},
 		"vertica": {
 			"oracle": 17
+		},
+		"teradata": {
+			"oracle": 10
 		}
 	},
 	"DOUBLE_PRECISION": {
@@ -101,6 +105,12 @@
 		"vertica" : {
 			"mssql" : 19
 		,   "snowflake" : 19
+		},
+		"teradata" : {
+			"mssql" : 19
+		,   "snowflake" : 19
+		,   "mysql" : 30
+		,   "mariadb" : 32
 		}
 	},
 	"SERIALIZED_JSON": {
@@ -144,7 +154,7 @@
 			"oracle": true
 		,	"csv"   : true
 		},
-		"terdata": {
+		"teradata": {
 			"oracle": true
 		},
 		"db2": {
@@ -184,7 +194,7 @@
 		"cockroach": {
 			"vertica": true
 		},
-		"terdata": {
+		"teradata": {
 			"vertica": true
 		},
 		"db2": {
@@ -241,6 +251,13 @@
 		, "mysql": true
 		, "db2": true
 		, "sqlite": true
+		},
+		"teradata": {
+	      "mariadb": true
+		, "mssql": true
+		, "mysql": true
+		, "db2": true
+		, "sqlite": true
 		}
 	},
 	"ORDERED_JSON": {
@@ -266,6 +283,13 @@
 			"yugabyte": true,
 			"mysql": true,
 			"snowflake": true
+		},
+		"teradata": {
+			"oracle#23": true,
+			"oracle#21": true,
+			"mysql": true,
+			"snowflake": true,
+			"cockroach": true
 		}
 	},
 	"XML_COMPARISON_RULE": {
@@ -275,7 +299,7 @@
 	    }
 	  , "oracle"       : {
 		  "mssql"      : "STRIP_XML_DECLARATION"
-        , "teradata"   : "SERIALIZE_AS_BLOB"
+        , "teradata"   : "STRIP_XML_DECLARATION"
         , "snowflake": {
 		    "VARIANT"  : "SNOWFLAKE_VARIANT"
 		}
@@ -283,6 +307,7 @@
 	  }
 	, "mssql": {
 		"db2"          : "TRIM_WHITESPACE"
+		, "teradata"     : "TRIM_WHITESPACE"
 	  }	               
 	, "oracle#11.2":   {
 		"mssql"        : "SERIALIZE_AS_BLOB"

@@ -15,6 +15,7 @@ import {
 }                                 from './yadamuException.js'
 
 import DBReader                   from './dbReader.js';									 
+import ParallelWorkerHost         from './parallelWorkerHost.js';
 
 class DBReaderParallel extends DBReader {  
 
@@ -22,6 +23,25 @@ class DBReaderParallel extends DBReader {
 
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
+  }
+  
+  // Run the workers on worker threads when both drivers support it. On by default (cfg/yadamuDefaults.json); THREADED=false keeps them in-process.
+  get THREADED() {
+	// The environment variable YADAMU_THREADED (true or false) overrides the parameter, so a whole regression suite can be run either way without changing its configuration.
+	const threaded = process.env.YADAMU_THREADED?.trim().toLowerCase()
+	return ((threaded === 'true') || (threaded === 'false')) ? (threaded === 'true') : (this.dbi.yadamu.parameters.THREADED === true)
+  }
+
+  threadsSupported(dbi) {
+	// The class itself must name its module (WORKER_MODULE_URL), otherwise a thread would load its parent class, e.g. the product class for a QA subclass.
+	return dbi.THREADED_PARALLEL_SUPPORTED && Object.hasOwn(Object.getPrototypeOf(dbi),'WORKER_MODULE_URL')
+  }
+  
+  async pipelineTablesThreaded(taskList,readerDBI,writerDBI,workerCount) {
+    const host = new ParallelWorkerHost(this,readerDBI,writerDBI,workerCount)
+	const results = await host.pipelineTables(taskList)
+	const fatalError = results.find((result) => { return result instanceof Error })
+	if (fatalError) throw fatalError
   }
     
   async pipelineTables(taskList,readerDBI,writerDBI) {
@@ -40,7 +60,14 @@ class DBReaderParallel extends DBReader {
     await Promise.all([readerDBI.dbConnected,writerDBI.cacheLoaded])
 	// this.yadamuLogger.trace(['PIPELINE',this.PIPELINE_MODE,this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'MANAGER READY'],'PROCESSING')
 
-	this.yadamuLogger.info(['PIPELINE',this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
+	// The pipeline mode is part of the tag (THREADED or PARALLEL), so threaded and in-process runs log the same number of lines.
+	const threaded = this.THREADED && this.threadsSupported(readerDBI) && this.threadsSupported(writerDBI)
+	const unsupported = this.THREADED && !threaded ? `. Worker threads are not supported by ${[readerDBI,writerDBI].filter((dbi) => { return !this.threadsSupported(dbi) }).map((dbi) => { return dbi.constructor.name }).join(' and ')}.` : ''
+	this.yadamuLogger.info(['PIPELINE',threaded ? 'THREADED' : this.PIPELINE_MODE,workerCount,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing ${taskList.length} Tables${unsupported}`);
+	
+	if (threaded) {
+	  return await this.pipelineTablesThreaded(taskList,readerDBI,writerDBI,workerCount)
+	}
 	
 	let operationAborted = false;
 	const results = []

@@ -63,6 +63,10 @@ class YadamuStatementGenerator {
       typeMappings.forEach((value,key) => {
         typeMappings.set(key, value.size === 1 ? value.values().next().value : this.dbi.DATA_TYPES.coalesceTypeMappings(Array.from(value.values())))
       })
+      // A source type that is exported as a different kind of type than the one it is imported from, e.g. Teradata's INTERVAL YEAR, which stores a YEAR
+      Object.entries(this.SOURCE_DATA_TYPES.EXPORT_TYPE_MAPPINGS || {}).forEach(([sourceType,typeName]) => {
+        typeMappings.set(sourceType,this.dbi.DATA_TYPES[typeName])
+      })
       // console.log(typeMappings)
 	  return typeMappings
     })()

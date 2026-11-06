@@ -68,6 +68,9 @@ class YadamuQALibrary {
       }
     }
     
+    // A worker thread's shadow manager forwards the termination request to the real manager, which owns a live pool and the kill timer.
+    get THREAD_RPC_METHODS() { return [...super.THREAD_RPC_METHODS,'scheduleTermination'] }
+
     async initializeWorker(manager)  {
       await super.initializeWorker(manager);
       const idx = this.getWorkerNumber()

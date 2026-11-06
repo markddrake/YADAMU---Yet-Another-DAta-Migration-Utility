@@ -11,5 +11,5 @@
 **
 */
 --
-@@resizeLogGroups.sql
+@@configure_redo
 --

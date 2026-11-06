@@ -27,7 +27,11 @@ class TeradataConstants {
 
   static get BOOLEAN_STORAGE_OPTION()              { return this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION}
   static get FETCH_SIZE()                          { return this.DBI_PARAMETERS.FETCH_SIZE}
-  
+
+  // Slots in the Int32Array the main thread shares with each worker thread (see worker/teradataDBI.js)
+  static get WORKER_STOP()                         { return 0 }
+  static get WORKER_CLOSED()                       { return 1 }
+
 }
 
 export { TeradataConstants as default }

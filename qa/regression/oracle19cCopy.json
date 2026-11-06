@@ -19,7 +19,6 @@
     },{
             "source": "oracle#1",
             "target": "oracle19c",
-            "homogeneousOperation" : true,
             "tasks": [
                 "oracle","mssql","mysql"
             ]

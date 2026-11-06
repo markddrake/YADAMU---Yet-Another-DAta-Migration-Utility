@@ -902,8 +902,11 @@ class MongoDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-	return new MongoDBI(yadamu)
+	return new MongoDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
+  
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
   
   generateDatabaseMappings(metadata) {
     

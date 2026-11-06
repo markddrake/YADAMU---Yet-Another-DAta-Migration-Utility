@@ -616,6 +616,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	return new SnowflakeDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  
   async getConnectionID() {
     const results = await this.executeSQL(`select CURRENT_SESSION() "pid"`)
     const pid = results[0].pid;

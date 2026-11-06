@@ -2,6 +2,11 @@ export STAGE=/opt/oracle/oradata/stage
 cd $STAGE
 mkdir log
 sqlplus sys/oracle@localhost:1521/$ORACLE_PDB  as sysdba @$STAGE/setup/configure.sql $STAGE /opt/oracle
+# A version specific script that changes static parameters (configure_2326.sql) leaves this marker
+if [ -f $STAGE/restartRequired ]; then
+  source $STAGE/setup/restartDatabase.sh
+  rm $STAGE/restartRequired
+fi
 echo "# Do Nothing" > extendedStringSizeAction.sh
 sqlplus -s / as sysdba <<-EOF
 whenever oserror exit failure

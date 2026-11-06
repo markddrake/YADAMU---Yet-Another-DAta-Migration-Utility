@@ -32,7 +32,16 @@ EOF
 }
 trap _kill SIGKILL
 
-export DB_CREATED=`cat /etc/oratab | grep CDB21300 | wc -l`
+# The database exists once its spfile is on the data volume (moved there below
+# after the first dbca). /etc/oratab is in the container layer, so a container
+# recreated on the existing data volume has no entry for the database, and dbca
+# would fail on the existing datafiles.
+DB_CREATED=0
+if [ -f $ORACLE_BASE/oradata/dbconfig/dbs/spfile$ORACLE_SID.ora ] || grep -q "^$ORACLE_SID:" /etc/oratab 2>/dev/null
+then
+  DB_CREATED=1
+fi
+export DB_CREATED
 if [ "$DB_CREATED" == "0" ]
 then
   netca -silent -responseFile $ORACLE_HOME/assistants/netca/netca.rsp
@@ -55,6 +64,16 @@ then
   /
 EOF
 else
+  # The links created above live in the container layer, so a container recreated
+  # on the existing data volume starts without them, and without the /etc/oratab
+  # entry written by dbca.
+  mkdir -p $ORACLE_BASE/dbs $ORACLE_BASE/homes/OraDB21Home1/network/admin
+  ln -sf $ORACLE_BASE/oradata/dbconfig/dbs/spfile$ORACLE_SID.ora   $ORACLE_BASE/dbs/spfile$ORACLE_SID.ora
+  ln -sf $ORACLE_BASE/oradata/dbconfig/dbs/orapw$ORACLE_SID        $ORACLE_BASE/dbs/orapw$ORACLE_SID
+  ln -sf $ORACLE_BASE/oradata/dbconfig/network/admin/sqlnet.ora    $ORACLE_BASE/homes/OraDB21Home1/network/admin/sqlnet.ora
+  ln -sf $ORACLE_BASE/oradata/dbconfig/network/admin/listener.ora  $ORACLE_BASE/homes/OraDB21Home1/network/admin/listener.ora
+  ln -sf $ORACLE_BASE/oradata/dbconfig/network/admin/tnsnames.ora  $ORACLE_BASE/homes/OraDB21Home1/network/admin/tnsnames.ora
+  grep -q "^$ORACLE_SID:" /etc/oratab || echo "$ORACLE_SID:$ORACLE_HOME:N" >> /etc/oratab
   lsnrctl start
   sqlplus / as sysdba << EOF
    STARTUP;
@@ -64,4 +83,4 @@ fi
 LOWER_SID=`echo $ORACLE_SID | tr "[:upper:]" "[:lower:]"`
 tail -f $ORACLE_BASE/diag/rdbms/$LOWER_SID/$ORACLE_SID/trace/alert_$ORACLE_SID.log &
 childPID=$!
-wait $childPI
+wait $childPID

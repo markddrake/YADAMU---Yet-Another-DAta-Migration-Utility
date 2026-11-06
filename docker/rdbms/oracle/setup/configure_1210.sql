@@ -3,3 +3,5 @@
 --
 @@configure_CDB
 --
+@@configure_redo
+--

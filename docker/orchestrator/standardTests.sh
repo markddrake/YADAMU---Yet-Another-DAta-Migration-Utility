@@ -25,8 +25,10 @@ docker run \
     -v ${VOLUME}:/usr/src/YADAMU/mnt \
     --network $NETWORK \
     -e YADAMU_TEST_NAME=$YADAMU_TASK_NAME \
+    -e YADAMU_THREADED \
     --add-host="MSSQL12-01:${MSSQL12}" \
     --add-host="MSSQL14-01:${MSSQL14}" \
+    --add-host="TDATA17-01:${TERADATA}" \
     -d $IMAGE
 	
 echo "Tailing logs from $CONTAINER_NAME (Ctrl+C to exit)..."

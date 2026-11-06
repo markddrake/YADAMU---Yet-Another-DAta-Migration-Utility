@@ -18,6 +18,9 @@ import Yadamu          from '../../core/yadamu.js';
 import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
+
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
     
 	get QA_COMPARE_DBNAME() { return 'YADAMU_QA' }
     

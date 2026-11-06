@@ -3,109 +3,90 @@ import {
   Readable
 }                      from 'stream';
 
-import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
-
-import { 
-  TeradataError 
-}                                     from '../teradataException.js'
-
+import YadamuLibrary                  from '../../../lib/yadamuLibrary.js'
 
 class TeradataReader extends Readable {
-    
-    constructor(worker,connectionProperties,sqlStatement,tableName,fetchSize) {
-      super({objectMode:true}) 
-      this.worker = worker
-      this.CONNECTION_PROPERTIES = connectionProperties
+
+  /*
+  **
+  ** Rows are pulled from the worker thread one batch at a time (see worker/teradataWorker.js). While one batch is being pushed
+  ** the next is being fetched, so at most two batches are held in memory, however slowly the rows are consumed.
+  **
+  */
+
+    constructor(dbi,sqlStatement,tableName,fetchSize) {
+      super({objectMode:true})
+      this.dbi = dbi
       this.sqlStatement = sqlStatement
       this.tableName = tableName
-      this.readPending = false;
       this.recordsRead = 0
-	  this.idleTime = 0;
 	  this.fetchSize = fetchSize;
-	  this.totalIdleTime = 0
-	  
-	  this.stagingArea = []
-        
+
+	  this.queryId = undefined
+	  this.rows = []
+	  this.rowIndex = 0
+	  this.streamComplete = false
+	  this.nextBatch = undefined
     }
-       
-    async enqueueTask(task) {
-      
-    // console.log(`deligateTask(${task.action})`)
-    
-    // Use the Worker to perform the task
-      
-    const taskComplete = new Promise((resolve,reject) => {
-      const stack = new Error().stack
-      this.worker.once('message',(response) => {
-		if (response.success) {
-          resolve(response)
-        }
-        else {
-          reject(response.name === 'TeradataError' ? TeradataError.recreateTeradataError(response.cause) : new TeradataError(this.worker,response.cause,stack,`${response.action}(${this.sqlStatement})`))
-        }
-      })
-    })
-    this.worker.postMessage(task)
-    return taskComplete
-    
-  } 
- 
-  async doConstruct() {
-      
-    // const result = await this.enqueueTask({action : "connect", connectionProperties : this.CONNECTION_PROPERTIES})
-    const response = await this.enqueueTask({action : "query", sql: this.sqlStatement, batchSize: this.fetchSize})
-    this.stagingArea.push(...response.rows)
-	this.recordsRead+=response.rows.length
-	if (response.streamComplete) {
-      this.stagingArea.push(null)
-	}
-	else {
-      const stack = new Error().stack
-  	  this.worker.on('message', (data) => {
-		if (data.success) {
-		  const recordsRead = data.rows.length 
-		  this.stagingArea.push(...data.rows)
-  		  data.rows.length = 0;
-	      this.recordsRead+= recordsRead
-          if (data.streamComplete) {
-		    this.worker.removeAllListeners('message')
-            this.stagingArea.push(null)
-		  }
-          if (this.readPending) {
-			const idleTime = performance.now() - this.startIdleTime
-			this.totalIdleTime+= idleTime
-    	    // console.log(this.tableName,recordsRead,data.elapsedTime,idleTime,(recordsRead/data.elapsedTime)*1000)
-			this.push(this.stagingArea.shift())
-		  } 
-        }
-        else {
-          throw data.name === 'TeradataError' ? TeradataError.recreateTeradataError(data.cause) : new TeradataError(this.worker,data.cause,stack,`${data.action}(${this.sqlStatement})`)
-        }
-	  })
-	}
+
+  fetchNextBatch() {
+	// Settle with the error rather than reject, so a fetch that fails before _read() waits for it is not an unhandled rejection.
+	return this.dbi.enqueueTask({action : "next", sql: this.sqlStatement, queryId: this.queryId, batchSize: this.fetchSize}).catch((e) => { return e })
   }
-    
+
+  setBatch(response) {
+	this.rows = response.rows
+	this.rowIndex = 0
+	this.recordsRead+= response.rows.length
+	this.streamComplete = response.streamComplete
+	this.nextBatch = this.streamComplete ? undefined : this.fetchNextBatch()
+  }
+
+  async doConstruct() {
+    const response = await this.dbi.enqueueTask({action : "query", sql: this.sqlStatement, batchSize: this.fetchSize})
+	this.queryId = response.id
+	this.setBatch(response)
+  }
+
   async doRead() {
-    if (this.stagingArea.length > 0) {
-      this.push(this.stagingArea.shift())
+	while (true) {
+	  while (this.rowIndex < this.rows.length) {
+		if (!this.push(this.rows[this.rowIndex++])) {
+		  return
+		}
+	  }
+	  if (this.streamComplete) {
+		this.push(null)
+		return
+	  }
+	  const response = await this.nextBatch
+	  if (this.destroyed) {
+		return
+	  }
+	  if (response instanceof Error) {
+		this.streamComplete = true
+		throw response
+	  }
+	  this.setBatch(response)
 	}
-	else {
-      this.readPending = true;
-	  this.startIdleTime = performance.now();
-    }
   }
 
   _construct(callback) {
     this.doConstruct().then(() => {callback()}).catch((e) => {callback(e)})
   }
-    
+
   _read() {
     this.doRead().then(YadamuLibrary.NOOP).catch((e) => {this.destroy(e)})
   }
-  
+
   async doDestroy(e) {
-    /// console.log('Read','Destroy',this.recordsRead,this.idleTime);
-    this.worker.removeAllListeners('message');
+    /// console.log('Read','Destroy',this.recordsRead);
+	if ((this.queryId !== undefined) && !this.streamComplete) {
+	  // Stopped early. Close the worker's cursor. The worker finishes any fetch already in progress first, and its rows are discarded.
+	  this.streamComplete = true
+	  this.rows = []
+	  await this.dbi.enqueueTask({action : "cancel", sql: this.sqlStatement, queryId: this.queryId}).catch(YadamuLibrary.NOOP)
+	}
   }
 
   _destroy(e,callback) {

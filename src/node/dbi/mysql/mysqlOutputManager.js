@@ -88,6 +88,18 @@ class MySQLOutputManager extends YadamuOutputManager {
             return col.substring(0,26).trim();
  		  }
  		  break;
+        case this.dbi.DATA_TYPES.YEAR_TYPE:
+          // A YEAR stored in an interval type arrives as a duration, P2026Y. Without strict mode MySQL stores a value outside 1901 to 2155 as 0, so the row is rejected instead.
+          return (col,idx) => {
+            if ((typeof col === 'string') && col.includes('P')) {
+              const year = col.match(/^P(\d{4})Y$/)?.[1]
+              if ((year === undefined) || (year < 1901) || (year > 2155)) {
+                throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col)
+              }
+              return parseInt(year)
+            }
+            return col
+          }
  		case this.dbi.DATA_TYPES.FLOAT_TYPE:
         case this.dbi.DATA_TYPES.DOUBLE_TYPE:
 		  switch (this.dbi.INFINITY_MANAGEMENT) {

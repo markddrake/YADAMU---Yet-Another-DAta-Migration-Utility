@@ -8,12 +8,10 @@ import TeradataConstants    from './teradataConstants.js'
 
 class TeradataStorageOptions extends YadamuStorageOptions {
 
-  get BOOLEAN_TYPE()                        { return OracleConstants.BOOLEAN_STORAGE_OPTION }	
-	
+  // teradataTypeMappings.json sets BYTEINT; TERADATA_BOOLEAN_STORAGE_OPTION overrides it (see TeradataDBI).
+  get BOOLEAN_TYPE()                        { return 'BYTEINT' }
+
   set BOOLEAN_TYPE(v)                       { YadamuDataTypes.redefineProperty(this,'BOOLEAN_TYPE',v) }
-  
-  get RAW1_IS_BOOLEAN()                     { return this.BOOLEAN_TYPE === 'RAW1' }
-  
 
 }
 
@@ -38,6 +36,26 @@ class TeradataDataTypes extends YadamuDataTypes {
     return this._UNBOUNDED_TYPES;
   }
 
+
+  coalesceTypeMappings(typeList) {
+    // Another database's interval type matches all of Teradata's INTERVAL types of the same kind. Keep the one that holds every value it can have.
+    switch (true) {
+      case typeList.includes(this.INTERVAL_TYPE):
+        return this.INTERVAL_TYPE
+      case typeList.includes(this.INTERVAL_DAY_TO_SECOND_TYPE):
+        return this.INTERVAL_DAY_TO_SECOND_TYPE
+      case typeList.includes(this.INTERVAL_YEAR_TO_MONTH_TYPE):
+        return this.INTERVAL_YEAR_TO_MONTH_TYPE
+      default:
+        return super.coalesceTypeMappings(typeList)
+    }
+  }
+
+  // A YEAR (MySQL's) is stored as an INTERVAL YEAR, but an INTERVAL YEAR is a duration: -1 or 5 is not a year. It is exported as an interval (P5Y).
+
+  get EXPORT_TYPE_MAPPINGS() {
+    return { [this.YEAR_TYPE] : 'INTERVAL_YEAR_TO_MONTH_TYPE' }
+  }
 
   get DATABASE_KEY()      { return TeradataConstants.DATABASE_KEY }
 

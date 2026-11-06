@@ -182,6 +182,18 @@ class AWSS3DBI extends CloudDBI {
   classFactory(yadamu) {
 	return new AWSS3DBI(yadamu,this,this.connectionParameters,this.parameters)
   }
+  
+  get WORKER_MODULE_URL()             { return import.meta.url }
+
+  getWorkerState() {
+	// The bucket name may contain macros, which must resolve as they did on the main thread.
+	return { ...super.getWorkerState(), bucket : this.BUCKET }
+  }
+
+  hydrateWorkerState(state) {
+	super.hydrateWorkerState(state)
+	this._BUCKET = state.bucket
+  }
    
   getCredentials(vendorKey) {
 	 

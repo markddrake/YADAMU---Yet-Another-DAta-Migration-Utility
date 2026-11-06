@@ -16,31 +16,35 @@ x-logging: &default-logging
 
 services:
 
+ # Teradata 17.10 appliance under qemu/KVM: see docker/linux/kvm/README.md.
+ # TDVM_BASE is the directory makeBase.sh built. "down" then "up" gives a fresh database;
+ # "stop" / "start" keeps the data (the guest's writes live in the container's /vm/run).
  TDATA17-01:
    container_name: TDATA17-01
    hostname: TDATA17-01
-   image:  yadamu/teradata
-   security_opt:
-      - label:disable    
-   privileged: true
-   mem_limit: '12gb'
-   shm_size: '2gb'
+   image:  yadamu/teradata:17.10-kvm
+   build: docker/linux/kvm
+   mem_limit: '10gb'
    networks:
      - YADAMU-NET
    ports:
-    - 1025:1025 
+    - 1025:1025
    volumes:
      - YADAMU_01-SHARED:/mnt/shared
-     - TDATA17-01-APPLIANCE:/root/VBox 
-     - /tmp/.X11-unix:/tmp/.X11-unix 
+     - ${TDVM_BASE:?set TDVM_BASE to the base directory makeBase.sh built}:/vm/base:ro
    devices:
-     - /dev/vboxdrv:/dev/vboxdrv
-   restart: always
+     - /dev/kvm:/dev/kvm
+   stop_grace_period: 3m
+   healthcheck:
+     test: ["CMD", "/usr/local/bin/tdvm.sh", "health"]
+     interval: 30s
+     timeout: 15s
+     start_period: 10m
+   logging: *default-logging
 
 volumes:
   YADAMU_01-SHARED:
     name: YADAMU_01-SHARED
-  TDATA17-01-APPLIANCE:
 
 networks: 
   YADAMU-NET:

@@ -275,9 +275,48 @@ services:
       - ORACL26-01-DATA:/opt/oracle/oradata
       - ORACL26-01-DIAG:/opt/oracle/diag
     restart: always
-      
-      
-networks: 
+
+  # 26ai Enterprise Edition from the OTN gold image (23.26.1), built with Oracle's docker-images recipe (build/23.26).
+  # Unlike Free (ORACL26-01) it has no CPU or memory caps, so it is sized like the other Oracles. Pinned at 23.26.1:
+  # later RUs are only available through My Oracle Support.
+  ORA2326-01:
+    logging: *default-logging
+    container_name: ORA2326-01
+    hostname: ORA2326-01
+    image:  yadamu/oracle:23.26.1
+    build:
+      context: build/23.26
+      dockerfile: Containerfile
+      args:
+        DB_EDITION: EE
+      additional_contexts:
+        tarballs: C:\Assets\Software\Oracle\23.26
+    mem_limit: '16gb'
+    memswap_limit: -1     # allow unlimited swap
+    shm_size: '8gb'
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - YADAMU-NET
+    ports:
+      - "15220:1521"
+    environment:
+      ORACLE_SID: CDB2326
+      ORACLE_PDB: PDB2326
+      ORACLE_PWD: oracle
+      ORACLE_CHARACTERSET: AL32UTF8
+      ORACLE_EDITION: enterprise
+      # Size the database at creation (MB) to match configure_memory.sql, instead of from the host's RAM.
+      INIT_SGA_SIZE: 10240
+      INIT_PGA_SIZE: 2048
+    volumes:
+      - YADAMU_01-SHARED:/mnt/shared
+      - ORA2326-01-DATA:/opt/oracle/oradata
+      - ORA2326-01-DIAG:/opt/oracle/diag
+    restart: always
+
+
+networks:
   YADAMU-NET:
      name: YADAMU-NET
 
@@ -300,3 +339,5 @@ volumes:
   ORACL23-01-DIAG:
   ORACL26-01-DATA:
   ORACL26-01-DIAG:
+  ORA2326-01-DATA:
+  ORA2326-01-DIAG:

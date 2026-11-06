@@ -86,6 +86,13 @@ class PostgresOutputManager extends YadamuOutputManager  {
             }
 			return col
 		  }
+        case this.dbi.DATA_TYPES.INTERVAL_TYPE:
+        case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
+        case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
+          // Postgres rejects an ISO 8601 duration with a leading minus sign (Oracle, Teradata), "-P1DT2H". It accepts negative fields, "P-1DT-2H".
+		  return (col,idx) => {
+            return ((typeof col === 'string') && col.startsWith('-P')) ? col.substring(1).replace(/(\d*\.?\d+)([YMWDHS])/g,'-$1$2') : col
+		  }
         case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
 	      const fixedLength = this.tableInfo.sizeConstraints[idx][0]
 		  return (col,idx) => {

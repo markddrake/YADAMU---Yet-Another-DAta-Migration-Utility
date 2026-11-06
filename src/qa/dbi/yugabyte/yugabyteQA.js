@@ -14,6 +14,9 @@ import YugabyteDBI       from '../../../node/dbi/yugabyte/yugabyteDBI.js';
 
 
 class YugabyteQA extends YadamuQALibrary.qaMixin(YugabyteDBI) {
+
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
     
 	static #DBI_PARAMETERS
 	

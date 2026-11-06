@@ -5,6 +5,7 @@ import _YadamuLogger from '../..//node/core/yadamuLogger.js';
 class YadamuLogger extends _YadamuLogger {
       
   static get LOGGER_CLASS() { return YadamuLogger }
+  get MODULE_URL()          { return import.meta.url }
 
   constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
    

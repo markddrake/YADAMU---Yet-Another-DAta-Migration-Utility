@@ -12,6 +12,9 @@ import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
 
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
+
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }

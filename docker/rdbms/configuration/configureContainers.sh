@@ -1,6 +1,6 @@
 #!/bin/bash
 export YADAMU_SCRIPT_PATH=$(dirname "$0")
-source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1903-01
+source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA2326-01
 source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1803-01
 source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1220-01
 source $YADAMU_SCRIPT_PATH/linux/configureOracle.sh   ORA1120-01

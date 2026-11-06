@@ -1392,7 +1392,7 @@ class OracleDBI extends YadamuDBI {
 	try {
       await this.ddlComplete	
       const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" DISABLE ALL TRIGGERS`;
-      return this.isManager() ? await this.executeSQL(sqlStatement,[]) : await this.manager.executeSQL(sqlStatement,[])
+      return this.isManager() ? await this.executeSQL(sqlStatement,[]) : await this.manager.executeManagerSQL(sqlStatement,[])
 	  return results
 	} catch (e) {
       // console.log(e)
@@ -1404,7 +1404,7 @@ class OracleDBI extends YadamuDBI {
 	try {
   	  this.checkConnectionState(this.LATEST_ERROR)
       const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" ENABLE ALL TRIGGERS`;
-	  return this.isManager() ? await this.executeSQL(sqlStatement,[]) : await this.manager.executeSQL(sqlStatement,[])
+	  return this.isManager() ? await this.executeSQL(sqlStatement,[]) : await this.manager.executeManagerSQL(sqlStatement,[])
 	} catch (e) {
 	  this.LOGGER.error(['DBA',this.DATABASE_VENDOR,'TRIGGERS',tableName],`Unable to re-enable triggers.`)
       this.LOGGER.handleException(['TRIGGERS',this.DATABASE_VENDOR,],e)
@@ -1527,6 +1527,38 @@ class OracleDBI extends YadamuDBI {
 
   classFactory(yadamu) {
 	return new OracleDBI(yadamu,this,this.connectionParameters,this.parameters)
+  }
+  
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+
+  getWorkerState() {
+	return {
+	  ...super.getWorkerState()
+	, sqlDirectoryPath   : this.SQL_DIRECTORY_PATH
+	, localDirectoryPath : this.LOCAL_DIRECTORY_PATH
+	}
+  }
+
+  hydrateWorkerState(state) {
+	super.hydrateWorkerState(state)
+	this.SQL_DIRECTORY_PATH = state.sqlDirectoryPath
+	this.LOCAL_DIRECTORY_PATH = state.localDirectoryPath
+	// Structured cloning turns the oracledb DbType instances used as bind types into plain objects. Restore them by name.
+	const restoreDbTypes = (binds) => { return binds?.map((bind) => { return (bind?.type?.name && oracledb[bind.type.name]) ? { ...bind, type : oracledb[bind.type.name] } : bind }) }
+	Object.values(this.statementCache || {}).forEach((tableInfo) => {
+	  tableInfo.binds = restoreDbTypes(tableInfo.binds)
+	  tableInfo.lobBinds = restoreDbTypes(tableInfo.lobBinds)
+	})
+  }
+
+  getThreadResults() {
+	// Oracle 11g wrapper procedures created by a thread's workers are dropped by the real manager in final().
+	return { dropWrapperStatements : this.dropWrapperStatements }
+  }
+
+  mergeThreadResults(results) {
+	this.dropWrapperStatements.push(...(results.dropWrapperStatements || []))
   }
     
   async initializeWorker(manager) {

@@ -12,6 +12,9 @@ import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 
 
 class VerticaQA extends YadamuQALibrary.qaMixin(VerticaDBI) {
+
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
     
     static #DBI_PARAMETERS
     

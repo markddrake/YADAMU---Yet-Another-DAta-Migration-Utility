@@ -13,6 +13,9 @@ import YadamuQALibrary          from '../../lib/yadamuQALibrary.js'
 import RedshiftStatementLibrary from './pg802StatementLibrary.js'
 
 class RedshiftQA extends YadamuQALibrary.qaMixin(RedshiftDBI) {
+
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
 	
     // static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }

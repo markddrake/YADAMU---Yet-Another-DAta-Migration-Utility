@@ -9,6 +9,9 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
 
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
+
   static #DBI_PARAMETERS
   
   static get DBI_PARAMETERS()  { 

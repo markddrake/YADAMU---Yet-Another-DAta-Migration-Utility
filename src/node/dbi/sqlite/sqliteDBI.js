@@ -632,6 +632,9 @@ class SqliteDBI extends YadamuDBI {
     return new SqliteDBI(yadamu, this, this.CONNECTION_SETTINGS, this.parameters)
   }
   
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  
   async getConnectionID() {
     return `sqlite-${Date.now()}`
   }

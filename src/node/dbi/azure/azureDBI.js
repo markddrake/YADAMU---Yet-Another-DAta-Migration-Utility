@@ -177,6 +177,18 @@ class AzureDBI extends CloudDBI {
   classFactory(yadamu) {
 	return new AzureDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
+  
+  get WORKER_MODULE_URL()             { return import.meta.url }
+
+  getWorkerState() {
+	// The container name may contain macros, which must resolve as they did on the main thread.
+	return { ...super.getWorkerState(), container : this.CONTAINER }
+  }
+
+  hydrateWorkerState(state) {
+	super.hydrateWorkerState(state)
+	this._CONTAINER = state.container
+  }
    
   async createInputStream(filename) {
     // this.LOGGER.trace([this.constructor.name,this.DATABASE_VENDOR,],`Creating readable stream on ${file)}`)

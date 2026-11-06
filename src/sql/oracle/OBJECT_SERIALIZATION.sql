@@ -154,13 +154,22 @@ begin
   return C_SERIALIZE_OBJECT_PART1;
 end;
 --
+--
+-- The fields of a negative interval are all negative. It is written with a leading minus sign, "-P1Y2M", the form TO_YMINTERVAL and TO_DSINTERVAL accept.
+--
 function SERIALIZE_YMINTERVAL_ISO8601(P_INTERVAL INTERVAL YEAR TO MONTH)
 return VARCHAR2
 as
-begin 
-  return 'P'
-      || extract(YEAR  FROM P_INTERVAL) || 'Y'
-      || case when extract(MONTH FROM  P_INTERVAL) <> 0 then extract(MONTH FROM P_INTERVAL) || 'M' end;
+  V_YEARS   NUMBER := extract(YEAR FROM P_INTERVAL);
+  V_MONTHS  NUMBER := extract(MONTH FROM P_INTERVAL);
+begin
+  if (P_INTERVAL is NULL) then
+    return NULL;
+  end if;
+  return case when (V_YEARS < 0) or (V_MONTHS < 0) then '-' end
+      || 'P'
+      || abs(V_YEARS) || 'Y'
+      || case when V_MONTHS <> 0 then abs(V_MONTHS) || 'M' end;
 end;
 --
 function SERIALIZE_DSINTERVAL_ISO8601(P_INTERVAL INTERVAL DAY TO SECOND)
@@ -170,14 +179,19 @@ as
   V_HOURS   NUMBER := extract(HOUR FROM P_INTERVAL);
   V_MINUTES NUMBER := extract(MINUTE FROM P_INTERVAL);
   V_SECONDS NUMBER := extract(SECOND FROM P_INTERVAL);
-begin 
-  return 'P'
-      || V_DAYS || 'D'
-      || case when (V_HOURS + V_MINUTES + V_SECONDS) > 0 then 'T' end
-      || case when (V_HOURS)   > 0 then V_HOURS   || 'H' end
-      || case when (V_MINUTES) > 0 then V_MINUTES || 'M' end
-      || case when (V_SECONDS) > 0 then V_SECONDS || 'S' end;
-end;    
+begin
+  if (P_INTERVAL is NULL) then
+    return NULL;
+  end if;
+  return case when (V_DAYS < 0) or (V_HOURS < 0) or (V_MINUTES < 0) or (V_SECONDS < 0) then '-' end
+      || 'P'
+      || abs(V_DAYS) || 'D'
+      || case when (V_HOURS <> 0) or (V_MINUTES <> 0) or (V_SECONDS <> 0) then 'T' end
+      || case when V_HOURS   <> 0 then abs(V_HOURS)   || 'H' end
+      || case when V_MINUTES <> 0 then abs(V_MINUTES) || 'M' end
+      -- TO_CHAR keeps the zero before the decimal point: 0.5 is "0.5S", not ".5S"
+      || case when V_SECONDS <> 0 then RTRIM(TO_CHAR(abs(V_SECONDS),'FM99990.999999999'),'.') || 'S' end;
+end;
 --
 function DESERIALIZE_ISO8601_DSINTERVAL(P_INTERVAL VARCHAR2) 
 return VARCHAR2

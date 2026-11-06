@@ -14,15 +14,18 @@ fi
 : ${LOG_DIR:=./logs}
 : ${MSSQL12:=192.168.1.234}
 : ${MSSQL14:=192.168.1.235}
+: ${TERADATA:=192.168.1.233}
 : ${GREEN:='\033[0;32m'}
 : ${YELLOW:='\033[1;33m'}
 : ${RED:='\033[0;31m'}
 : ${NC:='\033[0m'}
 
 # Database startup wait times
+# 19c creates its database with DBCA on first start; recreateDB.sh allows the same 20 minutes.
+ORACLE_19C_STARTUP_WAIT=1200
 ORACLE_21C_STARTUP_WAIT=600
 ORACLE_23AI_STARTUP_WAIT=60
-ORACLE_26AI_STARTUP_WAIT=60
+ORACLE_26AI_STARTUP_WAIT=120
 VERTICA_STARTUP_WAIT=300
 DB2_STARTUP_WAIT=600
 COCKROACH_STARTUP_WAIT=60
@@ -43,6 +46,7 @@ wait_message() {
 
 run_test_suite() {
     local suite_name=$1
+    local image=${2:-yadamu/secure:latest}
     local log_file="$LOG_DIR/${suite_name}.log"
     
     log_message "Starting task YADAMU:$suite_name using container $CONTAINER_NAME."
@@ -55,9 +59,11 @@ run_test_suite() {
         -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt \
         --network YADAMU-NET \
         -e YADAMU_TEST_NAME="$suite_name" \
+        -e YADAMU_THREADED \
         ${MSSQL12:+--add-host="MSSQL12-01:${MSSQL12}"} \
         ${MSSQL14:+--add-host="MSSQL14-01:${MSSQL14}"} \
-        -d yadamu/secure:latest
+        ${TERADATA:+--add-host="TDATA17-01:${TERADATA}"} \
+        -d "$image"
     
     # Stream logs directly to stdout (captured by parent tee), redirect stderr too
     wait_message "Tailing logs from $CONTAINER_NAME (Ctrl+C to exit)..."
@@ -87,8 +93,10 @@ run_cmdline_test() {
         -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt \
         --network YADAMU-NET \
         -e YADAMU_TEST_NAME="cmdLine" \
+        -e YADAMU_THREADED \
         ${MSSQL12:+--add-host="MSSQL12-01:${MSSQL12}"} \
         ${MSSQL14:+--add-host="MSSQL14-01:${MSSQL14}"} \
+        ${TERADATA:+--add-host="TDATA17-01:${TERADATA}"} \
         -d yadamu/commandline:latest
 
     docker logs -f YADAMU-01 2>&1 &
@@ -205,13 +213,43 @@ run_test() {
             ;;
             
         oracle19c)
+            # 26ai is the primary Oracle (oracle#1) in the standing stack; 19.3 runs here, like 21c.
+            compose_up "docker/rdbms/oracle/docker-compose.yml" "ORA1903-01" "Oracle 19c"
+
+            # Tail Oracle container logs in background so they appear in orchestrator logs
+            log_message "Monitoring Oracle 19c startup logs..."
+            docker logs -f ORA1903-01 2>&1 &
+            ORACLE_LOG_PID=$!
+
+            wait_message "Waiting for Oracle 19c Startup (${ORACLE_19C_STARTUP_WAIT}s)..."
+            sleep "$ORACLE_19C_STARTUP_WAIT"
+
+            # Stop tailing logs
+            kill $ORACLE_LOG_PID 2>/dev/null || true
+            wait $ORACLE_LOG_PID 2>/dev/null || true
+
+            configure_database "oracle" "ORA1903-01"
             run_test_suite "oracle19c"
+            compose_down "docker/rdbms/oracle/docker-compose.yml" "ORA1903-01" "Oracle 19c"
             ;;
 
         sqlite)
             # SQLite is a file, so there is no container to start: the suites use the standing
             # stack and the source schemas built by sqliteStageDataSets during initialization.
             run_test_suite "sqlite"
+            ;;
+
+        teradata)
+            # TDATA17-01 runs on yadamu-db3, which holds one of Teradata and the SQL Server 2012/2014 VMs at a time
+            # (docker/server/yadamu-db3/switchDatabase.sh teradata). The suites need the yadamu/teradata image
+            # (docker/build/teradata), because the base images don't include the Teradata driver.
+            if ! timeout 10 bash -c "</dev/tcp/${TERADATA}/1025" 2>/dev/null; then
+                error_message "Teradata is not answering on ${TERADATA}:1025. Run 'switchDatabase.sh teradata' on yadamu-db3. Skipping the Teradata test."
+            elif ! docker image inspect yadamu/teradata:latest >/dev/null 2>&1; then
+                error_message "Image yadamu/teradata:latest not found. Build it with 'docker compose --file docker/build/docker-compose.yml build teradata'. Skipping the Teradata test."
+            else
+                run_test_suite "teradata" "yadamu/teradata:latest"
+            fi
             ;;
 
         oracle21c)
@@ -255,23 +293,25 @@ run_test() {
             ;;
             
         oracle26ai)
-            compose_up "docker/rdbms/oracle/docker-compose.yml" "ORACL26-01" "Oracle 26ai"
-            
+            # 26ai Free (gvenzl/oracle-free). The primary Oracle (oracle#1) is 26ai Enterprise Edition (ORA2326-01) in the
+            # standing stack, so Free gets its own one-off slot here, like 21c and 23ai.
+            compose_up "docker/rdbms/oracle/docker-compose.yml" "ORACL26-01" "Oracle 26ai Free"
+
             # Tail Oracle container logs in background
-            log_message "Monitoring Oracle 26ai startup logs..."
+            log_message "Monitoring Oracle 26ai Free startup logs..."
             docker logs -f ORACL26-01 2>&1 &
             ORACLE_LOG_PID=$!
-            
-            wait_message "Waiting for Oracle 26ai Startup (${ORACLE_26AI_STARTUP_WAIT}s)..."
+
+            wait_message "Waiting for Oracle 26ai Free Startup (${ORACLE_26AI_STARTUP_WAIT}s)..."
             sleep "$ORACLE_26AI_STARTUP_WAIT"
-            
+
             # Stop tailing logs
             kill $ORACLE_LOG_PID 2>/dev/null || true
             wait $ORACLE_LOG_PID 2>/dev/null || true
-            
+
             configure_database "oracle" "ORACL26-01"
             run_test_suite "oracle26ai"
-            compose_down "docker/rdbms/oracle/docker-compose.yml" "ORACL26-01" "Oracle 26ai"
+            compose_down "docker/rdbms/oracle/docker-compose.yml" "ORACL26-01" "Oracle 26ai Free"
             ;;
 
         vertica09)
@@ -337,7 +377,7 @@ run_test() {
             
         *)
             error_message "Unknown test: $test_name"
-            echo "Available tests: cmdline, oracle11g, oracle19c, sqlite, oracle21c, oracle23ai, oracle26ai, vertica09, db2, cockroach, yugabyte, snowflake"
+            echo "Available tests: cmdline, oracle11g, oracle19c, sqlite, teradata, oracle21c, oracle23ai, oracle26ai, vertica09, db2, cockroach, yugabyte, snowflake"
             exit 1
             ;;
     esac
@@ -356,6 +396,7 @@ run_all_tests() {
         "oracle11g"
         "oracle19c"
         "sqlite"
+        # No teradata yet: it runs on its own (run_test teradata) until it has had its full-suite reruns on yadamu-db3.
         "oracle21c"
         "oracle23ai"
         "oracle26ai"
@@ -367,7 +408,12 @@ run_all_tests() {
     )
 
     # Iterate through all tests
+    # EXTENDED_EXCLUDE (space separated test names) skips tests, for example "snowflake" in a rerun
     for test_name in "${EXTENDED_TESTS[@]}"; do
+        if [[ " ${EXTENDED_EXCLUDE:-} " == *" $test_name "* ]]; then
+            log_message "Skipping $test_name (EXTENDED_EXCLUDE)"
+            continue
+        fi
         run_test "$test_name"
     done
     

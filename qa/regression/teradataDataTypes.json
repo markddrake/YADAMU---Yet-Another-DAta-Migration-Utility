@@ -139,6 +139,46 @@
             "tasks": [
                 "postgresDataTypes"
             ]
+        },
+        {
+            "source": "tera#1",
+            "targets": [
+                "tera#1"
+            ],
+            "tasks": [
+                "teradataDataTypes"
+            ]
+        },
+        {
+            "operation": "export",
+            "source": "tera#1",
+            "target": "file-staging",
+            "createDirectory": true,
+            "verifyOperation": true,
+            "parameters": {
+                "DIRECTORY": "export/json/%vendor%"
+            },
+            "tasks": [
+                "teradataDataTypes"
+            ]
+        },
+        {
+            "source": "tera#1",
+            "targets": [
+                "oracle#1",
+                "oracle#2",
+                "oracle#3",
+                "oracle#4",
+                "mssql#1",
+                "mssql#2",
+                "postgres#1",
+                "mysql#1",
+                "mariadb#1",
+                "mongodb#1"
+            ],
+            "tasks": [
+                "teradataDataTypes"
+            ]
         }
     ]
 }

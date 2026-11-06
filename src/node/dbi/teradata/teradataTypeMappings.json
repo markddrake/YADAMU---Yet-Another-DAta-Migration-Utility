@@ -25,9 +25,10 @@
   , "SMALLINT_TYPE"                                        : "I2"     
   , "BIGINT_TYPE"                                          : "I8"     
   , "JSON_TYPE"                                            : "JN"     
+  , "INTERVAL_MONTH_TYPE"                                  : "MO"     
   , "INTERVAL_MINUTE_TYPE"                                 : "MI"     
   , "INTERVAL_MINUTE_TO_SECOND_TYPE"                       : "MS"     
-  , "PERIOD_DAY_TYPE"                                      : "PD"     
+  , "PERIOD_DATE_TYPE"                                     : "PD"     
   , "PERIOD_TIME_TYPE"                                     : "PT"     
   , "PERIOD_TIME_TZ_TYPE"                                  : "PZ"     
   , "PERIOD_TIMESTAMP_TYPE"                                : "PS"     
@@ -40,7 +41,7 @@
   , "TD_UDT_TYPE"                                          : "UT"     
   , "XML_TYPE"                                             : "XM"     
   , "YEAR_TYPE"                                            : "YR"     
-  , "INTERVAL_YEAR_TO_MONTH"                               : "YM"   
+  , "INTERVAL_YEAR_TO_MONTH_TYPE"                          : "YM"   
   , "SPATIAL_TYPE"                                         : "UT"
   , "UNBOUNDED_NUMERIC_TYPE"                               : "NUMBER(*)"  
   }
@@ -52,7 +53,7 @@
   , "BLOB_LENGTH"                                           : 2097088000
 }
 , "storageOptions": {
-	"SPATIAL_FORMAT"                                       : "WKT"
+	"SPATIAL_FORMAT"                                       : "WKB"
   , "BOOLEAN_TYPE"                                         : "BYTEINT"
   }
 , "sqlDataTypeNames" : {
@@ -82,6 +83,7 @@
   , "I4"                                                   : "INTEGER"                           
   , "I8"                                                   : "BIGINT"                            
   , "JN"                                                   : "JSON"                              
+  , "MO"                                                   : "INTERVAL MONTH"
   , "MI"                                                   : "INTERVAL MINUTE"                   
   , "MS"                                                   : "INTERVAL MINUTE TO SECOND"         
   , "N"                                                    : "NUMBER"                           

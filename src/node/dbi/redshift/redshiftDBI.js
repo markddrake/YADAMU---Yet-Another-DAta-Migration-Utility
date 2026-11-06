@@ -650,6 +650,9 @@ class RedshiftDBI extends YadamuDBI {
   classFactory(yadamu) {
 	return new RedshiftDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
+  
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
 
   async reportCopyErrors(tableName,copyState) {
 	  

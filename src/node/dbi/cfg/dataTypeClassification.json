@@ -20,7 +20,8 @@
 		"OBJECTID",
 		"BINDATA",
 		"BF",
-		"BV"
+		"BV",
+		"BO"
 	],
 	"date": [
 		"DATE",
@@ -111,7 +112,9 @@
 		"GEOMETRYCOLLECTION",
 		"MULTIPOINT",
 		"MULTILINESTRING",
-		"MULTIPOLYGON"
+		"MULTIPOLYGON",
+		"UT",
+		"ST_GEOMETRY"
 	],
 	"unboundedNumerics" : {
 	   "MariaDB"    : "decimal(65,32)"

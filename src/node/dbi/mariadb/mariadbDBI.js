@@ -591,10 +591,19 @@ class MariadbDBI extends YadamuDBI {
 	return new MariadbDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  
   async getConnectionID() {
 	const results = await this.executeSQL(`select connection_id() "pid"`)
 	const pid = results[0][0];
     return pid
+  }
+
+  hydrateWorkerState(state) {
+	// A mariadb pool opens its connections eagerly (minimumIdle defaults to connectionLimit). Each thread's pool opens connections only as its workers need them.
+	state.connectionProperties.minimumIdle = 0
+	super.hydrateWorkerState(state)
   }
 
   

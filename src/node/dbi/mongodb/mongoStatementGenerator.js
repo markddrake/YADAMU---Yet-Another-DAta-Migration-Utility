@@ -7,6 +7,32 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
+  /*
+  **
+  ** A Decimal128 holds 34 significant digits. A Teradata DECIMAL or NUMBER with a larger precision is stored as a string, so that every value
+  ** survives exactly, e.g. a DECIMAL(38,10). A NUMBER without a precision has up to 38 digits. Only Teradata sources, for now: other vendors'
+  ** wide decimals still become Decimal128, which rejects a value with more than 34 digits.
+  **
+  */
+
+  static get DECIMAL128_PRECISION() { return 34 }
+
+  static get STRING_DECIMAL_VENDORS() {
+	// The precision of a NUMBER without one
+	return { Teradata: 38 }
+  }
+
+  refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint) {
+	const dataType = super.refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint)
+	if ((dataType === this.dbi.DATA_TYPES.MONGO_DECIMAL128_TYPE) && MongoStatementGenerator.STRING_DECIMAL_VENDORS.hasOwnProperty(this.SOURCE_VENDOR)) {
+	  const precision = sizeConstraint?.length > 0 ? sizeConstraint[0] : MongoStatementGenerator.STRING_DECIMAL_VENDORS[this.SOURCE_VENDOR]
+	  if (precision > MongoStatementGenerator.DECIMAL128_PRECISION) {
+		return this.dbi.DATA_TYPES.VARCHAR_TYPE
+	  }
+	}
+	return dataType
+  }
+
   generateStorageClause(mappedDataType) {
 	return mappedDataType
   }

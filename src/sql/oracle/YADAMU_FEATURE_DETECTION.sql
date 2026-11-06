@@ -43,6 +43,9 @@ declare
   TRANSPORTABLE_XML_ORA28817 EXCEPTION;
   PRAGMA EXCEPTION_INIT( TRANSPORTABLE_XML_ORA28817 , -28817);
 
+  INVALID_SQL_STATEMENT EXCEPTION;
+  PRAGMA EXCEPTION_INIT( INVALID_SQL_STATEMENT , -900);
+
   V_PACKAGE_DEFINITION VARCHAR2(32767);
   
   V_DUMMY                  NUMBER;
@@ -56,6 +59,7 @@ declare
   V_HASH                   RAW(32);
   V_XMLDOC                 VARCHAR2(64) := '<A>X'||CHR(13)||CHR(10)||'X</A>'; 
   V_SERIALIZED_LENGTH      NUMBER(2);
+  V_STATEMENT              CLOB;
 begin
 
   begin
@@ -375,6 +379,38 @@ $END
       V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                       || '  XML_PRESERVE_CRLF CONSTANT BOOLEAN      := FALSE;'    || C_NEWLINE;
     end if;						  
+
+    --
+    -- Temporary CLOB statements and ORA-00900 in 26ai (23.26.3). After an INSERT ... SELECT that calls a function
+    -- converting XMLSERIALIZE output to a BLOB, EXECUTE IMMEDIATE of a temporary CLOB holding a valid statement fails
+    -- at parse with ORA-00900. Reading from the CLOB first avoids it. See qa/sql/oracle/tempClobExecuteBug.sql.
+    --
+    begin
+      execute immediate 'create or replace function YADAMU_TEMP_CLOB_PROBE(P_CLOB CLOB) return BLOB as V_BLOB BLOB; V_DEST INTEGER := 1; V_SRC INTEGER := 1; V_LANG INTEGER := 0; V_WARNING INTEGER; begin DBMS_LOB.CREATETEMPORARY(V_BLOB,TRUE); DBMS_LOB.CONVERTTOBLOB(V_BLOB,P_CLOB,DBMS_LOB.LOBMAXSIZE,V_DEST,V_SRC,NLS_CHARSET_ID(''AL32UTF8''),V_LANG,V_WARNING); return V_BLOB; end;';
+      -- CREATE FUNCTION commits and YADAMU_XML_STORAGE_TEST is ON COMMIT DELETE ROWS, so insert the document again.
+      execute immediate 'insert into YADAMU_XML_STORAGE_TEST values (:1)' using V_XMLDOC;
+      execute immediate 'insert into YADAMU_XML_STORAGE_TEST select X from YADAMU_XML_STORAGE_TEST t where DBMS_LOB.GETLENGTH(YADAMU_TEMP_CLOB_PROBE(XMLSERIALIZE(CONTENT t.X AS CLOB))) > 0';
+      V_STATEMENT := 'select count(*) ' || 'from DUAL';
+      begin
+        execute immediate V_STATEMENT into V_DUMMY;
+        V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+                             || '  TEMP_CLOB_EXECUTE_ORA00900 CONSTANT BOOLEAN      := FALSE;'     || C_NEWLINE;
+      exception
+        when INVALID_SQL_STATEMENT then
+          V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+                               || '  TEMP_CLOB_EXECUTE_ORA00900 CONSTANT BOOLEAN      := TRUE;'      || C_NEWLINE;
+      end;
+      execute immediate 'drop function YADAMU_TEMP_CLOB_PROBE';
+    exception
+      when OTHERS then
+        begin
+          execute immediate 'drop function YADAMU_TEMP_CLOB_PROBE';
+        exception
+          when OTHERS then
+            NULL;
+        end;
+        RAISE;
+    end;
 
     begin 
       execute immediate 'drop table YADAMU_XML_STORAGE_TEST';

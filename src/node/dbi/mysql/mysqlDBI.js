@@ -754,10 +754,26 @@ class MySQLDBI extends YadamuDBI {
     return new MySQLDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  
   async getConnectionID() {
     const results = await this.executeSQL(`select connection_id() "pid"`)
     const pid = results[0].pid
     return pid
+  }
+
+  getWorkerState() {
+	// The connection properties include a function (infileStreamFactory), which cannot be posted to a worker thread.
+	const state = super.getWorkerState()
+	state.connectionProperties = { ...state.connectionProperties }
+	delete state.connectionProperties.infileStreamFactory
+	return state
+  }
+
+  hydrateWorkerState(state) {
+	state.connectionProperties.infileStreamFactory = MySQLConstants.CONNECTION_PROPERTY_DEFAULTS.infileStreamFactory
+	super.hydrateWorkerState(state)
   }
     
 }

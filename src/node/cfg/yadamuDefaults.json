@@ -1,6 +1,7 @@
 {
 	"yadamu": {
-		"FILE": "yadamu.json"
+		"FILE": "yadamu.json",
+		"THREADED": true
 	},
 	"yadamuDBI": {
 		"MODE": "DATA_ONLY",

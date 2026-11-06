@@ -1039,6 +1039,9 @@ $END
   	     "COLUMNS_CLAUSE"
         ,-- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
          case
+           when (TARGET_DATA_TYPE = 'BOOLEAN') and (P_BOOLEAN_DATA_TYPE = 'BOOLEAN') then
+             -- Native BOOLEAN (23ai and later) will not accept the RAW value used for RAW(1) storage (ORA-00932). The value is extracted as text (true/false or 1/0)
+             'TO_BOOLEAN("' || COLUMN_NAME || '")'
            when (TARGET_DATA_TYPE = 'BOOLEAN') then
              'HEXTORAW(LTRIM(TO_CHAR("' || COLUMN_NAME || '", ''0X'')))'
            when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
@@ -1126,6 +1129,9 @@ $END
              C_MAX_STRING_TYPE
            when TARGET_DATA_TYPE  = '"MDSYS"."SDO_GEOMETRY"' then
              C_MAX_STRING_TYPE
+           when (TARGET_DATA_TYPE  = 'BOOLEAN') and (P_BOOLEAN_DATA_TYPE = 'BOOLEAN') then
+             -- 23ai and later will not convert a JSON true/false to NUMBER (ORA-40799). Extract as text and convert with TO_BOOLEAN
+             'VARCHAR2(32)'
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
              -- Maybe TRUE / FALSE or 01/00
              'NUMBER(1)'

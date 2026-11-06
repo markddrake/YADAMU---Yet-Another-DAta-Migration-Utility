@@ -16,12 +16,18 @@ import Yadamu              from '../../core/yadamu.js';
 import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
+
+  // Lets a worker thread load this QA class.
+  get WORKER_MODULE_URL()     { return import.meta.url }
     			
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
     static get SQL_GATHER_SCHEMA_STATS()   { return _SQL_GATHER_SCHEMA_STATS }
+    static get SQL_SHARED_POOL_HEADROOM()  { return _SQL_SHARED_POOL_HEADROOM }
+    // Flush the shared pool after a DDL extraction when the SGA can give it less than this.
+    static get FLUSH_HEADROOM_THRESHOLD()  { return 1024 * 1024 * 1024 }
 
 	static #DBI_PARAMETERS
 	
@@ -64,6 +70,27 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
      
    classFactory(yadamu) {
      return new OracleQA(yadamu,this,this.connectionParameters,this.parameters)
+   }
+
+   async getDDLOperations() {
+     const ddl = await super.getDDLOperations()
+     // QA only: DBMS_METADATA's KU$ cursors are very large (one TABLE_T cursor was 52 MB on 26ai), and a schema extraction needs
+     // 200-400 MB of shared pool for them. Where the SGA can grow the shared pool (EE and the older versions, which can take memory
+     // from the buffer cache) they age out normally. Where it can't (26ai Free: about 1.5 GB of SGA with a 1 GB shared pool and a
+     // fixed buffer cache), repeated extractions fragment the pool and later statements fail with ORA-04031, so flush it there.
+     // Flushing an instance that doesn't need it is expensive: every statement is hard parsed again (+2 hours in dbRoundtrip).
+     // YADAMU itself never flushes: it affects every session on the instance. Logged at INFO when it fails, so the run's warning count
+     // doesn't change.
+     try {
+       const results = await this.executeSQL(OracleQA.SQL_SHARED_POOL_HEADROOM,{})
+       const headroom = results.rows[0][0]
+       if ((headroom === null) || (headroom < OracleQA.FLUSH_HEADROOM_THRESHOLD)) {
+         await this.executeSQL(`alter system flush shared_pool`,{})
+       }
+     } catch (e) {
+       this.LOGGER.info([this.DATABASE_VENDOR,'QA','FLUSH SHARED POOL'],`Unable to flush the shared pool: ${e.message}`)
+     }
+     return ddl
    }
 	
    async configureConnection() {
@@ -153,6 +180,11 @@ const _SQL_FAILED =
  order by TABLE_NAME`;
 
 const _SQL_GATHER_SCHEMA_STATS = `begin dbms_stats.gather_schema_stats(ownname => :target); end;`;
+
+// How much more memory the SGA could give the shared pool: the buffer cache above its configured minimum, plus unallocated SGA.
+// CDB-wide, and readable by SYSTEM in a PDB (v$sgastat in a PDB shows only that PDB's share).
+const _SQL_SHARED_POOL_HEADROOM = `select (select current_size - user_specified_size from v$sga_dynamic_components where component = 'DEFAULT buffer cache')
+                                        + (select current_size from v$sga_dynamic_free_memory) from dual`;
 
 // LEFT Join works in 11.x databases where 'EXTERNAL' column does not exist in ALL_TABLES
 

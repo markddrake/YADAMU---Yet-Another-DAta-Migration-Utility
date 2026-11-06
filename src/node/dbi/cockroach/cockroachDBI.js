@@ -264,7 +264,8 @@ class CockroachDBI extends YadamuDBI {
     })
 
 
-    const needNewPool = await this.setMaxReadBufferSize()
+    // A worker thread's shadow manager uses the setting the main thread's manager established. Checking it again could undo a worker's resize.
+    const needNewPool = this.THREAD_SHADOW ? false : await this.setMaxReadBufferSize()
 
     if (needNewPool) {
 	  await this.closePool();
@@ -937,6 +938,9 @@ class CockroachDBI extends YadamuDBI {
   classFactory(yadamu) {
 	return new CockroachDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
+  
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
   
   async getConnectionID() {
 	const results = await this.executeSQL(`select pg_backend_pid()`)

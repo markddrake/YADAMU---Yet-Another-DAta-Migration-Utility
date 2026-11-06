@@ -591,7 +591,21 @@ begin
 
   if (V_INDEX_NAME <> P_INDEX_NAME) then
     V_STATEMENT := 'ALTER INDEX "' || V_INDEX_NAME || '" RENAME TO "' || P_INDEX_NAME || '"';
-    EXECUTE IMMEDIATE(V_STATEMENT);
+    if (P_TABLE_NAME like 'AQ$_%') then
+      -- The AQ background processes lock a queue table's internal tables for a moment after the queue table is created,
+      -- and a rename that arrives then fails with ORA-00054 (seen on 26ai with IX ORDERS_QUEUETABLE). Wait for the lock.
+      EXECUTE IMMEDIATE 'ALTER SESSION SET DDL_LOCK_TIMEOUT = 60';
+      begin
+        EXECUTE IMMEDIATE(V_STATEMENT);
+      exception
+        when OTHERS then
+          EXECUTE IMMEDIATE 'ALTER SESSION SET DDL_LOCK_TIMEOUT = 0';
+          RAISE;
+      end;
+      EXECUTE IMMEDIATE 'ALTER SESSION SET DDL_LOCK_TIMEOUT = 0';
+    else
+      EXECUTE IMMEDIATE(V_STATEMENT);
+    end if;
   end if;
   
 exception

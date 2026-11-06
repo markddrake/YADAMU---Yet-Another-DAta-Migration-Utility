@@ -31,7 +31,9 @@ import DBIConstants                   from '../base/dbiConstants.js'
 /* Vendor Specific DBI Implimentation */                                   
 
 import Comparitor                     from './teradataCompare.js'
-import DatabaseError                  from './teradataException.js'
+import {
+  TeradataError
+}                                     from './teradataException.js'
 import DataTypes                      from './teradataDataTypes.js'
 import Parser                         from './teradataParser.js'
 import StatementGenerator             from './teradataStatementGenerator.js'
@@ -67,7 +69,8 @@ class TeradataDBI extends YadamuDBI {
   get STATEMENT_TERMINATOR()      { return TeradataConstants.STATEMENT_TERMINATOR };
 
   get DATATYPE_IDENTITY_MAPPING() { return false }
-  get FETCH_SIZE()                { return this.parameters.TERDATA_FETCH_SIZE || TeradataConstants.FETCH_SIZE}
+  // Rows per fetch from the worker. TERDATA_FETCH_SIZE is the parameter's original, misspelt name.
+  get FETCH_SIZE()                { return this.parameters.TERADATA_FETCH_SIZE || this.parameters.TERDATA_FETCH_SIZE || TeradataConstants.FETCH_SIZE}
   
   addVendorExtensions(connectionProperties) {
 
@@ -81,7 +84,7 @@ class TeradataDBI extends YadamuDBI {
     super(yadamu,manager,connectionSettings,parameters)
 
 	this.COMPARITOR_CLASS = Comparitor
-	this.DATABASE_ERROR_CLASS = DatabaseError
+	this.DATABASE_ERROR_CLASS = TeradataError
     this.PARSER_CLASS = Parser
     this.STATEMENT_GENERATOR_CLASS = StatementGenerator
     this.STATEMENT_LIBRARY_CLASS = StatementLibrary
@@ -163,7 +166,7 @@ class TeradataDBI extends YadamuDBI {
   
   async configureConnection() {    
     
-	const results = await this.executeSQL(TeradataStatementLibrary.SQL_SYSTEM_INFORMATION,[])
+	const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION,[])
 	this._DATABASE_VERSION = results[0][0].slice('Database Version'.length+1)
   }
 
@@ -266,7 +269,7 @@ class TeradataDBI extends YadamuDBI {
     // this.LOGGER.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
      
     this.setTransactionCursor()
-    await this.executeSQL(TeradataStatementLibrary.SQL_BEGIN_TRANSACTION,[])
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_TRANSACTION,[])
     await super.beginTransaction()
 
   }
@@ -282,7 +285,7 @@ class TeradataDBI extends YadamuDBI {
     // this.LOGGER.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     super.commitTransaction()
-    await this.executeSQL(TeradataStatementLibrary.SQL_COMMIT_TRANSACTION,[])
+    await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_COMMIT_TRANSACTION,[])
     this.resetTransactionCursor()
 	
   }
@@ -312,7 +315,7 @@ class TeradataDBI extends YadamuDBI {
      
     try {
       super.rollbackTransaction()
-      await this.executeSQL(TeradataStatementLibrary.SQL_ROLLBACK_TRANSACTION,[])
+      await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_ROLLBACK_TRANSACTION,[])
       this.resetTransactionCursor()
     } catch (newIssue) {
       this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)                                  
@@ -343,7 +346,7 @@ class TeradataDBI extends YadamuDBI {
   
     // Get Information about the target server
    
-    const results = await this.executeSQL(TeradataStatementLibrary.SQL_SYSTEM_INFORMATION,[])
+    const results = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SYSTEM_INFORMATION,[])
     const sysInfo = results[0]
 
 	return Object.assign(
@@ -364,7 +367,7 @@ class TeradataDBI extends YadamuDBI {
   
   async getSchemaMetadata() {
 
-    let schemaInfo = await this.executeSQL(TeradataStatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
+    let schemaInfo = await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
 	schemaInfo = schemaInfo.map((table) => {
 	  return {
 	    TABLE_SCHEMA          : table[0]
@@ -372,10 +375,26 @@ class TeradataDBI extends YadamuDBI {
 	  , COLUMN_NAME_ARRAY     : table[2]
 	  , DATA_TYPE_ARRAY       : table[3]
 	  , SIZE_CONSTRAINT_ARRAY : table[4]
-	  , CLIENT_SELECT_LIST    : table[5]
+	  , CLIENT_SELECT_LIST    : this.getClientSelectList(JSON.parse(table[2]),JSON.parse(table[3]))
 	  }
     })
     return schemaInfo
+  }
+
+  getClientSelectList(columnNames,dataTypes) {
+    // ST_GEOMETRY's default transform, WKT, doesn't print enough digits to reproduce every coordinate, so spatial columns are read as WKB unless SPATIAL_FORMAT is WKT.
+    // XML's default transform puts a space between the nodes that precede the root element, and XMLSERIALIZE doesn't.
+    return columnNames.map((columnName,idx) => {
+      switch (dataTypes[idx]) {
+        case this.DATA_TYPES.XML_TYPE:
+          return `XMLSERIALIZE(CONTENT "${columnName}" AS CLOB CHARACTER SET UNICODE) "${columnName}"`
+        case this.DATA_TYPES.SPATIAL_TYPE:
+        case 'ST_GEOMETRY':
+          return this.SPATIAL_FORMAT.endsWith('WKT') ? `"${columnName}".ST_AsText() "${columnName}"` : `"${columnName}".ST_AsBinary() "${columnName}"`
+        default:
+          return `"${columnName}"`
+      }
+    }).join(',')
   }
 
   async _getInputStream(queryInfo) {

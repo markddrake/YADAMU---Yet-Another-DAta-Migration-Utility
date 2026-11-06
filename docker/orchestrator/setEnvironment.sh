@@ -8,10 +8,13 @@ export LOG_DIR="${LOG_DIR:-./logs}"
 export CONTAINER_NAME="${CONTAINER_NAME:-YADAMU-01}"
 export MSSQL12="${MSSQL12:-192.168.1.234}"
 export MSSQL14="${MSSQL14:-192.168.1.235}"
+export TERADATA="${TERADATA:-192.168.1.233}"
 export MEMORY="${MEMORY:-16g}"
 export NETWORK="${NETWORK:-YADAMU-NET}"
 export VOLUME="${VOLUME:-YADAMU_01-SHARED}"
 export IMAGE="${IMAGE:-yadamu/secure:latest}"
+# YADAMU_THREADED (true|false), when set on the orchestrator, is passed to the test container and overrides the THREADED default for every operation.
+# EXTENDED_EXCLUDE (space separated extendedTests.sh test names) skips those tests in the extended run.
 
 # Colors for output
 export GREEN='\033[0;32m'
@@ -29,6 +32,7 @@ echo "Container Name: $CONTAINER_NAME"
 echo "Log Directory: $LOG_DIR"
 echo "SQL Server 2012: $MSSQL12"
 echo "SQL Server 2014: $MSSQL14"
+echo "Teradata: $TERADATA"
 echo "Memory Limit: $MEMORY"
 echo "Network: $NETWORK"
 echo "Image: $IMAGE"

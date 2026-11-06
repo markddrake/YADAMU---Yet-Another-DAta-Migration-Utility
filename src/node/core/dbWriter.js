@@ -26,7 +26,9 @@ class DBWriter extends Writable {
     this.currentTable   = undefined;
     this.ddlCompleted   = false;
     this.deferredCallback = YadamuLibrary.NOOP
-  }  
+    // Resolved once initializeData() has been called, so the target's readyForData (e.g. Oracle's disabled constraints) can be awaited by worker threads
+    this.dataInitialized = new Promise((resolve) => { this.setDataInitialized = resolve })
+  }
   
   getOutputStream() {
       
@@ -214,7 +216,11 @@ class DBWriter extends Writable {
           break;
         case 'metadata':
           await this.setMetadata(obj.metadata);
-          await this.dbi.initializeData();
+          try {
+            await this.dbi.initializeData();
+          } finally {
+            this.setDataInitialized()
+          }
           return true
         case 'eof':      
           break;

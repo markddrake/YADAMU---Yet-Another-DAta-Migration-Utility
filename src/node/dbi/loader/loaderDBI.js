@@ -36,6 +36,7 @@ import {
 
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
+import WorkerThreadSupport            from '../../core/workerThreadSupport.js'
 
 import {
   FileError, 
@@ -348,12 +349,18 @@ class LoaderDBI extends YadamuDBI {
 	  outputFile.retry = false
 	  return outputFile.file
 	}
-	const manager = this.isManager() ? this : this.manager
-	manager.UNASSIGNED_FILES = manager.UNASSIGNED_FILES || {}
-	manager.UNASSIGNED_FILES[tableName] = manager.UNASSIGNED_FILES[tableName] || [...tableData.files]
-	const file = manager.UNASSIGNED_FILES[tableName].shift()
+	// In a worker thread the file was assigned by the main thread's manager in getOutputStreams(), which is asynchronous.
+	const file = this.ASSIGNED_OUTPUT_FILE ?? (this.isManager() ? this : this.manager).assignOutputFile(tableName)
+	this.ASSIGNED_OUTPUT_FILE = undefined
 	this.OUTPUT_FILES[tableName] = { file: file, retry: false }
 	return file
+  }
+  
+  assignOutputFile(tableName) {
+	// Invoked on the manager, which hands out a partitioned table's planned files in turn.
+	this.UNASSIGNED_FILES = this.UNASSIGNED_FILES || {}
+	this.UNASSIGNED_FILES[tableName] = this.UNASSIGNED_FILES[tableName] || [...this.controlFile.data[tableName].files]
+	return this.UNASSIGNED_FILES[tableName].shift()
   }
   
   releaseOutputFile(tableName) {
@@ -620,6 +627,11 @@ class LoaderDBI extends YadamuDBI {
     // this.LOGGER.trace([this.constructor.name,'getOutputStreams()'],`DDL Complete. [${this.ddlComplete}]`)
 	this.reloadControlFile()
 
+	if (this.manager?.THREAD_SHADOW && Array.isArray(this.controlFile.data[tableName]?.files) && !this.OUTPUT_FILES?.[tableName]?.retry) {
+	  // Workers on different threads share the main thread's list of planned files, so the file is assigned before the output stream is created.
+	  this.ASSIGNED_OUTPUT_FILE = await this.manager.assignOutputFile(tableName)
+	}
+
     this.PIPELINE_STATE = pipelineState
 	pipelineState.writerState = this.ERROR_STATE
 
@@ -827,6 +839,40 @@ class LoaderDBI extends YadamuDBI {
   
   classFactory(yadamu) {
 	return new LoaderDBI(yadamu,this,this.connectionParameters,this.parameters)
+  }
+  
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  get THREAD_RPC_METHODS()            { return [...super.THREAD_RPC_METHODS,'assignOutputFile'] }
+
+  getWorkerState() {
+	return {
+	  ...super.getWorkerState()
+	// The control file embeds the source's systemInformation, which may not be clonable (e.g. MongoDB's clientMetadata is a Promise)
+	, controlFile        : WorkerThreadSupport.clonable(this.controlFile)
+	, controlFilePath    : this._CONTROL_FILE_PATH
+	, controlFileFolder  : this._CONTROL_FILE_FOLDER
+	, encryptionKey      : this.ENCRYPTION_KEY
+	}
+  }
+
+  hydrateWorkerState(state) {
+	super.hydrateWorkerState(state)
+	this.controlFile = state.controlFile
+	this._CONTROL_FILE_PATH = state.controlFilePath
+	this._CONTROL_FILE_FOLDER = state.controlFileFolder
+	// The key arrives as a Uint8Array.
+	this._ENCRYPTION_KEY = state.encryptionKey ? Buffer.from(state.encryptionKey) : undefined
+  }
+
+  getPostDDLWorkerState() {
+	// The control file's data section is written when the DDL phase completes.
+	return { ...super.getPostDDLWorkerState(), controlFile : WorkerThreadSupport.clonable(this.controlFile) }
+  }
+
+  hydratePostDDLWorkerState(state) {
+	super.hydratePostDDLWorkerState(state)
+	this.controlFile = state.controlFile
   }
   
   async cloneSettings() {

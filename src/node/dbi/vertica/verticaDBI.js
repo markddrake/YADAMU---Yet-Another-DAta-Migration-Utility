@@ -667,6 +667,9 @@ class VerticaDBI extends YadamuDBI {
 	return new VerticaDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
+  get THREADED_PARALLEL_SUPPORTED()   { return true }
+  get WORKER_MODULE_URL()             { return import.meta.url }
+  
   async getConnectionID() {
 	const results = await this.executeSQL(`select pg_backend_pid()`)
 	const pid = results.rows[0][0];

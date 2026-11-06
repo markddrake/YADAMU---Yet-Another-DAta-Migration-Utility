@@ -16,6 +16,32 @@ import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
 class OracleStatementGenerator extends YadamuStatementGenerator {
 
+  /*
+  **
+  ** Oracle's interval types default to a leading precision of 2: INTERVAL YEAR(2) TO MONTH and INTERVAL DAY(2) TO SECOND(6). A Teradata INTERVAL
+  ** has a leading precision of up to 4, in any of its fields, e.g. INTERVAL MONTH(4) holds 833 years and INTERVAL HOUR(4) 416 days.
+  **
+  */
+
+  get TYPE_MAPPINGS() {
+    if (this._TYPE_MAPPINGS === undefined) {
+      const typeMappings = super.TYPE_MAPPINGS
+      if (this.SOURCE_VENDOR === 'Teradata') {
+        typeMappings.forEach((targetType,sourceType) => {
+          switch (targetType) {
+            case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
+              typeMappings.set(sourceType,'INTERVAL YEAR(4) TO MONTH')
+              break
+            case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
+              typeMappings.set(sourceType,'INTERVAL DAY(4) TO SECOND(6)')
+              break
+          }
+        })
+      }
+    }
+    return this._TYPE_MAPPINGS
+  }
+
   get BIND_LENGTH() {     
     this._BIND_LENGTH = this._BIND_LENGTH || Object.freeze({
       BLOB          : this.dbi.LOB_MAX_SIZE
@@ -31,7 +57,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
     , BFILE         : 4096
     , DATE          : 24
     , TIMESTAMP     : 35
-    , INTERVAL      : 12
+    , INTERVAL      : 64 // An ISO 8601 duration, e.g. P45DT12H30M15.123456S
     })
     return this._BIND_LENGTH
   }

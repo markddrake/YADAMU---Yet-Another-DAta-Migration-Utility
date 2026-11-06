@@ -1,0 +1,9 @@
+*
+!docker/regressionTests/bin/chooseTest.sh
+!qa/regression/teradata*.json
+!src/install
+!src/node
+!src/qa
+!src/sql
+src/node/gui
+src/node/server

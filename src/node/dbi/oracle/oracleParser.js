@@ -20,10 +20,23 @@ class OracleParser extends YadamuParser {
         dbi.ACTIVE_PARSER = this
   }
 
+  freeLob(lob) {
+    // Free each temporary LOB as soon as its content has been read instead of leaving it to the garbage collector.
+    // When frees reach the server in GC-timed bursts during a fetch, Oracle 19.3 can crash the session with
+    // ORA-07445 [_intel_fast_memcmp()+28] (temporary LOB refcount use-after-free; seen on get_WKB() spatial exports).
+    // Not called once the connection is lost: the session's temporary LOBs are gone with it, and a close on a half-open
+    // connection could hold a libuv thread (needed by the reconnect) until TCP times out.
+    // A failed close is reported as a stream 'error'; ignore it rather than crash.
+    lob.once('error',() => {})
+    lob.destroy()
+  }
+
   fetchLobContent = (row,idx)  => {
     const stack = new Error().stack
     row[idx] = new Promise((resolve,reject) => {
-      row[idx].getData().then((data) => { 
+      const lob = row[idx]
+      lob.getData().then((data) => { 
+        this.freeLob(lob)
   	    row[idx] = data
 	    resolve()
       }).catch((e) => {
@@ -31,6 +44,9 @@ class OracleParser extends YadamuParser {
         if (cause.lostConnection()) {
           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
           row[idx] = null
+        }
+        else {
+          this.freeLob(lob)
         }
         reject(cause)
 	  })
@@ -40,7 +56,9 @@ class OracleParser extends YadamuParser {
   fetchJSONfromBLOB = (row,idx)  => {
     const stack = new Error().stack
     row[idx] = new Promise((resolve,reject) => {
-      row[idx].getData().then((data) => { 
+      const lob = row[idx]
+      lob.getData().then((data) => { 
+        this.freeLob(lob)
   	    row[idx] = data.toString('utf-8')
 	    resolve()
       }).catch((e) => {
@@ -48,6 +66,9 @@ class OracleParser extends YadamuParser {
         if (cause.lostConnection()) {
           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
           row[idx] = null
+        }
+        else {
+          this.freeLob(lob)
         }
         reject(cause)
 	  })
@@ -57,7 +78,9 @@ class OracleParser extends YadamuParser {
   fetchGeoJSONContent = (row,idx)  => {
     const stack = new Error().stack
     row[idx] = new Promise((resolve,reject) => {
-      row[idx].getData().then((data) => { 
+      const lob = row[idx]
+      lob.getData().then((data) => { 
+        this.freeLob(lob)
 	    row[idx] = YadamuSpatialLibrary.geoJSONtoWKB(JSON.parse(data))
 	    resolve()
       }).catch((e) => {
@@ -65,6 +88,9 @@ class OracleParser extends YadamuParser {
         if (cause.lostConnection()) {
           this.LOGGER.qaWarning([this.dbi.DATABASE_VENDOR,'PARSER',this.queryInfo.TABLE_NAME,'CLOB'],'LOB Content unavailable following Lost Connection')
           row[idx] = null
+        }
+        else {
+          this.freeLob(lob)
         }
         reject(cause)
 	  })

@@ -110,34 +110,39 @@ services:
       - ORA1803-01-DIAG:/opt/oracle/diag
     restart: always
 
-  ORA1903-01: 
+  # The primary Oracle (oracle#1, ORACLE-DB1) is 26ai Enterprise Edition 23.26.1 (2026-10-26), sized like the other
+  # Oracles. It replaced 26ai Free (gvenzl/oracle-free), whose ~1 GB shared pool ran out (ORA-04031) after a few days
+  # of runs and whose 2 CPU limit capped PARALLEL; Free now runs as the extended oracle26ai test. 19.3 runs in its own
+  # extended slot. The image is built from docker/rdbms/oracle (build/23.26); pinned at 23.26.1, later RUs need MOS.
+  ORA2326-01:
     logging: *default-logging
-    container_name: ORA1903-01
-    hostname: ORA1903-01
-    # image:  oracle/database:19.3.0-ee
-    image:  yadamu/oracle:19.3.0
-    mem_limit: '16gb'          #
+    container_name: ORA2326-01
+    hostname: ORA2326-01
+    image:  yadamu/oracle:23.26.1
+    mem_limit: '16gb'
     memswap_limit: -1     # allow unlimited swap
     shm_size: '8gb'
     security_opt:
       - seccomp:unconfined
-    # tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       YADAMU-NET:
         aliases:
           - ORACLE-DB1
-    ports: 
-      - "15215:1521"
+    ports:
+      - "15220:1521"
     environment:
-      ORACLE_SID: CDB19300 
-      ORACLE_PDB: PDB19300 
-      ORACLE_PWD: oracle 
+      ORACLE_SID: CDB2326
+      ORACLE_PDB: PDB2326
+      ORACLE_PWD: oracle
       ORACLE_CHARACTERSET: AL32UTF8
+      ORACLE_EDITION: enterprise
+      # Size the database at creation (MB) to match configure_memory.sql, instead of from the host's RAM.
+      INIT_SGA_SIZE: 10240
+      INIT_PGA_SIZE: 2048
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - ORA1903-01-DATA:/opt/oracle/admin
-      - ORA1903-01-DATA:/opt/oracle/oradata
-      - ORA1903-01-DIAG:/opt/oracle/diag
+      - ORA2326-01-DATA:/opt/oracle/oradata
+      - ORA2326-01-DIAG:/opt/oracle/diag
     restart: always
   
 
@@ -411,8 +416,8 @@ networks:
 volumes:
   YADAMU_01-SHARED:
     name: YADAMU_01-SHARED
-  ORA1903-01-DATA:
-  ORA1903-01-DIAG:
+  ORA2326-01-DATA:
+  ORA2326-01-DIAG:
   ORA1803-01-DATA:
   ORA1803-01-DIAG:
   ORA1220-01-DATA:

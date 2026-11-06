@@ -9,8 +9,7 @@
         {
             "operation": "import",
             "parameters": {
-                "DIRECTORY": "export/json/%location%",
-                "XML_STORAGE_MODEL": "VARIANT"
+                "DIRECTORY": "export/json/%location%"
             },
             "source": "file-staging",
             "target": "tera#1",

@@ -290,6 +290,23 @@ begin
   V_XML := P_XML.transform(SNOWFLAKE_TRANSFORMATION);		
 end;
 --  
+procedure EXECUTE_STATEMENT(P_SQL_STATEMENT CLOB)
+as
+$IF YADAMU_FEATURE_DETECTION.TEMP_CLOB_EXECUTE_ORA00900 $THEN
+  V_FIRST_CHARACTER VARCHAR2(4);
+$END
+begin
+$IF YADAMU_FEATURE_DETECTION.TEMP_CLOB_EXECUTE_ORA00900 $THEN
+  --
+  -- Oracle 26ai (23.26.3): the XMLType comparisons (XMLSERIALIZE converted to a BLOB in an INSERT ... SELECT) leave the
+  -- next generated CLOB statement failing at parse with ORA-00900, although it is valid. Reading from the CLOB first
+  -- avoids it; one character is enough, at any statement length. See qa/sql/oracle/tempClobExecuteBug.sql.
+  --
+  V_FIRST_CHARACTER := DBMS_LOB.SUBSTR(P_SQL_STATEMENT,1,1);
+$END
+  EXECUTE IMMEDIATE P_SQL_STATEMENT;
+end;
+--
 procedure COMPARE_SCHEMAS(
   P_SOURCE_SCHEMA       VARCHAR2, 
   P_TARGET_SCHEMA       VARCHAR2, 
@@ -653,11 +670,11 @@ begin
     begin 
 	  -- DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT);
 	  begin
-        EXECUTE IMMEDIATE V_SQL_STATEMENT;
+        EXECUTE_STATEMENT(V_SQL_STATEMENT);
       exception 
 	    when ORACLE_21C_SPATIAL_ISSUE THEN  
 		  V_SQL_STATEMENT := REPLACE(V_SQL_STATEMENT,'get_WKB','get_GeoJSON');
-          EXECUTE IMMEDIATE V_SQL_STATEMENT;
+          EXECUTE_STATEMENT(V_SQL_STATEMENT);
 	    when OTHERS THEN
           RAISE;
       end;

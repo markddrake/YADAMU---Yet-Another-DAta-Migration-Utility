@@ -5,12 +5,13 @@ x-orchestrator-common: &orchestrator-common
   build:
     context: .
     dockerfile: Dockerfile.orchestrator
+    # YADAMU_SOURCE selects the checkout the orchestrator runs, for example a worktree of a branch that isn't merged yet
     additional_contexts:
-      src:    c:/development/YADAMU/src
-      bin:    c:/development/YADAMU/bin
-      qa:     c:/development/YADAMU/qa
-      docker: c:/development/YADAMU/docker
-      util:   c:/development/YADAMU/utilities
+      src:    ${YADAMU_SOURCE:-c:/development/YADAMU}/src
+      bin:    ${YADAMU_SOURCE:-c:/development/YADAMU}/bin
+      qa:     ${YADAMU_SOURCE:-c:/development/YADAMU}/qa
+      docker: ${YADAMU_SOURCE:-c:/development/YADAMU}/docker
+      util:   ${YADAMU_SOURCE:-c:/development/YADAMU}/utilities
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
   networks:
@@ -23,6 +24,7 @@ x-orchestrator-common: &orchestrator-common
     - IMAGE=yadamu/secure:latest
     - MSSQL12=${MSSQL12:-192.168.1.234}
     - MSSQL14=${MSSQL14:-192.168.1.235}
+    - TERADATA=${TERADATA:-192.168.1.233}
   stdin_open: true
   tty: true
   restart: "no"
@@ -75,6 +77,11 @@ services:
     <<: *orchestrator-common
     container_name: yadamu-test-sqlite
     command: sh -c "/usr/local/bin/runIndividualTest.sh sqlite && tail -f /dev/null"
+
+  teradata:
+    <<: *orchestrator-common
+    container_name: yadamu-test-teradata
+    command: sh -c "/usr/local/bin/runIndividualTest.sh teradata && tail -f /dev/null"
 
   oracle21c:
     <<: *orchestrator-common

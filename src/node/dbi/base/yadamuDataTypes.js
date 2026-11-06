@@ -250,7 +250,7 @@ class YadamuDataTypes {
                                                    
   set TIMESTAMP_LTZ_TYPE(v)                 { YadamuDataTypes.redefineProperty(this,'TIMESTAMP_LTZ_TYPE',v) }
                                                    
-  get INTERVAL_TYPE()                       { return `${this.VARCHAR_TYPE}(16)` } 
+  get INTERVAL_TYPE()                       { return `${this.VARCHAR_TYPE}(32)` } 
                                                    
   set INTERVAL_TYPE(v)                      { YadamuDataTypes.redefineProperty(this,'INTERVAL_TYPE',v) }
                                                    
@@ -261,6 +261,68 @@ class YadamuDataTypes {
   get INTERVAL_YEAR_TO_MONTH_TYPE()         { return this.INTERVAL_TYPE }
                                                    
   set INTERVAL_YEAR_TO_MONTH_TYPE(v)        { YadamuDataTypes.redefineProperty(this,'INTERVAL_YEAR_TO_MONTH_TYPE',v) }
+                                                   
+  // Teradata's other INTERVAL and PERIOD types. A database without them stores them as the nearest interval type, and a PERIOD as JSON.
+                                                   
+  get INTERVAL_MONTH_TYPE()                 { return this.INTERVAL_YEAR_TO_MONTH_TYPE }
+                                                   
+  set INTERVAL_MONTH_TYPE(v)                { YadamuDataTypes.redefineProperty(this,'INTERVAL_MONTH_TYPE',v) }
+                                                   
+  get INTERVAL_DAY_TYPE()                   { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_DAY_TYPE(v)                  { YadamuDataTypes.redefineProperty(this,'INTERVAL_DAY_TYPE',v) }
+                                                   
+  get INTERVAL_DAY_TO_HOUR_TYPE()           { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_DAY_TO_HOUR_TYPE(v)          { YadamuDataTypes.redefineProperty(this,'INTERVAL_DAY_TO_HOUR_TYPE',v) }
+                                                   
+  get INTERVAL_DAY_TO_MINUTE_TYPE()         { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_DAY_TO_MINUTE_TYPE(v)        { YadamuDataTypes.redefineProperty(this,'INTERVAL_DAY_TO_MINUTE_TYPE',v) }
+                                                   
+  get INTERVAL_HOUR_TYPE()                  { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_HOUR_TYPE(v)                 { YadamuDataTypes.redefineProperty(this,'INTERVAL_HOUR_TYPE',v) }
+                                                   
+  get INTERVAL_HOUR_TO_MINUTE_TYPE()        { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_HOUR_TO_MINUTE_TYPE(v)       { YadamuDataTypes.redefineProperty(this,'INTERVAL_HOUR_TO_MINUTE_TYPE',v) }
+                                                   
+  get INTERVAL_HOUR_TO_SECOND_TYPE()        { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_HOUR_TO_SECOND_TYPE(v)       { YadamuDataTypes.redefineProperty(this,'INTERVAL_HOUR_TO_SECOND_TYPE',v) }
+                                                   
+  get INTERVAL_MINUTE_TYPE()                { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_MINUTE_TYPE(v)               { YadamuDataTypes.redefineProperty(this,'INTERVAL_MINUTE_TYPE',v) }
+                                                   
+  get INTERVAL_MINUTE_TO_SECOND_TYPE()      { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_MINUTE_TO_SECOND_TYPE(v)     { YadamuDataTypes.redefineProperty(this,'INTERVAL_MINUTE_TO_SECOND_TYPE',v) }
+                                                   
+  get INTERVAL_SECOND_TYPE()                { return this.INTERVAL_DAY_TO_SECOND_TYPE }
+                                                   
+  set INTERVAL_SECOND_TYPE(v)               { YadamuDataTypes.redefineProperty(this,'INTERVAL_SECOND_TYPE',v) }
+                                                   
+  get PERIOD_DATE_TYPE()                    { return this.JSON_TYPE }
+                                                   
+  set PERIOD_DATE_TYPE(v)                   { YadamuDataTypes.redefineProperty(this,'PERIOD_DATE_TYPE',v) }
+                                                   
+  get PERIOD_TIME_TYPE()                    { return this.JSON_TYPE }
+                                                   
+  set PERIOD_TIME_TYPE(v)                   { YadamuDataTypes.redefineProperty(this,'PERIOD_TIME_TYPE',v) }
+                                                   
+  get PERIOD_TIME_TZ_TYPE()                 { return this.JSON_TYPE }
+                                                   
+  set PERIOD_TIME_TZ_TYPE(v)                { YadamuDataTypes.redefineProperty(this,'PERIOD_TIME_TZ_TYPE',v) }
+                                                   
+  get PERIOD_TIMESTAMP_TYPE()               { return this.JSON_TYPE }
+                                                   
+  set PERIOD_TIMESTAMP_TYPE(v)              { YadamuDataTypes.redefineProperty(this,'PERIOD_TIMESTAMP_TYPE',v) }
+                                                   
+  get PERIOD_TIMESTAMP_TZ_TYPE()            { return this.JSON_TYPE }
+                                                   
+  set PERIOD_TIMESTAMP_TZ_TYPE(v)           { YadamuDataTypes.redefineProperty(this,'PERIOD_TIMESTAMP_TZ_TYPE',v) }
                                                    
   get YEAR_TYPE()                            { return `${this.NUMERIC_TYPE}(4)` }
                                                    

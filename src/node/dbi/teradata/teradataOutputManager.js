@@ -9,6 +9,8 @@ import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
+import TeradataIntervals        from './teradataIntervals.js'
+
 class TeradataOutputManager extends YadamuOutputManager {
 
   constructor(dbi,tableName,pipelineState,status,yadamuLogger) {
@@ -25,6 +27,20 @@ class TeradataOutputManager extends YadamuOutputManager {
     
     return dataTypes.map((dataType,idx) => {      
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+      // The length of a time or timestamp value with the column's fractional precision. A copy between Teradata databases maps 'TS' to 'TS',
+      // so the precision comes from the column's size constraint rather than the data type.
+      const fractionLength = (wholeSeconds) => {
+        const precision = dataTypeDefinition.length ?? this.tableInfo.sizeConstraints?.[idx]?.[0] ?? this.dbi.DATA_TYPES.TIMESTAMP_PRECISION
+        return (precision > 0) ? wholeSeconds + 1 + precision : wholeSeconds
+      }
+      // An ISO 8601 duration becomes Teradata's text for the column's INTERVAL type, and a range a PERIOD literal (see teradataIntervals.js)
+      // A YEAR arrives in an INTERVAL YEAR as a number. The driver binds a number as FLOAT, which Teradata can't convert to an interval (Error 5407), but it converts text.
+      if (TeradataIntervals.isInterval(dataTypeDefinition.type)) {
+        return (col,idx) => { return typeof col === 'number' ? col.toString() : TeradataIntervals.intervalFromISO(dataTypeDefinition.type,col,this.tableInfo.sizeConstraints?.[idx]) }
+      }
+      if (TeradataIntervals.isPeriod(dataTypeDefinition.type)) {
+        return (col,idx) => { return TeradataIntervals.periodFromJSON(dataTypeDefinition.type,col) }
+      }
 	  switch (dataTypeDefinition.type.toUpperCase()) {
         case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
   	      spatialFormat = 'WKT'
@@ -42,37 +58,43 @@ class TeradataOutputManager extends YadamuOutputManager {
 		      return null
 		  }
 		case this.dbi.DATA_TYPES.TIME_TYPE:
-		   return (col,idx) => {
-			 return typeof col === 'string' && col[10] === 'T' ? col.substring(11,26) : col
-		   }	       
+		  // Teradata rejects more fractional digits than the column's precision
+		  const timeLength = fractionLength(8)
+		  return (col,idx) => {
+		    if (typeof col === 'string') {
+		      col = (col[10] === 'T') ? col.substring(11) : col
+		      col = col.replace(/(Z|[+-]\d\d:\d\d)$/,'').slice(0,timeLength)
+		    }
+		    return col
+		  }
 		case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
 		   return (col,idx) => {
 			 return typeof col === 'string' && col[10] === 'T' ? col.substring(11) : col
 		   }	       
 		case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
-		   return (col,idx) => {
-			 col = ((typeof col === 'string') && (col[10] === 'T')) ? col.replace('T',' ') : col
-			 col = ((typeof col === 'string') && (col.length > 26)) ? col.substring(0,26) : col
-			 return col
-		   }	       
-		case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
-		  const tz_length = ((dataTypeDefinition.length === 0) || !dataTypeDefinition.hasOwnProperty('length')) ? 19 : (20 + dataTypeDefinition.length)
+		  const timestampLength = fractionLength(19)
 		  return (col,idx) => {
-            if (typeof col === 'string') {
-              col = col.slice(0,tz_length) + 'Z'
+		    col = (col instanceof Date) ? col.toISOString() : col
+		    if (typeof col === 'string') {
+		      col = (col[10] === 'T') ? col.replace('T',' ') : col
+		      col = col.replace(/(Z|[+-]\d\d:\d\d)$/,'').slice(0,timestampLength)
+		    }
+		    return col
+		  }
+		case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+		  const tzLength = fractionLength(19)
+		  return (col,idx) => {
+            if (col instanceof Date) {
+              // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object
+              col = col.toISOString();
             }
-            else {
-              if (col.endsWith('+00:00')) {
-			    if (col.length > tz_length+6) {
-			      col = col.slice(0,tz_length) + '+00:00'
-				}
-			  }
-		      else {
-                // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
-                col = col.toISOString();
-              }
-			}
-            col = (col[10] === 'T') ? col.replace('T',' ') : col 
+            // Keep the column's fractional digits and the offset, and write UTC as Z
+            const components = (typeof col === 'string') && col.match(/^(\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d*)?)(.*)$/)
+            if (components) {
+              const offset = ((components[2] === '') || (components[2] === '+00:00') || (components[2] === '-00:00')) ? 'Z' : components[2]
+              col = components[1].slice(0,tzLength) + offset
+            }
+            col = (col[10] === 'T') ? col.replace('T',' ') : col
             return col
 	      }
 		case this.dbi.DATA_TYPES.DATE_TYPE:

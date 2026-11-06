@@ -10,11 +10,7 @@ GRANT CREATE PROCEDURE ON YADAMU TO DBC;
 --
 set session database YADAMU;
 --
-.compile file = src/install/teradata/sql/SP_MAP_DATATYPE.sql;
---
-.compile file = src/install/teradata/sql/SP_GENERATE_STATEMENTS.sql
---
-.compile file = src/install/teradata/sql/SP_RECREATE_DATABASE.sql;
+.compile file = src/sql/teradata/SP_RECREATE_DATABASE.sql;
 --
 DELETE DATABASE YADAMU_QA ALL;
 --

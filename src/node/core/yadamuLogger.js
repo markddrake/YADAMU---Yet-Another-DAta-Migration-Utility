@@ -29,6 +29,9 @@ class YadamuLogger {
   
   static get LOGGER_CLASS() { return YadamuLogger }
 
+  // Lets a worker thread load the same logger class.
+  get MODULE_URL()          { return import.meta.url }
+
   static get LOGGER_DEFAULTS() {
     this._LOGGER_DEFAULTS = this._LOGGER_DEFAULTS || Object.freeze({
       "EXCEPTION_FOLDER"          : 'exception'

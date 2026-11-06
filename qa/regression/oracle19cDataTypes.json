@@ -29,7 +29,6 @@
   },{
     "source"               : "oracle#1"
   , "target"               : "oracle19c"
-  , "homogeneousOperation" : true
   , "tasks": [ 
       "postgresDataTypes"
 	]
@@ -93,7 +92,6 @@
   },{
     "source"          : "oracle19c"
   , "target"          : "oracle#1"
-  , "homogeneousOperation" : true
   , "tasks": [ 
       "postgresDataTypes"
 	]

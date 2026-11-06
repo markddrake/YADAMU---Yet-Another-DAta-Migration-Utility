@@ -65,6 +65,9 @@ class Yadamu {
 
   get QA_TEST()                       { return false }
 
+  // Lets a worker thread load the same Yadamu class.
+  get MODULE_URL()                    { return import.meta.url }
+
   get YADAMU_PARAMETERS()             { return Yadamu.YADAMU_PARAMETERS }
 
   get DBI_PARAMETERS()                { return Yadamu.DBI_PARAMETERS }
@@ -790,6 +793,9 @@ class Yadamu {
             break;
           case 'PARALLEL':
             parameters.PARALLEL = parameterValue;
+            break;
+          case 'THREADED':
+            parameters.THREADED = this.getBooleanValue(parameterName,parameterValue)
             break;
           case 'LOG_FILE':
             parameters.LOG_FILE = parameterValue;

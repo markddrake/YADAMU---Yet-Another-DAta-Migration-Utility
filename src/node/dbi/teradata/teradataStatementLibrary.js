@@ -29,6 +29,10 @@ const _SQL_SCHEMA_INFORMATION =
 										    '[' || TRIM(DecimalFractionalDigits) || '],'
 										 when (ColumnType = 'DA') then
 										    '[],'
+										 when (ColumnType in ('PT','PZ','PS','PM')) then
+										    '[' || TRIM(DecimalFractionalDigits) || '],'
+										 when (ColumnType = 'PD') then
+										    '[],'
                                          when DecimalTotalDigits is not NULL then 
                                            case 
                                              when DecimalTotalDigits = -128 and DecimalFractionalDigits = -128 then
@@ -39,7 +43,8 @@ const _SQL_SCHEMA_INFORMATION =
                                                '[' || TRIM(DecimalTotalDigits) || '],'
                                            end
                                          when ColumnLength is not NULL then 
-                                           '[' || cast(cast(ColumnLength as INT) as VARCHAR(256)) || '],'
+                                           /* ColumnLength is in bytes, and a UNICODE character takes 2 */
+                                           '[' || cast(cast(case when CharType = 2 then ColumnLength / 2 else ColumnLength end as INT) as VARCHAR(256)) || '],'
                                          else 
                                           '[],'
                                        end 
