@@ -38,6 +38,50 @@ class YadamuCompare {
 	this.DEBUGGER = this.dbi.DEBUGGER
   }
   
+  /*
+  **
+  ** Some databases reorder the keys of a JSON object (ORDERED_JSON). A comparator that hashes JSON in SQL sees such a value as changed, so it can
+  ** fetch just the rows its first pass reported and recount them here, with the keys of each JSON value sorted. Rows are matched as sets, like EXCEPT.
+  **
+  */
+
+  canonicalJSON(text,orderedJSON) {
+    const sortKeys = (value) => {
+      return Array.isArray(value) ? value.map(sortKeys) : ((value !== null) && (typeof value === 'object')) ? Object.fromEntries(Object.keys(value).sort().map((key) => { return [key,sortKeys(value[key])] })) : value
+    }
+    try {
+      const value = JSON.parse(text)
+      return JSON.stringify(orderedJSON ? sortKeys(value) : value)
+    } catch (e) {
+      return text
+    }
+  }
+
+  recountOrderedJSON(extraRows,missingRows,jsonColumns) {
+    const rowKey = (row) => {
+      return JSON.stringify(row.map((value,idx) => {
+        switch (true) {
+          case (value === null) || (value === undefined):
+            return null
+          case jsonColumns.includes(idx):
+            return ['JSON',this.canonicalJSON(Buffer.isBuffer(value) ? value.toString('utf8') : value,true)]
+          case Buffer.isBuffer(value):
+            return value.toString('hex')
+          case (typeof value === 'bigint'):
+            return value.toString()
+          default:
+            return value
+        }
+      }))
+    }
+    const extraKeys = new Set(extraRows.map(rowKey))
+    const missingKeys = new Set(missingRows.map(rowKey))
+    return {
+      extraRows   : Array.from(extraKeys).filter((key) => { return !missingKeys.has(key) }).length
+    , missingRows : Array.from(missingKeys).filter((key) => { return !extraKeys.has(key) }).length
+    }
+  }
+
   formatCompareRules(rules) {
 	return {
       emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 

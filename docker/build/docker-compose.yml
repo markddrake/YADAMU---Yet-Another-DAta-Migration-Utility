@@ -8,6 +8,8 @@ services:
       no_cache: true
       args:
         BUILDKIT_PROGRESS: plain
+        # The node image tag, e.g. NODE_VERSION=22 docker compose build environment
+        NODE_VERSION: ${NODE_VERSION:-lts}
 
   base:
     image: yadamu/base:latest
@@ -46,3 +48,10 @@ services:
     build:
       context: ../..
       dockerfile: docker/build/service
+
+  # secure plus wtfnode, to see what keeps Node from exiting (src/qa/wtf/test.js)
+  wtf:
+    image: yadamu/wtf:latest
+    build:
+      context: ../..
+      dockerfile: docker/build/wtf

@@ -1,11 +1,12 @@
 FROM alpine:latest
 
-# Install Docker CLI and docker-compose
+# Install Docker CLI and docker-compose, and the ssh client that starts databases on yadamu-db3 (ensureDb3.sh)
 RUN apk add --no-cache \
     docker-cli \
     docker-cli-compose \
     bash \
-    coreutils
+    coreutils \
+    openssh-client
 
 # Copy all scripts
 RUN mkdir -p /usr/local/bin/

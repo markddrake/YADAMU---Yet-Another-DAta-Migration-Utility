@@ -42,6 +42,10 @@ import {
   FileNotFound, 
   DirectoryNotFound
  }                                    from '../file/fileException.js'
+
+import {
+  NotConnected
+}                                    from '../../core/yadamuException.js'
  
 /* Vendor Specific DBI Implimentation */                                   
 
@@ -453,11 +457,16 @@ class OracleDBI extends YadamuDBI {
     try {
       const sqlStartTime = performance.now()
 	  stack = new Error().stack
+      if (this.connection === undefined) throw new NotConnected(this,stack,`Oracledb.Connection.createLob()`)
       const lob =  await this.connection.createLob(lobType)
+      // Lob.close() does not throw when the close fails: it destroys the stream with the error, which is emitted as 'error'. A temporary LOB closed
+      // after its connection has gone (DPI-1010), e.g. while a failed operation shuts down, would then raise an unhandled 'error' event and kill the
+      // process. The session's temporary LOBs are freed with it, so the error can be ignored. Errors while writing the LOB still reach pipeline().
+      lob.on('error',() => {})
       // this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return lob;
    	} catch (e) {
-	  throw this.getDatabaseException(e,stack,`Oracledb.Connection.createLob()`)
+	  throw (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,`Oracledb.Connection.createLob()`)
     }
   }
 
@@ -694,11 +703,13 @@ class OracleDBI extends YadamuDBI {
         try {
           const sqlStartTime = performance.now()
           stack = new Error().stack
+          // A reconnect in progress, or one that gave up, leaves no connection. Report it as a lost connection rather than a TypeError.
+          if (this.connection === undefined) throw new NotConnected(this,stack,sqlStatement)
           results = await this.connection.executeMany(sqlStatement,rows,binds)
 	      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		  return results;
         } catch (e) {
-		  const cause = this.createDatabaseError(e,stack,sqlStatement,binds,{rows : rows.length})
+		  const cause = (e instanceof NotConnected) ? e : this.createDatabaseError(e,stack,sqlStatement,binds,{rows : rows.length})
 		  if (attemptReconnect && cause.lostConnection()) {
             attemptReconnect = false;
 		    // reconnect() throws cause if it cannot reconnect or if rows are lost (ABORT, SKIP)
@@ -823,11 +834,12 @@ class OracleDBI extends YadamuDBI {
       try {
         const sqlStartTime = performance.now()
         stack = new Error().stack
+        if (this.connection === undefined) throw new NotConnected(this,stack,sqlStatement)
         results = await this.connection.execute(sqlStatement,args,outputFormat)
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.createDatabaseError(e,stack,sqlStatement,args,outputFormat)
+		const cause = (e instanceof NotConnected) ? e : this.createDatabaseError(e,stack,sqlStatement,args,outputFormat)
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -1035,6 +1047,8 @@ class OracleDBI extends YadamuDBI {
 		reject(e)
 	  }
 	})
+	// Writers that wait for the data phase still see a failure. If the operation has already failed, nothing waits, and the rejection would be unhandled.
+	this.readyForData.catch(() => {})
   }
 
   async finalizeData() {
@@ -1084,10 +1098,11 @@ class OracleDBI extends YadamuDBI {
 	try {
 	  super.commitTransaction()
       stack = new Error().stack
+      if (this.connection === undefined) throw new NotConnected(this,stack,`Oracledb.Transaction.commit()`)
       await this.connection.commit()
   	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  throw this.getDatabaseException(e,stack,`Oracledb.Transaction.commit()`)
+	  throw (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,`Oracledb.Transaction.commit()`)
 	}
   }
 
@@ -1112,10 +1127,11 @@ class OracleDBI extends YadamuDBI {
 	try {
 	  super.rollbackTransaction()
       stack = new Error().stack
+      if (this.connection === undefined) throw new NotConnected(this,stack,`Oracledb.Transaction.rollback()`)
       await this.connection.rollback()
   	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  const newIssue = this.getDatabaseException(e,stack,`Oracledb.Transaction.rollback()`)
+	  const newIssue = (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,`Oracledb.Transaction.rollback()`)
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
 	}
   }

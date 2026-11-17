@@ -32,8 +32,16 @@ class PostgresError extends DatabaseError {
     return (
 	  (this.cause.message && (knownErrors.indexOf(this.cause.message) > -1)) ||
 	  (this.cause.code === '57P03') ||
-	  (this.cause.code === 'ECONNREFUSED')
+	  (this.cause.code === 'ECONNREFUSED') ||
+	  // A database container that is restarting has no DNS entry. reconnect() is the only caller, so a mistyped host still fails at once.
+	  (this.cause.code === 'ENOTFOUND') ||
+	  (this.cause.code === 'EAI_AGAIN')
 	)
+  }
+
+  snapshotMissing() {
+	// SET TRANSACTION SNAPSHOT for a snapshot whose exporting transaction has ended (invalid_parameter_value)
+	return (this.cause.code === '22023') && /snapshot ".*" does not exist/.test(this.cause.message)
   }
 
   missingTable() {

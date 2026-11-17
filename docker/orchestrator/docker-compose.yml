@@ -14,6 +14,9 @@ x-orchestrator-common: &orchestrator-common
       util:   ${YADAMU_SOURCE:-c:/development/YADAMU}/utilities
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
+    # The key that lets the orchestrator start the SQL Server VMs and Teradata on yadamu-db3 (id_ed25519 + known_hosts in a
+    # folder on the docker host; see ensureDb3.sh). If the folder is missing or empty, the suites only check the ports.
+    - ${DB3_SSH_DIR:-/home/yadamu/.ssh/yadamu-db3}:/run/yadamu-db3:ro
   networks:
     - yadamu-net
   environment:
@@ -83,6 +86,16 @@ services:
     container_name: yadamu-test-teradata
     command: sh -c "/usr/local/bin/runIndividualTest.sh teradata && tail -f /dev/null"
 
+  mssql12:
+    <<: *orchestrator-common
+    container_name: yadamu-test-mssql12
+    command: sh -c "/usr/local/bin/runIndividualTest.sh mssql12 && tail -f /dev/null"
+
+  mssql14:
+    <<: *orchestrator-common
+    container_name: yadamu-test-mssql14
+    command: sh -c "/usr/local/bin/runIndividualTest.sh mssql14 && tail -f /dev/null"
+
   oracle21c:
     <<: *orchestrator-common
     container_name: yadamu-test-oracle21c
@@ -122,6 +135,12 @@ services:
     <<: *orchestrator-common
     container_name: yadamu-test-snowflake
     command: sh -c "/usr/local/bin/runIndividualTest.sh snowflake && tail -f /dev/null"
+
+  # Server-side upload (parser SQL), frozen and run on its own: uploadRoundtrip, then the 19c, 21c, 23ai and 26ai upload suites
+  upload:
+    <<: *orchestrator-common
+    container_name: yadamu-test-upload
+    command: sh -c "/usr/local/bin/runIndividualTest.sh upload && tail -f /dev/null"
 
 networks:
   yadamu-net:

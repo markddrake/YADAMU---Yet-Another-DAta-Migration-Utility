@@ -142,29 +142,102 @@ class SqliteDBI extends YadamuDBI {
     }
   }
   get BUSY_TIMEOUT()           { return this.parameters.BUSY_TIMEOUT || SqliteConstants.BUSY_TIMEOUT }
+  get BUSY_RETRY_LIMIT()       { return this.parameters.BUSY_RETRY_LIMIT ?? SqliteConstants.BUSY_RETRY_LIMIT }
+  get WRITE_TURN_TIMEOUT()     { return this.parameters.WRITE_TURN_TIMEOUT || SqliteConstants.WRITE_TURN_TIMEOUT }
+
+  /*
+  **
+  ** Write turns.
+  **
+  ** busy_timeout is not fair. A waiting writer polls for the write lock, and a writer that commits and
+  ** starts its next transaction straight away takes the lock again before the waiter's next poll. A
+  ** large table committing every few hundred milliseconds can therefore hold off a small table for the
+  ** whole busy timeout, and the small table's batch fails with SQLITE_BUSY even though the lock was
+  ** released many times while it waited (seen on db1 2026-11-02: ColdRoomTemperatures_Archive against
+  ** StockGroups_Archive and StockItemTransactions).
+  **
+  ** So the writers of a database take turns. A turn is a ticket lock - two counters, the next ticket
+  ** and the ticket being served - held in a SharedArrayBuffer, so the manager's workers share it
+  ** whether they run in-process or on worker threads (getWorkerState() passes the buffer, and a
+  ** SharedArrayBuffer is shared, not copied). A worker takes a ticket before the first write of a
+  ** transaction and hands the turn on when the transaction commits or rolls back, so writers are
+  ** served in the order they asked, one transaction at a time. A writer waiting for its turn waits on
+  ** Atomics.waitAsync, not inside sqlite3_step(), so it does not hold a libuv threadpool thread.
+  **
+  ** If a turn is not handed on within WRITE_TURN_TIMEOUT the waiter assumes the holder is gone and
+  ** takes it anyway. Waiters treat any ticket at or behind the one being served as their turn, so
+  ** forcing the counter forward lets everyone queued behind it through, which degrades to plain
+  ** busy_timeout behaviour rather than hanging.
+  **
+  */
+
+  get WRITE_TURN() {
+    if (!this.isManager()) {
+      return this.manager.WRITE_TURN
+    }
+    this._WRITE_TURN = this._WRITE_TURN || new Int32Array(new SharedArrayBuffer(2 * Int32Array.BYTES_PER_ELEMENT))
+    return this._WRITE_TURN
+  }
+
+  static #NEXT_TICKET    = 0
+  static #NOW_SERVING    = 1
+
+  async acquireWriteTurn() {
+
+    if (this.HOLDS_WRITE_TURN === true) return
+
+    const turn = this.WRITE_TURN
+    const ticket = Atomics.add(turn, SqliteDBI.#NEXT_TICKET, 1)
+    const startTime = performance.now()
+
+    while (true) {
+      const serving = Atomics.load(turn, SqliteDBI.#NOW_SERVING)
+      // (serving - ticket) | 0 keeps the comparison correct when the counters wrap.
+      if (((serving - ticket) | 0) >= 0) break
+      const waited = performance.now() - startTime
+      if (waited >= this.WRITE_TURN_TIMEOUT) {
+        this.LOGGER.warning([this.DATABASE_VENDOR,'WRITE TURN',this.getWorkerNumber()],`Turn not handed on after ${Math.round(waited)} ms. Taking it.`)
+        Atomics.compareExchange(turn, SqliteDBI.#NOW_SERVING, serving, ticket)
+        Atomics.notify(turn, SqliteDBI.#NOW_SERVING)
+        continue
+      }
+      const result = Atomics.waitAsync(turn, SqliteDBI.#NOW_SERVING, serving, Math.min(this.WRITE_TURN_TIMEOUT - waited, 5000))
+      if (result.async) {
+        await result.value
+      }
+    }
+
+    this.HOLDS_WRITE_TURN = true
+
+  }
+
+  releaseWriteTurn() {
+
+    if (this.HOLDS_WRITE_TURN !== true) return
+
+    this.HOLDS_WRITE_TURN = false
+    const turn = this.WRITE_TURN
+    Atomics.add(turn, SqliteDBI.#NOW_SERVING, 1)
+    Atomics.notify(turn, SqliteDBI.#NOW_SERVING)
+
+  }
+
+  getWorkerState() {
+    return { ...super.getWorkerState(), writeTurn : this.WRITE_TURN.buffer }
+  }
+
+  hydrateWorkerState(state) {
+    super.hydrateWorkerState(state)
+    this._WRITE_TURN = new Int32Array(state.writeTurn)
+  }
 
   
   /*
   **
-  ** SQLite allows one write transaction per database file, so parallel writers serialize on the
-  ** write lock. On its own that would only make them queue. What makes it fail is the threadpool:
-  ** node-sqlite3 runs every statement on the libuv threadpool, and a writer that finds the lock
-  ** held blocks inside sqlite3_step() for the whole busy timeout, holding its thread while it
-  ** waits. With W writers, W-1 can be blocked at once, and the pool must also have a thread free
-  ** for the writer holding the lock so that it can run the COMMIT that releases it. Once blocked
-  ** writers fill the pool nothing can commit, every writer waits out the full busy timeout, and
-  ** the operation collapses. That is starvation, not contention: raising the pool fixes it.
-  **
-  ** Measured, postgres -> sqlite, HR (7 tables), busy_timeout 30000:
-  **
-  **    7 workers, pool  4    52 SQLITE_BUSY, 48 errors, 6 tables failed   00:06:34
-  **    7 workers, pool  7     0 SQLITE_BUSY,  0 errors                    00:00:03.5
-  **    7 workers, pool  8     0 SQLITE_BUSY,  0 errors                    00:00:03.5
-  **    7 workers, pool 16     0 SQLITE_BUSY,  0 errors                    00:00:03.4
-  **    3 workers, pool  4     0 SQLITE_BUSY,  0 errors                    00:00:03.4
-  **
-  ** So W <= pool is the boundary, and initialize() caps PARALLEL to fit rather than refusing
-  ** parallel writes outright. See MAX_PARALLEL_WRITERS.
+  ** node-sqlite3 runs every statement on the libuv threadpool, and a writer that finds the write lock
+  ** held blocks inside sqlite3_step(), holding its thread while it waits. That is why PARALLEL used to
+  ** be capped at UV_THREADPOOL_SIZE - 1. With write turns only the writer holding the turn asks SQLite
+  ** for the lock; the others wait on Atomics.waitAsync, so the pool size no longer limits PARALLEL.
   **
   */
 
@@ -193,36 +266,6 @@ class SqliteDBI extends YadamuDBI {
   */
   addVendorExtensions(connectionProperties) {
     return connectionProperties
-  }
-
-  /*
-  **
-  ** UV_THREADPOOL_SIZE is read by libuv the first time the pool is used and cannot be changed from
-  ** inside the process, so raising this ceiling means setting it in the environment before node
-  ** starts. One thread is held back below the measured boundary because the pool is shared with
-  ** everything else libuv schedules on it - file system operations in particular, which is exactly
-  ** what YADAMU starts doing when it writes exception and rejection traces.
-  **
-  */
-
-  get THREADPOOL_SIZE()        { return parseInt(process.env.UV_THREADPOOL_SIZE) || SqliteConstants.DEFAULT_THREADPOOL_SIZE }
-
-  get MAX_PARALLEL_WRITERS()   { return Math.max(1,this.THREADPOOL_SIZE - 1) }
-
-  async initialize(requirePassword) {
-
-    await super.initialize(requirePassword)
-
-    // Only the target serializes on the write lock: readers open no transactions and never block on it.
-
-    if (this.IS_WRITER) {
-      const requested = parseInt(this.yadamu.PARALLEL) || 0
-      if (requested > this.MAX_PARALLEL_WRITERS) {
-        this.LOGGER.warning([this.DATABASE_VENDOR,'PARALLEL'],`Reduced from ${requested} to ${this.MAX_PARALLEL_WRITERS}. A SQLite writer blocked on the write lock holds a libuv threadpool thread, and UV_THREADPOOL_SIZE is ${this.THREADPOOL_SIZE}. Set UV_THREADPOOL_SIZE in the environment before starting node to raise the limit.`)
-        this.yadamu.parameters.PARALLEL = this.MAX_PARALLEL_WRITERS
-      }
-    }
-
   }
 
   async testConnection() {
@@ -314,6 +357,7 @@ class SqliteDBI extends YadamuDBI {
   }
 
   async closeConnection(options) {
+    this.releaseWriteTurn()
     if (this.connection) {
       await this.connection.close()
       this.connection = null
@@ -379,7 +423,11 @@ class SqliteDBI extends YadamuDBI {
 
   async commitTransaction() {
     super.commitTransaction()
-    await this.executeSQL(SqliteStatementLibrary.SQL_COMMIT_TRANSACTION)
+    try {
+      await this.executeSQL(SqliteStatementLibrary.SQL_COMMIT_TRANSACTION)
+    } finally {
+      this.releaseWriteTurn()
+    }
   }
 
   async rollbackTransaction(cause) {
@@ -389,6 +437,8 @@ class SqliteDBI extends YadamuDBI {
       await this.executeSQL(SqliteStatementLibrary.SQL_ROLLBACK_TRANSACTION)
     } catch (newIssue) {
       this.checkCause('ROLLBACK TRANSACTION', cause, newIssue)
+    } finally {
+      this.releaseWriteTurn()
     }
   }
 
@@ -612,6 +662,7 @@ class SqliteDBI extends YadamuDBI {
     const sqlStatement = `${this.SQL_TRUNCATE_TABLE_OPERATION} ${this.qualifiedTableName(tableName,schema)}`
 
     await this.beginTransaction()
+    await this.acquireWriteTurn()
     await this.executeSQL(sqlStatement)
     await this.commitTransaction()
 

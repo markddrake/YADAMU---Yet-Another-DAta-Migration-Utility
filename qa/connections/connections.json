@@ -267,6 +267,20 @@
             "dateStrings": true
         }
     },
+    "mysql26": {
+        "mysql": {
+            "user": "root",
+            "host": "MYSQL26-01",
+            "database": "sys",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
     "mariadb#1": {
         "mariadb": {
             "user": "root",
@@ -299,6 +313,20 @@
         "mariadb": {
             "user": "root",
             "host": "MARIA11-01",
+            "database": "mysql",
+            "password": "oracle",
+            "port": 3306,
+            "multipleStatements": true,
+            "typeCast": true,
+            "supportBigNumbers": true,
+            "bigNumberStrings": true,
+            "dateStrings": true
+        }
+    },
+    "mariadb13": {
+        "mariadb": {
+            "user": "root",
+            "host": "MARIA13-01",
             "database": "mysql",
             "password": "oracle",
             "port": 3306,
@@ -348,6 +376,15 @@
     "mongodb70": {
         "mongodb": {
             "host": "MONGO80-01",
+            "port": 27017,
+            "options": {
+                "socketTimeoutMS": 900000
+            }
+        }
+    },
+    "mongodb90": {
+        "mongodb": {
+            "host": "MONGO90-01",
             "port": 27017,
             "options": {
                 "socketTimeoutMS": 900000
@@ -563,6 +600,16 @@
     "loader-sRegress": {
         "loader": {
             "directory": "shortRegress/loader"
+        }
+    },
+    "sqlite#1": {
+        "sqlite": {
+            "database": "mnt/sqlite/sqliteRegression.db"
+        }
+    },
+    "sqlite#2": {
+        "sqlite": {
+            "directory": "mnt/sqlite/regression"
         }
     }
 }

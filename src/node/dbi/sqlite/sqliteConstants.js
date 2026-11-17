@@ -9,6 +9,8 @@ class SqliteConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "BUSY_TIMEOUT"            : 30000
+    , "BUSY_RETRY_LIMIT"        : 5
+    , "WRITE_TURN_TIMEOUT"      : 600000
     })
     return this._STATIC_PARAMETERS;
   }
@@ -21,14 +23,14 @@ class SqliteConstants {
   }
   
   static get BUSY_TIMEOUT()               { return this.DBI_PARAMETERS.BUSY_TIMEOUT }
+  static get BUSY_RETRY_LIMIT()           { return this.DBI_PARAMETERS.BUSY_RETRY_LIMIT }
+  static get WRITE_TURN_TIMEOUT()         { return this.DBI_PARAMETERS.WRITE_TURN_TIMEOUT }
 
   static get IN_MEMORY_DATABASE()         { return ':memory:' }
 
   static get MAIN_SCHEMA()                { return 'main' }
 
   static get DATABASE_EXTENSION()         { return '.db' }
-
-  static get DEFAULT_THREADPOOL_SIZE()    { return 4 }
 
   static get STATEMENT_TERMINATOR()       { return ';' }
 

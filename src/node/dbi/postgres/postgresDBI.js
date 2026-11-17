@@ -38,7 +38,9 @@ import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
   YadamuError,
-  YadamuShutdown
+  YadamuShutdown,
+  NotConnected,
+  SnapshotLost
 }                                    from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
@@ -327,7 +329,7 @@ class PostgresDBI extends YadamuDBI {
 	}
 
 	if (this.EXPORT_SNAPSHOT) {
-	  await this.importSnapshot(this.EXPORT_SNAPSHOT)
+	  await this.joinExportSnapshot()
 	}
   }
 
@@ -370,6 +372,65 @@ class PostgresDBI extends YadamuDBI {
 	await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_SET_TRANSACTION_SNAPSHOT(snapshotId))
   }
 
+  /*
+  **
+  ** A connection opened while a consistent export is in progress joins its snapshot. The manager only gets here with a new connection, after its
+  ** old one, and with it the transaction that exported the snapshot, was lost. Under ON_ERROR ABORT that ends the export. Any other mode means the
+  ** user chose to finish rather than throw the work away, so the manager exports a new snapshot and warns that the tables read from now on are
+  ** read as of a later point in time. A worker that finds the snapshot gone asks the manager for the current one.
+  **
+  */
+
+  async joinExportSnapshot() {
+	if (this.isManager()) {
+	  // A reconnect configures the new connection more than once. Only the first replaces the snapshot.
+	  if (!this.SNAPSHOT_TRANSACTION_ACTIVE) {
+	    await this.replaceLostSnapshot()
+	  }
+	  return
+	}
+	const snapshotId = this.EXPORT_SNAPSHOT
+	try {
+	  await this.importSnapshot(snapshotId)
+	} catch (e) {
+	  if (!((e instanceof DatabaseError) && e.snapshotMissing())) throw e
+	  // End the failed transaction, so that the connection is not left unusable.
+	  await this.endSnapshotTransaction()
+	  const replacement = await this.manager.refreshExportSnapshot(snapshotId)
+	  if (this.manager.THREAD_SHADOW) {
+		this.manager._EXPORT_SNAPSHOT = replacement
+	  }
+	  await this.importSnapshot(replacement)
+	}
+  }
+
+  async replaceLostSnapshot() {
+	const lostSnapshot = this._EXPORT_SNAPSHOT
+	if (this.ON_ERROR === 'ABORT') {
+	  throw new SnapshotLost(lostSnapshot,'ON_ERROR is ABORT, so the export cannot continue from a later snapshot.')
+	}
+	await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_BEGIN_CONSISTENT_EXPORT)
+	this.SNAPSHOT_TRANSACTION_ACTIVE = true
+	this._EXPORT_SNAPSHOT = (await this.executeSQL(this.STATEMENT_LIBRARY_CLASS.SQL_EXPORT_SNAPSHOT)).rows[0][0]
+	this.LOGGER.warning([this.DATABASE_VENDOR,'EXPORT',this.ON_ERROR],`Consistent export: snapshot "${lostSnapshot}" was lost with its connection. Tables read from now on are read from snapshot "${this._EXPORT_SNAPSHOT}", a later point in time than the tables already read.`)
+  }
+
+  async refreshExportSnapshot(lostSnapshot) {
+	// Called by a worker that found the snapshot gone. Probing the manager's connection reconnects it, and the reconnect replaces the snapshot. Workers asking at the same time share one probe.
+	if (this._EXPORT_SNAPSHOT === lostSnapshot) {
+	  if (this.snapshotProbe === undefined) {
+		this.snapshotProbe = this.executeSQL('select 1').finally(() => { this.snapshotProbe = undefined })
+	  }
+	  await this.snapshotProbe
+	}
+	if (this._EXPORT_SNAPSHOT === lostSnapshot) {
+	  throw new SnapshotLost(lostSnapshot,'The connection that exported it is still open, so the snapshot cannot be replaced.')
+	}
+	return this._EXPORT_SNAPSHOT
+  }
+
+  get THREAD_RPC_METHODS()            { return [...super.THREAD_RPC_METHODS,'refreshExportSnapshot'] }
+
   async endSnapshotTransaction() {
 	if (this.SNAPSHOT_TRANSACTION_ACTIVE) {
 	  this.SNAPSHOT_TRANSACTION_ACTIVE = false
@@ -388,6 +449,8 @@ class PostgresDBI extends YadamuDBI {
     // this.LOGGER.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${this.connection === undefined})`)
 	  
     if (this.connection !== undefined && this.connection.release) {
+	  // A reconnect can replace or clear this.connection while this method waits, so release the connection that was current when it started.
+	  const connection = this.connection
 	  let stack
 	  try {
 	    await this.endSnapshotTransaction()
@@ -398,10 +461,10 @@ class PostgresDBI extends YadamuDBI {
      	stack = new Error().stack;
         // When reconnecting, destroy the client rather than returning it to the pool. pg-pool only discards a client it already knows is broken,
         // and reuses the most recently released idle client first, so a lost connection could be handed straight back to reconnect().
-        await this.connection.release(this.RECONNECT_IN_PROGRESS === true)
-        this.connection = undefined;
+        await connection.release(this.RECONNECT_IN_PROGRESS === true)
+        if (this.connection === connection) this.connection = undefined;
       } catch (e) {
-        this.connection = undefined;
+        if (this.connection === connection) this.connection = undefined;
 		const err = this.getDatabaseException(e,stack,'Client.release()')
   	    this.LOGGER.handleWarning([this.DATABASE_VENDOR,this.DATABASE_VERSION,this.ROLE,this.getWorkerNumber(),`closeConnection`],err)
 		throw err
@@ -478,12 +541,14 @@ class PostgresDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		stack = new Error().stack
         const sqlQuery = typeof sqlStatement === 'string' ? {text : sqlStatement, values: args, rowMode : 'array'} : sqlStatement
+        if (this.connection === undefined) throw new NotConnected(this,stack,sqlStatement)
         const results = await this.connection.query(sqlQuery)
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(e,stack,sqlStatement)
-		if (cause.connectionTerminated() && this.DESTROYED) throw new YadamuShutdown(this,cause,stack,sqlStatement)
+		const cause = (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,sqlStatement)
+		if ((cause instanceof NotConnected) && this.DESTROYED) throw cause
+		if (cause.connectionTerminated?.() && this.DESTROYED) throw new YadamuShutdown(this,cause,stack,sqlStatement)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -852,6 +917,7 @@ class PostgresDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        if (this.connection === undefined) throw new NotConnected(this,stack,queryInfo.SQL_STATEMENT)
         const inputStream = await this.connection.query(queryStream)   
 		
 		/*
@@ -886,7 +952,7 @@ class PostgresDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
+		const cause = (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

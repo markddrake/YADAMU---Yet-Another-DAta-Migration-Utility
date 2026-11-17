@@ -1,3 +1,11 @@
+The quickest way to get a YADAMU image is to build it straight from GitHub with the repository's root Dockerfile (add `--build-arg NODE_VERSION=22` to pick another Node version):
+
+```
+docker build -t yadamu https://github.com/markddrake/YADAMU---Yet-Another-DAta-Migration-Utility.git
+```
+
+The rest of this page describes the older step-by-step build.
+
 
 Download the latest verions of YADAMU from [https://github.com/markddrake/YADAMU---Yet-Another-DAta-Migration-Utility/archive/master.zip](url)
 

@@ -1043,7 +1043,8 @@ $END
              -- Native BOOLEAN (23ai and later) will not accept the RAW value used for RAW(1) storage (ORA-00932). The value is extracted as text (true/false or 1/0)
              'TO_BOOLEAN("' || COLUMN_NAME || '")'
            when (TARGET_DATA_TYPE = 'BOOLEAN') then
-             'HEXTORAW(LTRIM(TO_CHAR("' || COLUMN_NAME || '", ''0X'')))'
+             -- RAW(1) storage: the value is extracted as text. true/false become 01/00; numbers (1/0, or 01/00) are converted as before
+             'case lower("' || COLUMN_NAME || '") when ''true'' then HEXTORAW(''01'') when ''false'' then HEXTORAW(''00'') else HEXTORAW(LTRIM(TO_CHAR(TO_NUMBER("' || COLUMN_NAME || '"), ''0X''))) end'
            when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
              case 
                when P_SPATIAL_FORMAT in ('WKB','EWKB') then
@@ -1051,7 +1052,15 @@ $END
                when P_SPATIAL_FORMAT in ('WKT','EWKT') then
                  'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
                when P_SPATIAL_FORMAT in ('GeoJSON') then
-                 'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_GEOJSON("' || COLUMN_NAME || '") end'
+                 -- The column is extracted FORMAT JSON, which returns a JSON null as the text null, or [null] before 21c (FROM_GEOJSON raises ORA-13050 on it).
+                 -- No GeoJSON value is that short.
+                 'case when "' || COLUMN_NAME || '" is NULL or (DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") <= 6 and translate(DBMS_LOB.SUBSTR("' || COLUMN_NAME || '",6,1),''x[]'',''x'') = ''null'') then NULL else ' ||
+                 $IF (DBMS_DB_VERSION.VERSION > 12) or ((DBMS_DB_VERSION.VERSION = 12) and (DBMS_DB_VERSION.RELEASE >= 2)) $THEN
+                 -- DESERIALIZE_GEOJSON works around FROM_GEOJSON(CLOB) raising ORA-40441 on some valid GeoJSON (12.2 and later).
+                 'OBJECT_SERIALIZATION.DESERIALIZE_GEOJSON("' || COLUMN_NAME || '") end'
+                 $ELSE
+                 'SDO_UTIL.FROM_GEOJSON("' || COLUMN_NAME || '") end'
+                 $END
              end
            when TYPE_EXISTS = 1 then
              '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
@@ -1094,6 +1103,11 @@ $END
 			 -- Implicit conversion takes place for all JSON storage options
       		 '"' || COLUMN_NAME || '"'
 			 $END
+           $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+           when REGEXP_LIKE(TARGET_DATA_TYPE,'^TIMESTAMP\([7-9]\)$') or ((TARGET_DATA_TYPE = 'TIMESTAMP') and (DATA_TYPE_LENGTH > 6)) then
+             -- Extracted as text (see the JSON_TABLE column list). Accept a space or T as the separator, and drop a UTC suffix (Z or +00:00).
+             'TO_TIMESTAMP(REGEXP_REPLACE(REPLACE("' || COLUMN_NAME || '",'' '',''T''),''(Z|[+-]00:00)$'',''''),''YYYY-MM-DD"T"HH24:MI:SS.FF'')'
+           $END
            when TARGET_DATA_TYPE = 'BLOB' then
              $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
              'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")'
@@ -1128,13 +1142,19 @@ $END
            when TYPE_EXISTS = 1 then
              C_MAX_STRING_TYPE
            when TARGET_DATA_TYPE  = '"MDSYS"."SDO_GEOMETRY"' then
-             C_MAX_STRING_TYPE
-           when (TARGET_DATA_TYPE  = 'BOOLEAN') and (P_BOOLEAN_DATA_TYPE = 'BOOLEAN') then
-             -- 23ai and later will not convert a JSON true/false to NUMBER (ORA-40799). Extract as text and convert with TO_BOOLEAN
-             'VARCHAR2(32)'
+             -- An export file holds GeoJSON as a JSON object, which a plain string column cannot return (ORA-40456). The wrapper is only added to a
+             -- JSON null, which cannot be returned FORMAT JSON without one before 21c (ORA-40480).
+             C_MAX_STRING_TYPE || case when P_SPATIAL_FORMAT = 'GeoJSON' then ' FORMAT JSON WITH CONDITIONAL WRAPPER' else '' end
+           $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+           when REGEXP_LIKE(TARGET_DATA_TYPE,'^TIMESTAMP\([7-9]\)$') or ((TARGET_DATA_TYPE = 'TIMESTAMP') and (DATA_TYPE_LENGTH > 6)) then
+             -- JSON_TABLE raises ORA-01841 converting 9999-12-31T23:59:59.9999999 to TIMESTAMP(7) or TIMESTAMP(9), although the value fits.
+             -- Extract the value as text and convert it with TO_TIMESTAMP (see INSERT_SELECT_LIST)
+             'VARCHAR2(48)'
+           $END
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
-             -- Maybe TRUE / FALSE or 01/00
-             'NUMBER(1)'
+             -- Maybe true / false, 1 / 0 or 01 / 00. 21c and later will not convert a JSON true/false to NUMBER (ORA-40799; 19c does),
+             -- so extract the value as text and convert it in INSERT_SELECT_LIST (TO_BOOLEAN for BOOLEAN, 01/00 for RAW(1))
+             'VARCHAR2(32)'
            when TARGET_DATA_TYPE in ('JSON','BFILE') then
              C_MAX_STRING_TYPE || ' FORMAT JSON'
            when TARGET_DATA_TYPE  = 'FLOAT' then

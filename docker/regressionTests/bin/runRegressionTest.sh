@@ -1,4 +1,10 @@
 # Run from YADAMU_HOME
+# YADAMU_SKIP_TESTS (space separated test names) skips those tests, for example when the orchestrator couldn't start the
+# yadamu-db3 database they need (docker/orchestrator/ensureDb3.sh). This file is sourced, so return to the caller.
+if [[ " ${YADAMU_SKIP_TESTS:-} " == *" $1 "* ]]; then
+  echo "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ) [WARNING][QA][REGRESSION][$1]: Skipped (YADAMU_SKIP_TESTS)."
+  return 0 2>/dev/null || exit 0
+fi
 export YADAMU_TASK=$1
 unset YADAMU_LOG_PATH
 export YADAMU_LOG_ROOT=$YADAMU_HOME/log

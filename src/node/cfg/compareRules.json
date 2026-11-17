@@ -276,6 +276,13 @@
 			"snowflake": true,
 			"cockroach": true
 		},
+		"db2": {
+			"oracle#23": true,
+			"oracle#21": true,
+			"mysql": true,
+			"snowflake": true,
+			"cockroach": true
+		},
 		"mongodb": {
 			"oracle#23": true,
 			"oracle#21": true,

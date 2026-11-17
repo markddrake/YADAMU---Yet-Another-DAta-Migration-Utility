@@ -1,4 +1,6 @@
-FROM node:lts
+# NODE_VERSION picks the node image tag, e.g. --build-arg NODE_VERSION=22 (docker-compose.yml passes it through; lts by default)
+ARG NODE_VERSION=lts
+FROM node:${NODE_VERSION}
 WORKDIR /usr/src/YADAMU
 
 # Add Oracle instant client
@@ -7,9 +9,13 @@ ADD https://download.oracle.com/otn_software/linux/instantclient/2326300/oracle-
 COPY src/package*.json ./
 
 # Install deps and build tools
+# Debian 13 (trixie) renamed libaio1 to libaio1t64 (libaio.so.1t64); Instant Client loads libaio.so.1, so link it.
+# Older node tags are Debian 12 (bookworm), which still has libaio1.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libaio1 alien python3 make g++ \
+ && if apt-cache show libaio1t64 >/dev/null 2>&1; then LIBAIO=libaio1t64; else LIBAIO=libaio1; fi \
+ && apt-get install -y --no-install-recommends $LIBAIO alien python3 make g++ \
  && rm -rf /var/lib/apt/lists/* \
+ && if [ -e /usr/lib/x86_64-linux-gnu/libaio.so.1t64 ]; then ln -sf libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1; fi \
  # Convert & install Oracle client
  && alien -i --scripts ./oracle-instantclient-basic-23.26.3.0.0-1.el9.x86_64.rpm \
  # npm hygiene

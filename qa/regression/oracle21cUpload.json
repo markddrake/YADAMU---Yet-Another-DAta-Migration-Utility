@@ -1,0 +1,42 @@
+{
+  "operation"         : "fileRoundtrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "createDirectory"   : true
+, "parameters": {
+    "SOURCE_DIRECTORY" : "stagingArea/export/json/%location%"
+  }
+, "tests" : [{
+    "source"     : "file-YADAMU_HOME"
+  , "target"     : "oracle21c"
+  , "parser"     : "SQL"
+  , "parameters" : {
+      "TARGET_DIRECTORY" : "longRegress/%operation%/rdbms/%connection%/%location%"
+    }
+  , "tasks"      : [
+      "oracle", "mysql", "mssql-rdbms"
+    ]
+  },{
+    "operation"  : "export"
+  , "source"     : "sqlite#2"
+  , "target"     : "file-staging"
+  , "parameters" : {
+      "DIRECTORY" : "export/geojson/%location%"
+    }
+  , "tasks"      : [
+      "WWI_Application"
+    ]
+  },{
+    "source"     : "file-YADAMU_HOME"
+  , "target"     : "oracle21c"
+  , "parser"     : "SQL"
+  , "parameters" : {
+      "SOURCE_DIRECTORY" : "stagingArea/export/geojson/%location%"
+    , "TARGET_DIRECTORY" : "longRegress/%operation%/geojson/%connection%/%location%"
+    }
+  , "tasks"      : [
+      "WWI_Application"
+    ]
+  }]
+}

@@ -37,7 +37,8 @@ import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
-  YadamuError
+  YadamuError,
+  NotConnected
 }                                    from '../../core/yadamuException.js'
 
 /* Yadamu DBI */                                    
@@ -398,11 +399,13 @@ class YugabyteDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		stack = new Error().stack
         const sqlQuery = typeof sqlStatement === 'string' ? {text : sqlStatement, values: args, rowMode : 'array'} : sqlStatement
+        if (this.connection === undefined) throw new NotConnected(this,stack,sqlStatement)
         const results = await this.connection.query(sqlQuery)
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.getDatabaseException(e,stack,sqlStatement)
+		const cause = (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,sqlStatement)
+		if ((cause instanceof NotConnected) && this.DESTROYED) throw cause
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -752,6 +755,7 @@ class YugabyteDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
         const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        if (this.connection === undefined) throw new NotConnected(this,stack,queryInfo.SQL_STATEMENT)
         const inputStream = await this.connection.query(queryStream)   
 		
 		/*
@@ -786,7 +790,7 @@ class YugabyteDBI extends YadamuDBI {
 		
 		return inputStream
       } catch (e) {
-		const cause = this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
+		const cause = (e instanceof NotConnected) ? e : this.getDatabaseException(e,stack,queryInfo.SQL_STATEMENT)
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

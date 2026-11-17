@@ -31,6 +31,7 @@ class YadamuRejectManager {
     fs.mkdirSync(errorFolderPath, { recursive: true });
 
 	this.recordCount = 0
+	this.pendingRejects = new Set()
 	this.tableName = undefined
 	this.outputStreams = undefined
 	this.currentOperation = new Promise((resolve,reject) => { resolve() })
@@ -38,7 +39,10 @@ class YadamuRejectManager {
     this.is = new ArrayReadable()	  
     this.initialziationCoomplete = new Promise((resolve,reject) => {
 	  this.setInitializationComplete = resolve
+	  this.setInitializationFailed = reject
     })
+	// Only the rejects waiting on it see a failure. The reject that opens the file reports its own.
+	this.initialziationCoomplete.catch(() => {})
 
   }	
   
@@ -63,11 +67,35 @@ class YadamuRejectManager {
 	this.pipeline = pipeline(this.is,...this.dbi.getOutputStreams(tableName,{}),{end:false})
   }
 	
-  async rejectData(tableName,data) {	
+  /*
+  **
+  ** Many callers (writers and output managers handling an iterative error) do not await rejectRow(),
+  ** and a record is only counted once the rejection file is open. Track every reject in flight so
+  ** close() can wait for them. Otherwise a row rejected just before the operation ends is counted
+  ** after close() has checked recordCount, and the file is never finalized.
+  **
+  */
+
+  rejectData(tableName,data) {
+	const reject = this.writeRejectedData(tableName,data)
+	// The tracked copy never rejects: a failure still reaches the caller through the returned promise.
+	const tracked = reject.then(() => {},() => {})
+	this.pendingRejects.add(tracked)
+	tracked.then(() => { this.pendingRejects.delete(tracked) })
+	return reject
+  }
+
+  async writeRejectedData(tableName,data) {
 	if (this.tableName !== tableName) {
 	  this.tableName = tableName
 	  this.tableStartTime = performance.now()
-      await this.initialize(tableName)
+	  try {
+        await this.initialize(tableName)
+	  } catch (e) {
+		// Fail the rejects waiting for the file, so close() does not wait for them forever.
+		this.setInitializationFailed(e)
+		throw e
+	  }
       this.is.addContent([{table:tableName}])
 	  this.setInitializationComplete()
 	  this.setInitializationComplete = YadamuLibrary.NOOP
@@ -86,6 +114,9 @@ class YadamuRejectManager {
   }
   
   async close() {
+	while (this.pendingRejects.size > 0) {
+	  await Promise.all(Array.from(this.pendingRejects))
+	}
     if (this.recordCount > 0) {
 	  // this.sendEndOfData() 
 	  this.is.addContent([null])

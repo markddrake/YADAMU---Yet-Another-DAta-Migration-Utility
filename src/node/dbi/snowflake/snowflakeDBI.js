@@ -116,7 +116,7 @@ class SnowflakeDBI extends YadamuDBI {
 
 	this.parameters.DATABASE = connectionProperties.database
 
-    const password                              = this.parameters.PASSWORD                   || process.env.SNOWFLAKE_WAREHOUSE              || connectionProperties.password  
+    const password                              = this.parameters.PASSWORD                   || process.env.SNOWFLAKE_PASSWORD               || connectionProperties.password  
 	const token                                 = this.parameters.TOKEN                      || process.env.SNOWFLAKE_TOKEN                  || connectionProperties.token
 
 

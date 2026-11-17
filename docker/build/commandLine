@@ -3,16 +3,18 @@ WORKDIR /usr/src/YADAMU
 ADD https://download.oracle.com/otn_software/linux/instantclient/2326300/oracle-instantclient-sqlplus-23.26.3.0.0-1.el9.x86_64.rpm .
 ENV ACCEPT_EULA=Y
 ENV YADAMU_PASSPHRASE=yabasc
-RUN apt install apt-transport-https \
- && curl -sSL https://packages.microsoft.com/config/ubuntu/20.04/prod.list | tee /etc/apt/sources.list.d/microsoft-prod.list \
- && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
- && apt -y update \
- && apt install -y  mssql-tools \
- && wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | apt-key add - \
- && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ bookworm-pgdg main" >> /etc/apt/sources.list.d/pgdg.list' \
- && apt-get  -y update \
- && apt install -y postgresql-client \
- && apt install -y mariadb-client \
+# Debian 13 (node:lts) has no apt-key. Microsoft's packages-microsoft-prod.deb installs its repository key and source; the PostgreSQL
+# key goes in /usr/share/keyrings and the source names it (signed-by). Both sources follow the base image's Debian release.
+RUN . /etc/os-release \
+ && curl -sSL -o packages-microsoft-prod.deb https://packages.microsoft.com/config/debian/$VERSION_ID/packages-microsoft-prod.deb \
+ && dpkg -i packages-microsoft-prod.deb \
+ && rm packages-microsoft-prod.deb \
+ && wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt/ $VERSION_CODENAME-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get -y update \
+ && apt-get install -y mssql-tools \
+ && apt-get install -y postgresql-client \
+ && apt-get install -y mariadb-client \
  && alien -i --scripts ./oracle-instantclient-sqlplus-23.26.3.0.0-1.el9.x86_64.rpm \
  && cd /usr/local/bin \
  && ln -s /opt/mssql-tools/bin/sqlcmd \

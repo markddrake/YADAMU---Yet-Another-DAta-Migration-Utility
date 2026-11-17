@@ -275,6 +275,8 @@ end;
 function DESERIALIZE_GEOJSON(P_SERIALIZATION CLOB) 
 return MDSYS.SDO_GEOMETRY
 as
+  JSON_SYNTAX_ERROR EXCEPTION;
+  PRAGMA EXCEPTION_INIT(JSON_SYNTAX_ERROR, -40441);
 begin
   if ((P_SERIALIZATION is not NULL) and (LENGTH(P_SERIALIZATION) > 0)) then
     --
@@ -286,9 +288,37 @@ begin
     --
     return SDO_UTIL.FROM_WKTGEOMETRY(P_SERIALIZATION);
     --se
+    $ELSIF (DBMS_DB_VERSION.VERSION >= 21) $THEN
+    --
+    begin
+      return SDO_UTIL.FROM_GEOJSON(P_SERIALIZATION);
+    exception
+      when JSON_SYNTAX_ERROR then
+        -- FROM_GEOJSON(CLOB) can raise ORA-40441 on valid GeoJSON, depending on how the CLOB is read in chunks. Parsing it as JSON first avoids that.
+        -- It is only done after a failure: building a JSON value for every row slows down tables with many small geometries.
+        return SDO_UTIL.FROM_GEOJSON(JSON(P_SERIALIZATION));
+    end;
+    --
     $ELSE
     --
-    return SDO_UTIL.FROM_GEOJSON(P_SERIALIZATION);
+    begin
+      return SDO_UTIL.FROM_GEOJSON(P_SERIALIZATION);
+    exception
+      when JSON_SYNTAX_ERROR then
+        -- The same FROM_GEOJSON(CLOB) bug, but JSON() does not exist before 21c. The bug depends on where the CLOB's chunk boundaries fall.
+        -- CLOBs made by the JSON engine (e.g. JSON_TABLE output in YADAMU_IMPORT) use a smaller chunk size than DBMS_LOB temporary CLOBs, so a copy is read in different pieces.
+        -- It is only done after a failure, so the common path does not copy every value.
+        declare
+          V_COPY     CLOB;
+          V_GEOMETRY MDSYS.SDO_GEOMETRY;
+        begin
+          DBMS_LOB.CREATETEMPORARY(V_COPY, TRUE, DBMS_LOB.CALL);
+          DBMS_LOB.COPY(V_COPY, P_SERIALIZATION, DBMS_LOB.GETLENGTH(P_SERIALIZATION));
+          V_GEOMETRY := SDO_UTIL.FROM_GEOJSON(V_COPY);
+          DBMS_LOB.FREETEMPORARY(V_COPY);
+          return V_GEOMETRY;
+        end;
+    end;
     --
     $END
     --

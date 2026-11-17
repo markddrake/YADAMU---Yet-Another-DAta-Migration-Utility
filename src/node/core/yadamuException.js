@@ -316,6 +316,23 @@ class YadamuShutdown extends DatabaseError {
   }
 }
 
+class NotConnected extends DatabaseError {
+  // A reconnect that gave up leaves a DBI without a connection. It is reported as a lost connection, so the next operation tries to reconnect.
+  constructor(dbi,stack,sql) {
+    super(dbi,new Error(`Not connected: an earlier attempt to reconnect to ${dbi.DATABASE_VENDOR} failed.`),stack,sql);
+  }
+
+  lostConnection() {
+	return true
+  }
+}
+
+class SnapshotLost extends YadamuError {
+  constructor(snapshotId,reason) {
+    super(`Consistent export: snapshot "${snapshotId}" was lost with the connection that exported it. ${reason}`);
+  }
+}
+
 class InputStreamError extends DatabaseError {
   constructor(cause,stack,sql) {
     super(cause,stack,sql)
@@ -340,4 +357,6 @@ export {
 , CopyOperationAborted
 , UnimplementedMethod
 , YadamuShutdown
+, NotConnected
+, SnapshotLost
 }

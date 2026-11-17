@@ -44,6 +44,9 @@ wait_message() {
     echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
 }
 
+# ensure_db3: start a yadamu-db3 database (SQL Server 2012/2014 VM or Teradata) before the suites that need it
+. /usr/local/bin/ensureDb3.sh
+
 run_test_suite() {
     local suite_name=$1
     local image=${2:-yadamu/secure:latest}
@@ -186,6 +189,28 @@ echo "YADAMU QA Extended Test Suite"
 echo "============================================"
 echo ""
 
+# Start an Oracle container from docker/rdbms/oracle/docker-compose.yml, wait for it, configure it, run one task in the
+# test container, then remove the Oracle container.
+run_with_oracle() {
+    local container=$1 startup_wait=$2 label=$3 suite=$4
+
+    compose_up "docker/rdbms/oracle/docker-compose.yml" "$container" "$label"
+
+    log_message "Monitoring $label startup logs..."
+    docker logs -f "$container" 2>&1 &
+    local log_pid=$!
+
+    wait_message "Waiting for $label Startup (${startup_wait}s)..."
+    sleep "$startup_wait"
+
+    kill $log_pid 2>/dev/null || true
+    wait $log_pid 2>/dev/null || true
+
+    configure_database "oracle" "$container"
+    run_test_suite "$suite"
+    compose_down "docker/rdbms/oracle/docker-compose.yml" "$container" "$label"
+}
+
 # ============================================
 # Individual Test Runner Function
 # ============================================
@@ -240,15 +265,28 @@ run_test() {
             ;;
 
         teradata)
-            # TDATA17-01 runs on yadamu-db3, which holds one of Teradata and the SQL Server 2012/2014 VMs at a time
-            # (docker/server/yadamu-db3/switchDatabase.sh teradata). The suites need the yadamu/teradata image
-            # (docker/build/teradata), because the base images don't include the Teradata driver.
-            if ! timeout 10 bash -c "</dev/tcp/${TERADATA}/1025" 2>/dev/null; then
-                error_message "Teradata is not answering on ${TERADATA}:1025. Run 'switchDatabase.sh teradata' on yadamu-db3. Skipping the Teradata test."
+            # TDATA17-01 runs on yadamu-db3 (docker/server/yadamu-db3/switchDatabase.sh), which starts it if it's down
+            # (ensureDb3.sh). The suites need the yadamu/teradata image (docker/build/teradata), because the base images
+            # don't include the Teradata driver.
+            if ! ensure_db3 teradata "${TERADATA}" 1025; then
+                error_message "Skipping the Teradata test."
             elif ! docker image inspect yadamu/teradata:latest >/dev/null 2>&1; then
                 error_message "Image yadamu/teradata:latest not found. Build it with 'docker compose --file docker/build/docker-compose.yml build teradata'. Skipping the Teradata test."
             else
                 run_test_suite "teradata" "yadamu/teradata:latest"
+            fi
+            ;;
+
+        mssql12|mssql14)
+            # The SQL Server 2012 and 2014 VMs on yadamu-db3, started if they're down (ensureDb3.sh). Either runs beside
+            # Teradata, but not both together: ensure refuses mssql12 while the 2014 VM is up, and the other way round.
+            # standard already runs the 2014 suites; this runs them on their own, for example in a rerun.
+            local mssql_host=$MSSQL12
+            [ "$test_name" = "mssql14" ] && mssql_host=$MSSQL14
+            if ensure_db3 "$test_name" "$mssql_host" 1433; then
+                run_test_suite "$test_name"
+            else
+                error_message "Skipping the $test_name test."
             fi
             ;;
 
@@ -314,6 +352,25 @@ run_test() {
             compose_down "docker/rdbms/oracle/docker-compose.yml" "ORACL26-01" "Oracle 26ai Free"
             ;;
 
+        upload)
+            # Server-side upload (parser SQL) is frozen: crash fixes only. It isn't part of standard or extended (not in
+            # EXTENDED_TESTS). uploadRoundtrip runs on the standing stack, then each Oracle version's upload suite runs on
+            # its own container, started and removed the way the oracle<version> tests do it.
+            # The suites read what the initialization task leaves in YADAMU_01-SHARED: the staged exports from stageDataSets
+            # (stagingArea/export/json/<vendor>) and the sqlite#2 databases from sqliteStageDataSets (the GeoJSON uploads).
+            # On a fresh stack, run initialization (part of standard and extended) first.
+            if ! docker run --rm --entrypoint sh -v YADAMU_01-SHARED:/mnt "$IMAGE" -c \
+                 'for d in stagingArea/export/json/oracle stagingArea/export/json/mysql stagingArea/export/json/mssql sqlite/regression; do [ -n "$(ls -A /mnt/$d 2>/dev/null)" ] || { echo "Missing or empty: $d"; exit 1; }; done'; then
+                error_message "YADAMU_01-SHARED has no staged data. Run the initialization task first. Skipping the upload test."
+            else
+                run_test_suite "upload"
+                run_with_oracle "ORA1903-01" "$ORACLE_19C_STARTUP_WAIT"  "Oracle 19c"       "oracle19cUpload"
+                run_with_oracle "ORA2103-01" "$ORACLE_21C_STARTUP_WAIT"  "Oracle 21c"       "oracle21cUpload"
+                run_with_oracle "ORACL23-01" "$ORACLE_23AI_STARTUP_WAIT" "Oracle 23ai"      "oracle23aiUpload"
+                run_with_oracle "ORACL26-01" "$ORACLE_26AI_STARTUP_WAIT" "Oracle 26ai Free" "oracle26aiUpload"
+            fi
+            ;;
+
         vertica09)
             compose_up "docker/rdbms/vertica/docker-compose.yml" "VRTCA09-01" "Vertica 9"
             wait_message "Waiting for Vertica 9 Startup (${VERTICA_STARTUP_WAIT}s)..."
@@ -377,7 +434,7 @@ run_test() {
             
         *)
             error_message "Unknown test: $test_name"
-            echo "Available tests: cmdline, oracle11g, oracle19c, sqlite, teradata, oracle21c, oracle23ai, oracle26ai, vertica09, db2, cockroach, yugabyte, snowflake"
+            echo "Available tests: cmdline, oracle11g, oracle19c, sqlite, teradata, mssql12, mssql14, oracle21c, oracle23ai, oracle26ai, upload, vertica09, db2, cockroach, yugabyte, snowflake"
             exit 1
             ;;
     esac

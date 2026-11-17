@@ -9,8 +9,6 @@ case $YADAMU_TEST_NAME  in
     source qa/bin/createOutputFolders.sh mnt
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh initialize
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh stageDataSets
-    # Last, because it raises the threadpool for the SQLite writers (see the sqlite test).
-    export UV_THREADPOOL_SIZE=8
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteStageDataSets
   ;;
   
@@ -25,7 +23,6 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
@@ -77,7 +74,6 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
@@ -100,7 +96,6 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
@@ -121,6 +116,16 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
     ;;	
   
+  upload)
+    # Server-side upload (parser SQL) is frozen: crash fixes only. It isn't part of standard or extended. The orchestrator's
+    # upload test runs this set on the standing stack, then each oracle<version>Upload set with that version's container up.
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
+  ;;
+
+  oracle19cUpload|oracle21cUpload|oracle23aiUpload|oracle26aiUpload)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh $YADAMU_TEST_NAME
+  ;;
+
   loader)
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
@@ -212,12 +217,7 @@ case $YADAMU_TEST_NAME  in
   ;;
 
   sqlite)
-    # A SQLite writer blocked on the write lock holds a libuv threadpool thread, so SqliteDBI caps
-    # PARALLEL at UV_THREADPOOL_SIZE-1 and warns. The default pool of 4 would cap the harness
-    # default PARALLEL of 4 on every SQLite target. 8 leaves PARALLEL 4 alone, and
-    # sqliteParallelRoundtrip exercises the cap deliberately. The source schemas are built by
-    # sqliteStageDataSets during initialization.
-    export UV_THREADPOOL_SIZE=8
+    # The source schemas are built by sqliteStageDataSets during initialization.
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteAsTargetRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteAsSourceRoundtrip
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh sqliteDataTypes
@@ -333,6 +333,6 @@ case $YADAMU_TEST_NAME  in
   
   
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, snowflake, sqlite, vertica, vertica09, cmdLine, copy, interactive or custom"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, snowflake, sqlite, vertica, vertica09, cmdLine, copy, upload, interactive or custom"
   ;;
 esac

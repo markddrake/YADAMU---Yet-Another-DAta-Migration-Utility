@@ -1,9 +1,7 @@
 *
 !bin/*.sh
+!src/package.json
 !src/install
 !src/node
-src/html
-src/js
-src/qa
 src/node/gui
-!src/package.json
+src/node/server

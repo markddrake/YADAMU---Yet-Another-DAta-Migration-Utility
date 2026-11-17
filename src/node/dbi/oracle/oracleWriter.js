@@ -280,7 +280,8 @@ end;`
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-		if (cause.spatialWKBPolygonError()) {
+		// cause is not always an OracleError (e.g. NotConnected), so the Oracle specific test is optional
+		if (cause.spatialWKBPolygonError?.()) {
 		  this.LOGGER.info([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`"${cause.message}" encountered while peforming batch operation with WKB content. Switching to Iterative mode.`);          
 		}
 		else {
@@ -317,7 +318,7 @@ end;`
           }
         } 
         else {  
-          if (!cause.spatialWKBPolygonError()) {
+          if (!cause.spatialWKBPolygonError?.()) {
 		    this.LOGGER.warning([this.dbi.DATABASE_VENDOR,this.PIPELINE_STATE.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
 		  }
    		  this.dbi.resetExceptionTracking()

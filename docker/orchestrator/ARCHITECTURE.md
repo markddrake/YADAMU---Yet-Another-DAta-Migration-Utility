@@ -15,6 +15,13 @@
 - Runs initialization container
 - Used by full test suite runners
 
+**ensureDb3.sh** - Starts the yadamu-db3 databases on demand
+- Sourced by standardTests.sh and extendedTests.sh
+- `ensure_db3 mssql12|mssql14|teradata <host> <port>` asks yadamu-db3 over ssh to start the database if it's down
+  (docker/server/yadamu-db3/switchDatabase.sh ensure, the only command the orchestrator's key may run), then checks the port
+- The key (id_ed25519 + known_hosts) is mounted read-only from `DB3_SSH_DIR` on the docker host; without it, only the port is checked
+- If the database can't be started, its suites are skipped with one error instead of failing every connection
+
 ### Test Scripts
 
 **standardTests.sh** - Standard test suite

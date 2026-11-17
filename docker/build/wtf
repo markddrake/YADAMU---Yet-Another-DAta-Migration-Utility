@@ -1,0 +1,7 @@
+# yadamu/secure plus wtfnode, for finding what keeps Node from exiting. Run a suite with
+#   node src/qa/wtf/test.js CONFIG=qa/regression/<suite>.json
+# instead of src/qa/cli/test.js: wtfnode lists the open handles when the run ends.
+FROM yadamu/secure:latest
+WORKDIR /usr/src/YADAMU
+RUN npm install --no-save --no-fund --no-audit wtfnode
+ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]
